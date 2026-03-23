@@ -2,16 +2,20 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import JournalList from "@/components/JournalList";
 import AuthGate from "@/components/AuthGate";
+import { supabase } from "@/lib/supabase-browser";
 
 export default function JournalPage() {
   const { setHeader, resetHeader } = useHeader();
+  const router = useRouter();
 
   useEffect(() => {
     setHeader({
       title: "Journal",
+
       rightSlot: (
         <Link
           href="/"
@@ -20,6 +24,18 @@ export default function JournalPage() {
           New
         </Link>
       ),
+
+      menuItems: [
+        {
+          label: "Logout",
+          danger: true,
+          onClick: async () => {
+            await supabase.auth.signOut();
+            router.refresh();
+            router.push("/sign-in");
+          },
+        },
+      ],
     });
 
     return () => {

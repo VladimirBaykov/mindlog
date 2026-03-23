@@ -1,33 +1,37 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 // ================= GET =================
 export async function GET(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { id } = await context.params;
 
-  const { data, error } = await supabase
-    .from("journals")
-    .select("*")
-    .eq("id", id)
-    .single();
+    const { data, error } = await supabase
+      .from("journals")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (error || !data) {
+    if (error) {
+      return NextResponse.json(
+        { error: "Journal not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (e) {
+    console.error("GET JOURNAL ERROR:", e);
+
     return NextResponse.json(
-      { error: "Conversation not found" },
-      { status: 404 }
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    id: data.id,
-    title: data.title,
-    mood: data.mood,
-    createdAt: new Date(data.created_at).getTime(),
-    messages: data.content || [],
-  });
 }
 
 // ================= PATCH =================
@@ -35,42 +39,63 @@ export async function PATCH(
   req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
-  const patch = await req.json();
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { id } = await context.params;
 
-  const { error } = await supabase
-    .from("journals")
-    .update(patch)
-    .eq("id", id);
+    const patch = await req.json();
 
-  if (error) {
+    const { error } = await supabase
+      .from("journals")
+      .update(patch)
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json(
+        { error: "Failed to update journal" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("PATCH JOURNAL ERROR:", e);
+
     return NextResponse.json(
-      { error: "Update failed" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ success: true });
 }
 
 // ================= DELETE =================
 export async function DELETE(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { id } = await context.params;
 
-  const { error } = await supabase
-    .from("journals")
-    .delete()
-    .eq("id", id);
+    const { error } = await supabase
+      .from("journals")
+      .delete()
+      .eq("id", id);
 
-  if (error) {
+    if (error) {
+      return NextResponse.json(
+        { error: "Failed to delete journal" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("DELETE JOURNAL ERROR:", e);
+
     return NextResponse.json(
-      { error: "Delete failed" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ success: true });
 }

@@ -70,9 +70,9 @@ export default function JournalList() {
 
             const isActive = item.id === activeId;
 
-            const preview = item.messages.find(
-              (m) => m.role === "user"
-            )?.content;
+            const preview = item.messages?.find(
+              (m: any) => m.role === "user"
+            )?.content || "No preview available";
 
             return (
               <motion.div

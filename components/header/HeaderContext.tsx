@@ -7,9 +7,19 @@ import {
   useCallback,
 } from "react";
 
+export type HeaderMenuItem = {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  highlight?: boolean;
+};
+
 type HeaderState = {
   title?: string;
+  subtitle?: string;
+  leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
+  menuItems?: HeaderMenuItem[];
 };
 
 type HeaderContextValue = {
@@ -53,9 +63,11 @@ export function HeaderProvider({
 
 export function useHeader() {
   const ctx = useContext(HeaderContext);
+
   if (!ctx)
     throw new Error(
       "useHeader must be used inside HeaderProvider"
     );
+
   return ctx;
 }

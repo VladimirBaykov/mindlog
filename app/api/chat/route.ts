@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -53,10 +55,11 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. безопасно извлекаем текст
-    const reply =
-      response.output_text ??
-      response.output?.[0]?.content?.[0]?.text ??
-      "I’m here with you.";
+      let reply = "I’m here with you.";
+
+      if (response.output_text) {
+        reply = response.output_text;
+      }
 
     return NextResponse.json({
       reply,

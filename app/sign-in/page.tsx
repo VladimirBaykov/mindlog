@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase-browser"
 
 export default function SignIn() {
 
@@ -30,8 +30,11 @@ export default function SignIn() {
       return
     }
 
-    router.push("/journal")
+    // обновляем серверную часть
     router.refresh()
+
+    // переходим в журнал
+    router.push("/journal")
 
   }
 
@@ -44,6 +47,8 @@ export default function SignIn() {
         <h1 className="text-2xl font-semibold">Welcome back</h1>
 
         <input
+          id="email"
+          name="email"
           className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-800"
           placeholder="Email"
           value={email}
@@ -51,6 +56,8 @@ export default function SignIn() {
         />
 
         <input
+          id="password"
+          name="password"
           type="password"
           className="w-full p-3 rounded-lg bg-zinc-900 border border-zinc-800"
           placeholder="Password"
@@ -66,14 +73,9 @@ export default function SignIn() {
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        <p className="text-sm text-zinc-400">
-          No account? <a href="/sign-up" className="underline">Create one</a>
-        </p>
-
       </div>
 
     </div>
-
   )
 
 }

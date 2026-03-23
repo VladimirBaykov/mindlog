@@ -126,7 +126,13 @@ export default function Chat() {
         body: JSON.stringify({ messages: nextMessages }),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        const text = await res.text()
+        console.error("API error:", text)
+        return
+      }
+
+      const data = await res.json()
 
       setMessages((prev) => [
         ...prev,

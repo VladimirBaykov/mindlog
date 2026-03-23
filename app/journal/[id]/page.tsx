@@ -120,7 +120,7 @@ export default function JournalEntryPage() {
         transition={{ duration: 0.25 }}
         className="mx-auto max-w-xl px-4 py-6 pt-24 space-y-5"
       >
-        {item.messages.map((msg, idx) => (
+        {(item.messages ?? []).map((msg, idx) => (
           <motion.div
             key={idx}
             initial={{ opacity: 0, y: 6 }}
