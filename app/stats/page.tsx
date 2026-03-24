@@ -47,8 +47,8 @@ export default function StatsPage() {
           onClick: () => router.push("/"),
         },
         {
-          label: "Back to Journal",
-          onClick: () => router.push("/journal"),
+          label: "Profile",
+          onClick: () => router.push("/profile"),
         },
       ],
     });

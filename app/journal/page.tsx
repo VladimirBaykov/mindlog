@@ -31,6 +31,10 @@ export default function JournalPage() {
           onClick: () => router.push("/stats"),
         },
         {
+          label: "Profile",
+          onClick: () => router.push("/profile"),
+        },
+        {
           label: "Logout",
           danger: true,
           onClick: async () => {
