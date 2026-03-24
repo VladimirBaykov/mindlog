@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import MoodChart from "./MoodChart";
+import MoodTimeline from "./MoodTimeline";
 
 type WeeklySummaryResponse = {
   summary: string;
@@ -101,6 +102,12 @@ export default function StatsPage() {
     return sorted[0]?.[0] || "No data";
   }, [items]);
 
+  const lastEntryDate = useMemo(() => {
+    if (!items.length) return "No entries yet";
+
+    return new Date(items[0].createdAt).toLocaleDateString();
+  }, [items]);
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
@@ -125,8 +132,13 @@ export default function StatsPage() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-          <div className="text-sm font-medium text-white">
-            Weekly reflection
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium text-white">
+              Weekly reflection
+            </div>
+            <div className="text-xs text-neutral-500">
+              Last entry: {lastEntryDate}
+            </div>
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-neutral-300">
@@ -161,6 +173,16 @@ export default function StatsPage() {
                 No insights available yet.
               </p>
             )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+          <div className="text-sm font-medium text-white">
+            Mood timeline
+          </div>
+
+          <div className="mt-4">
+            <MoodTimeline items={items} />
           </div>
         </div>
 
