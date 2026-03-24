@@ -8,7 +8,16 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function JournalList() {
-  const { items, loading, deleteItem, addItem } = useJournal();
+  const {
+    items,
+    loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+    deleteItem,
+    addItem,
+  } = useJournal();
+
   const router = useRouter();
   const pathname = usePathname();
 
@@ -21,14 +30,18 @@ export default function JournalList() {
     : null;
 
   if (loading) {
-    return <p className="text-sm text-neutral-400">Loading conversations…</p>;
+    return (
+      <p className="text-sm text-neutral-400">
+        Loading conversations…
+      </p>
+    );
   }
 
   if (items.length === 0) {
     return (
-      <p className="text-sm text-neutral-500">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-neutral-500">
         You don’t have any saved conversations yet.
-      </p>
+      </div>
     );
   }
 
@@ -70,9 +83,10 @@ export default function JournalList() {
 
             const isActive = item.id === activeId;
 
-            const preview = item.messages?.find(
-              (m: any) => m.role === "user"
-            )?.content || "No preview available";
+            const preview =
+              item.messages?.find(
+                (m: any) => m.role === "user"
+              )?.content || "No preview available";
 
             return (
               <motion.div
@@ -127,11 +141,9 @@ export default function JournalList() {
                       </span>
                     </div>
 
-                    {preview && (
-                      <p className="mt-2 text-xs text-neutral-400 line-clamp-2">
-                        {preview}
-                      </p>
-                    )}
+                    <p className="mt-2 line-clamp-2 text-xs text-neutral-400">
+                      {preview}
+                    </p>
 
                     <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
                       <span
@@ -140,9 +152,7 @@ export default function JournalList() {
                       <span>{mood.label}</span>
                       <span>·</span>
                       <span>
-                        {new Date(
-                          item.createdAt
-                        ).toLocaleDateString()}
+                        {new Date(item.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </motion.div>
@@ -151,6 +161,18 @@ export default function JournalList() {
             );
           })}
         </AnimatePresence>
+
+        {hasMore && (
+          <div className="pt-2">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-neutral-300 transition hover:bg-white/[0.05] disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : "Load more"}
+            </button>
+          </div>
+        )}
       </motion.div>
 
       <AnimatePresence>
@@ -159,20 +181,25 @@ export default function JournalList() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
-            transition={{ type: "spring", stiffness: 500, damping: 40 }}
+            transition={{
+              type: "spring",
+              stiffness: 500,
+              damping: 40,
+            }}
             className="fixed inset-x-0 bottom-0 z-[9999] flex justify-center"
             style={{
-              paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)",
+              paddingBottom:
+                "calc(env(safe-area-inset-bottom) + 16px)",
             }}
           >
-            <div className="bg-neutral-900/90 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2 flex items-center gap-3">
-              <span className="text-sm text-white whitespace-nowrap">
+            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-neutral-900/90 px-4 py-2 backdrop-blur-xl">
+              <span className="whitespace-nowrap text-sm text-white">
                 Conversation deleted
               </span>
 
               <button
                 onClick={handleUndo}
-                className="px-4 py-2 -my-2 rounded-full text-sm font-medium text-blue-400 hover:text-blue-300 active:scale-95 transition"
+                className="rounded-full px-4 py-2 -my-2 text-sm font-medium text-blue-400 transition hover:text-blue-300 active:scale-95"
               >
                 Undo
               </button>

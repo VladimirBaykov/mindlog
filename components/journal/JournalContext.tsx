@@ -38,7 +38,10 @@ type RawJournalItem = {
 type JournalContextValue = {
   items: JournalItem[];
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
   refresh: () => Promise<void>;
+  loadMore: () => Promise<void>;
   addItem: (item: JournalItem | RawJournalItem) => void;
   updateItem: (
     id: string,
@@ -47,6 +50,8 @@ type JournalContextValue = {
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
 };
+
+const PAGE_SIZE = 20;
 
 const JournalContext =
   createContext<JournalContextValue | null>(null);
@@ -81,6 +86,25 @@ function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
   };
 }
 
+function mergeUnique(
+  current: JournalItem[],
+  incoming: JournalItem[]
+): JournalItem[] {
+  const map = new Map<string, JournalItem>();
+
+  for (const item of current) {
+    map.set(item.id, item);
+  }
+
+  for (const item of incoming) {
+    map.set(item.id, item);
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => b.createdAt - a.createdAt
+  );
+}
+
 export function JournalProvider({
   children,
 }: {
@@ -88,59 +112,81 @@ export function JournalProvider({
 }) {
   const [items, setItems] = useState<JournalItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
   const [pendingDeletes, setPendingDeletes] =
     useState<Set<string>>(new Set());
 
   const { showUndo, showError } = useToast();
 
-  async function loadJournal() {
-    const res = await fetch("/api/journal", {
-      cache: "no-store",
-    });
+  const fetchPage = useCallback(
+    async (nextOffset: number) => {
+      const res = await fetch(
+        `/api/journal?limit=${PAGE_SIZE}&offset=${nextOffset}`,
+        { cache: "no-store" }
+      );
 
-    if (!res.ok) {
-      setItems([]);
-      return;
-    }
+      if (!res.ok) {
+        throw new Error("Failed to load journal");
+      }
 
-    const data: RawJournalItem[] = await res.json();
+      const data = await res.json();
 
-    const unique = Array.from(
-      new Map(
-        data.map((item) => [
-          item.id,
-          normalizeItem(item),
-        ])
-      ).values()
-    );
+      const normalized = (data.items ?? []).map(
+        (item: RawJournalItem) => normalizeItem(item)
+      );
 
-    setItems(
-      unique
-        .filter((i) => !i.deleted)
-        .sort((a, b) => b.createdAt - a.createdAt)
-    );
-  }
-
-  useEffect(() => {
-    loadJournal().finally(() => setLoading(false));
-  }, []);
+      return {
+        items: normalized,
+        hasMore: Boolean(data.hasMore),
+        nextOffset: nextOffset + normalized.length,
+      };
+    },
+    []
+  );
 
   const refresh = useCallback(async () => {
-    await loadJournal();
-  }, []);
+    try {
+      const firstPage = await fetchPage(0);
+      setItems(firstPage.items);
+      setHasMore(firstPage.hasMore);
+      setOffset(firstPage.nextOffset);
+    } catch {
+      setItems([]);
+      setHasMore(false);
+      setOffset(0);
+      showError("Failed to load journal");
+    }
+  }, [fetchPage, showError]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+
+    try {
+      const nextPage = await fetchPage(offset);
+      setItems((prev) => mergeUnique(prev, nextPage.items));
+      setHasMore(nextPage.hasMore);
+      setOffset(nextPage.nextOffset);
+    } catch {
+      showError("Failed to load more");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchPage, hasMore, loadingMore, offset, showError]);
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
+  }, [refresh]);
 
   const addItem = useCallback((item: JournalItem | RawJournalItem) => {
     const normalized = normalizeItem(item);
 
-    setItems((prev) => {
-      if (prev.find((i) => i.id === normalized.id)) {
-        return prev;
-      }
-
-      return [normalized, ...prev].sort(
-        (a, b) => b.createdAt - a.createdAt
-      );
-    });
+    setItems((prev) =>
+      mergeUnique([normalized], prev)
+    );
   }, []);
 
   const updateItem = useCallback(
@@ -150,7 +196,11 @@ export function JournalProvider({
       setItems((prev) =>
         prev.map((item) =>
           item.id === id
-            ? { ...item, ...patch }
+            ? {
+                ...item,
+                ...patch,
+                updatedAt: Date.now(),
+              }
             : item
         )
       );
@@ -180,13 +230,9 @@ export function JournalProvider({
       const item = items.find((i) => i.id === id);
       if (!item) return;
 
-      setPendingDeletes((prev) =>
-        new Set(prev).add(id)
-      );
+      setPendingDeletes((prev) => new Set(prev).add(id));
 
-      setItems((prev) =>
-        prev.filter((i) => i.id !== id)
-      );
+      setItems((prev) => prev.filter((i) => i.id !== id));
 
       showUndo("Entry deleted", () => restoreItem(id));
 
@@ -199,9 +245,7 @@ export function JournalProvider({
       } catch {
         showError("Delete failed");
         setItems((prev) =>
-          [item, ...prev].sort(
-            (a, b) => b.createdAt - a.createdAt
-          )
+          mergeUnique(prev, [item])
         );
       } finally {
         setPendingDeletes((prev) => {
@@ -242,7 +286,10 @@ export function JournalProvider({
       value={{
         items,
         loading,
+        loadingMore,
+        hasMore,
         refresh,
+        loadMore,
         addItem,
         updateItem,
         deleteItem,
