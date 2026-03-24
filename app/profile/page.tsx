@@ -11,6 +11,14 @@ type UserInfo = {
   id: string | null;
 };
 
+type UsageInfo = {
+  plan: "free" | "pro";
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  canSave: boolean;
+} | null;
+
 export default function ProfilePage() {
   const router = useRouter();
   const { setHeader, resetHeader } = useHeader();
@@ -19,6 +27,8 @@ export default function ProfilePage() {
     email: null,
     id: null,
   });
+
+  const [usage, setUsage] = useState<UsageInfo>(null);
 
   useEffect(() => {
     setHeader({
@@ -67,7 +77,23 @@ export default function ProfilePage() {
       });
     }
 
+    async function loadUsage() {
+      try {
+        const res = await fetch("/api/account/usage", {
+          cache: "no-store",
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        setUsage(data);
+      } catch (err) {
+        console.error("Usage load failed:", err);
+      }
+    }
+
     loadUser();
+    loadUsage();
   }, []);
 
   return (
@@ -78,9 +104,40 @@ export default function ProfilePage() {
             <div className="text-xs text-neutral-500">
               Signed in as
             </div>
-            <div className="mt-2 text-base font-medium text-white break-all">
+            <div className="mt-2 break-all text-base font-medium text-white">
               {userInfo.email || "Loading..."}
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+            <div className="text-sm font-medium text-white">
+              Plan
+            </div>
+
+            <div className="mt-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-base font-medium capitalize text-white">
+                  {usage?.plan || "free"} plan
+                </div>
+                <p className="mt-1 text-sm text-neutral-400">
+                  {usage?.limit
+                    ? `${usage.used}/${usage.limit} saved entries used`
+                    : "Unlimited saved entries"}
+                </p>
+              </div>
+
+              <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
+                Pro coming soon
+              </div>
+            </div>
+
+            {typeof usage?.remaining === "number" && (
+              <p className="mt-3 text-xs text-neutral-500">
+                {usage.remaining > 0
+                  ? `${usage.remaining} saves remaining on your current plan.`
+                  : "You’ve reached the current free plan limit."}
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
