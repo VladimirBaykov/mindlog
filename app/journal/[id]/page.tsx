@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
@@ -16,8 +16,10 @@ type JournalItem = {
   id: string;
   title: string;
   mood?: keyof typeof moodConfig;
-  createdAt: number;
-  messages: Message[];
+  createdAt?: number;
+  created_at?: string;
+  messages?: Message[];
+  content?: Message[];
 };
 
 export default function JournalEntryPage() {
@@ -31,10 +33,20 @@ export default function JournalEntryPage() {
 
   useEffect(() => {
     fetch(`/api/journal/${id}`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
       .then((data) => setItem(data))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const normalizedMessages = useMemo(() => {
+    if (!item) return [];
+    if (Array.isArray(item.messages)) return item.messages;
+    if (Array.isArray(item.content)) return item.content;
+    return [];
+  }, [item]);
 
   useEffect(() => {
     if (!item) return;
@@ -63,6 +75,7 @@ export default function JournalEntryPage() {
               "New conversation title:",
               item.title || ""
             );
+
             if (!nextTitle || nextTitle === item.title) return;
 
             setItem((prev) =>
@@ -111,7 +124,6 @@ export default function JournalEntryPage() {
 
   return (
     <div className="relative min-h-screen overscroll-y-contain">
-      {/* TOP FADE MASK */}
       <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-24 bg-gradient-to-b from-[#0a0a0a] to-transparent" />
 
       <motion.div
@@ -120,24 +132,30 @@ export default function JournalEntryPage() {
         transition={{ duration: 0.25 }}
         className="mx-auto max-w-xl px-4 py-6 pt-24 space-y-5"
       >
-        {(item.messages ?? []).map((msg, idx) => (
-          <motion.div
-            key={idx}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              duration: 0.25,
-              delay: idx * 0.02,
-            }}
-            className={`max-w-[78%] break-words rounded-2xl px-4 py-3.5 text-[14.5px] leading-relaxed ${
-              msg.role === "user"
-                ? "ml-auto bg-neutral-800 text-white"
-                : "mr-auto bg-neutral-900 text-neutral-200"
-            }`}
-          >
-            {msg.content}
-          </motion.div>
-        ))}
+        {normalizedMessages.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-neutral-400">
+            No messages in this entry yet.
+          </div>
+        ) : (
+          normalizedMessages.map((msg, idx) => (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.25,
+                delay: idx * 0.02,
+              }}
+              className={`max-w-[78%] break-words rounded-2xl px-4 py-3.5 text-[14.5px] leading-relaxed ${
+                msg.role === "user"
+                  ? "ml-auto bg-neutral-800 text-white"
+                  : "mr-auto bg-neutral-900 text-neutral-200"
+              }`}
+            >
+              {msg.content}
+            </motion.div>
+          ))
+        )}
       </motion.div>
     </div>
   );
