@@ -21,13 +21,25 @@ export type JournalItem = {
   createdAt: number;
   messages: Message[];
   deleted?: boolean;
+  updatedAt?: number | null;
+};
+
+type RawJournalItem = {
+  id: string;
+  title?: string;
+  mood?: string | null;
+  created_at?: string;
+  updated_at?: string | null;
+  deleted_at?: string | null;
+  content?: Message[];
+  messages?: Message[];
 };
 
 type JournalContextValue = {
   items: JournalItem[];
   loading: boolean;
   refresh: () => Promise<void>;
-  addItem: (item: JournalItem) => void;
+  addItem: (item: JournalItem | RawJournalItem) => void;
   updateItem: (
     id: string,
     patch: Partial<JournalItem>
@@ -37,25 +49,49 @@ type JournalContextValue = {
 };
 
 const JournalContext =
-  createContext<JournalContextValue | null>(
-    null
-  );
+  createContext<JournalContextValue | null>(null);
+
+function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
+  return {
+    id: item.id,
+    title: item.title,
+    mood: item.mood ?? null,
+    createdAt:
+      "createdAt" in item && typeof item.createdAt === "number"
+        ? item.createdAt
+        : item.created_at
+        ? new Date(item.created_at).getTime()
+        : Date.now(),
+    updatedAt:
+      "updatedAt" in item && typeof item.updatedAt === "number"
+        ? item.updatedAt
+        : item.updated_at
+        ? new Date(item.updated_at).getTime()
+        : null,
+    messages:
+      "messages" in item && Array.isArray(item.messages)
+        ? item.messages
+        : Array.isArray(item.content)
+        ? item.content
+        : [],
+    deleted:
+      "deleted" in item
+        ? item.deleted
+        : Boolean(item.deleted_at),
+  };
+}
 
 export function JournalProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [items, setItems] = useState<
-    JournalItem[]
-  >([]);
-  const [loading, setLoading] =
-    useState(true);
+  const [items, setItems] = useState<JournalItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [pendingDeletes, setPendingDeletes] =
     useState<Set<string>>(new Set());
 
-  const { showUndo, showError } =
-    useToast();
+  const { showUndo, showError } = useToast();
 
   async function loadJournal() {
     const res = await fetch("/api/journal", {
@@ -67,13 +103,13 @@ export function JournalProvider({
       return;
     }
 
-    const data = await res.json();
+    const data: RawJournalItem[] = await res.json();
 
     const unique = Array.from(
       new Map(
-        data.map((item: JournalItem) => [
+        data.map((item) => [
           item.id,
-          item,
+          normalizeItem(item),
         ])
       ).values()
     );
@@ -81,50 +117,34 @@ export function JournalProvider({
     setItems(
       unique
         .filter((i) => !i.deleted)
-        .sort(
-          (a, b) =>
-            b.createdAt - a.createdAt
-        )
+        .sort((a, b) => b.createdAt - a.createdAt)
     );
   }
 
   useEffect(() => {
-    loadJournal().finally(() =>
-      setLoading(false)
-    );
+    loadJournal().finally(() => setLoading(false));
   }, []);
 
-  const refresh = useCallback(
-    async () => {
-      await loadJournal();
-    },
-    []
-  );
+  const refresh = useCallback(async () => {
+    await loadJournal();
+  }, []);
 
-  const addItem = useCallback(
-    (item: JournalItem) => {
-      setItems((prev) => {
-        if (
-          prev.find(
-            (i) => i.id === item.id
-          )
-        )
-          return prev;
+  const addItem = useCallback((item: JournalItem | RawJournalItem) => {
+    const normalized = normalizeItem(item);
 
-        return [item, ...prev].sort(
-          (a, b) =>
-            b.createdAt - a.createdAt
-        );
-      });
-    },
-    []
-  );
+    setItems((prev) => {
+      if (prev.find((i) => i.id === normalized.id)) {
+        return prev;
+      }
+
+      return [normalized, ...prev].sort(
+        (a, b) => b.createdAt - a.createdAt
+      );
+    });
+  }, []);
 
   const updateItem = useCallback(
-    async (
-      id: string,
-      patch: Partial<JournalItem>
-    ) => {
+    async (id: string, patch: Partial<JournalItem>) => {
       const snapshot = [...items];
 
       setItems((prev) =>
@@ -136,20 +156,15 @@ export function JournalProvider({
       );
 
       try {
-        const res = await fetch(
-          `/api/journal/${id}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify(patch),
-          }
-        );
+        const res = await fetch(`/api/journal/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(patch),
+        });
 
-        if (!res.ok)
-          throw new Error();
+        if (!res.ok) throw new Error();
       } catch {
         setItems(snapshot);
         showError("Update failed");
@@ -160,12 +175,9 @@ export function JournalProvider({
 
   const deleteItem = useCallback(
     async (id: string) => {
-      if (pendingDeletes.has(id))
-        return;
+      if (pendingDeletes.has(id)) return;
 
-      const item = items.find(
-        (i) => i.id === id
-      );
+      const item = items.find((i) => i.id === id);
       if (!item) return;
 
       setPendingDeletes((prev) =>
@@ -173,79 +185,53 @@ export function JournalProvider({
       );
 
       setItems((prev) =>
-        prev.filter(
-          (i) => i.id !== id
-        )
+        prev.filter((i) => i.id !== id)
       );
 
-      showUndo(
-        "Entry deleted",
-        () => restoreItem(id)
-      );
+      showUndo("Entry deleted", () => restoreItem(id));
 
       try {
-        const res = await fetch(
-          `/api/journal/${id}`,
-          { method: "DELETE" }
-        );
+        const res = await fetch(`/api/journal/${id}`, {
+          method: "DELETE",
+        });
 
-        if (!res.ok)
-          throw new Error();
+        if (!res.ok) throw new Error();
       } catch {
-        showError(
-          "Delete failed"
-        );
+        showError("Delete failed");
         setItems((prev) =>
           [item, ...prev].sort(
-            (a, b) =>
-              b.createdAt -
-              a.createdAt
+            (a, b) => b.createdAt - a.createdAt
           )
         );
       } finally {
-        setPendingDeletes(
-          (prev) => {
-            const next =
-              new Set(prev);
-            next.delete(id);
-            return next;
-          }
-        );
+        setPendingDeletes((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     },
-    [
-      items,
-      pendingDeletes,
-      showUndo,
-      showError,
-    ]
+    [items, pendingDeletes, showUndo, showError]
   );
 
   const restoreItem = useCallback(
     async (id: string) => {
       try {
-        const res = await fetch(
-          `/api/journal/${id}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              restore: true,
-            }),
-          }
-        );
+        const res = await fetch(`/api/journal/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            restore: true,
+          }),
+        });
 
-        if (!res.ok)
-          throw new Error();
+        if (!res.ok) throw new Error();
 
         await refresh();
       } catch {
-        showError(
-          "Restore failed"
-        );
+        showError("Restore failed");
       }
     },
     [refresh, showError]
@@ -269,12 +255,13 @@ export function JournalProvider({
 }
 
 export function useJournal() {
-  const context =
-    useContext(JournalContext);
+  const context = useContext(JournalContext);
+
   if (!context) {
     throw new Error(
       "useJournal must be used within JournalProvider"
     );
   }
+
   return context;
 }

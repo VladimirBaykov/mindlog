@@ -14,6 +14,7 @@ export async function GET(
       .from("journals")
       .select("*")
       .eq("id", id)
+      .is("deleted_at", null)
       .single();
 
     if (error) {
@@ -45,9 +46,20 @@ export async function PATCH(
 
     const patch = await req.json();
 
+    const payload =
+      patch.restore
+        ? {
+            deleted_at: null,
+            updated_at: new Date().toISOString(),
+          }
+        : {
+            ...patch,
+            updated_at: new Date().toISOString(),
+          };
+
     const { error } = await supabase
       .from("journals")
-      .update(patch)
+      .update(payload)
       .eq("id", id);
 
     if (error) {
@@ -79,7 +91,10 @@ export async function DELETE(
 
     const { error } = await supabase
       .from("journals")
-      .delete()
+      .update({
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id);
 
     if (error) {
