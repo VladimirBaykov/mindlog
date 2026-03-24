@@ -27,6 +27,10 @@ export default function JournalPage() {
 
       menuItems: [
         {
+          label: "Stats",
+          onClick: () => router.push("/stats"),
+        },
+        {
           label: "Logout",
           danger: true,
           onClick: async () => {
@@ -41,7 +45,7 @@ export default function JournalPage() {
     return () => {
       resetHeader();
     };
-  }, []);
+  }, [router, resetHeader, setHeader]);
 
   return (
     <AuthGate>

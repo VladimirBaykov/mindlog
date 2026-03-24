@@ -1,6 +1,7 @@
 "use client";
 
 import { JournalItem } from "@/components/journal/JournalContext";
+import { moodConfig } from "@/lib/journal/moodMap";
 
 type Props = {
   items: JournalItem[];
@@ -16,71 +17,44 @@ export default function MoodChart({ items }: Props) {
     {}
   );
 
+  const entries = Object.entries(moodCount);
   const max = Math.max(...Object.values(moodCount), 1);
 
-  return (
-    <div style={{ marginTop: 40 }}>
-      <h2 style={{ marginBottom: 20 }}>
-        Mood Distribution
-      </h2>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 20,
-          height: 200,
-        }}
-      >
-        {Object.entries(moodCount).map(
-          ([mood, count]) => {
-            const height =
-              (count / max) * 100;
-
-            return (
-              <div
-                key={mood}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  flex: 1,
-                }}
-              >
-                <div
-                  style={{
-                    width: "100%",
-                    height: `${height}%`,
-                    background:
-                      "linear-gradient(180deg, #4f46e5, #6366f1)",
-                    borderRadius: 12,
-                    transition:
-                      "height 0.4s ease",
-                  }}
-                />
-
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 14,
-                  }}
-                >
-                  {mood}
-                </div>
-
-                <div
-                  style={{
-                    fontWeight: 600,
-                    marginTop: 4,
-                  }}
-                >
-                  {count}
-                </div>
-              </div>
-            );
-          }
-        )}
+  if (entries.length === 0) {
+    return (
+      <div className="text-sm text-neutral-500">
+        No mood data yet.
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([mood, count]) => {
+        const width = `${(count / max) * 100}%`;
+        const moodMeta =
+          mood in moodConfig
+            ? moodConfig[mood as keyof typeof moodConfig]
+            : null;
+
+        return (
+          <div key={mood} className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="capitalize text-neutral-300">
+                {moodMeta?.label || mood}
+              </span>
+              <span className="text-neutral-500">{count}</span>
+            </div>
+
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className="h-full rounded-full bg-white/70 transition-all duration-500"
+                style={{ width }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
