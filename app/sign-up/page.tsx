@@ -59,7 +59,7 @@ export default function SignUp() {
         <button
           onClick={handleSignUp}
           disabled={loading}
-          className="w-full rounded-lg bg-white p-3 font-medium text-black"
+          className="w-full rounded-lg bg-white p-3 font-medium text-black disabled:opacity-50"
         >
           {loading ? "Creating..." : "Sign Up"}
         </button>
