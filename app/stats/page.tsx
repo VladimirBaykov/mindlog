@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import MoodChart from "./MoodChart";
@@ -11,21 +12,49 @@ type WeeklySummaryResponse = {
   moods: Record<string, number>;
 };
 
+type InsightsResponse = {
+  insights: string[];
+};
+
 export default function StatsPage() {
+  const router = useRouter();
   const { items } = useJournal();
   const { setHeader, resetHeader } = useHeader();
 
   const [weekly, setWeekly] =
     useState<WeeklySummaryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [insights, setInsights] =
+    useState<InsightsResponse | null>(null);
+
+  const [loadingWeekly, setLoadingWeekly] = useState(true);
+  const [loadingInsights, setLoadingInsights] =
+    useState(true);
 
   useEffect(() => {
     setHeader({
       title: "Reflection stats",
+      leftSlot: (
+        <button
+          onClick={() => router.push("/journal")}
+          className="text-sm text-neutral-400 hover:text-white transition"
+        >
+          ← Journal
+        </button>
+      ),
+      menuItems: [
+        {
+          label: "New conversation",
+          onClick: () => router.push("/"),
+        },
+        {
+          label: "Back to Journal",
+          onClick: () => router.push("/journal"),
+        },
+      ],
     });
 
     return () => resetHeader();
-  }, [setHeader, resetHeader]);
+  }, [router, setHeader, resetHeader]);
 
   useEffect(() => {
     fetch("/api/stats/weekly-summary")
@@ -37,7 +66,20 @@ export default function StatsPage() {
       .catch((err) => {
         console.error("Stats load error:", err);
       })
-      .finally(() => setLoading(false));
+      .finally(() => setLoadingWeekly(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/stats/insights")
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed");
+        return res.json();
+      })
+      .then((data) => setInsights(data))
+      .catch((err) => {
+        console.error("Insights load error:", err);
+      })
+      .finally(() => setLoadingInsights(false));
   }, []);
 
   const totalEntries = items.length;
@@ -88,11 +130,38 @@ export default function StatsPage() {
           </div>
 
           <p className="mt-3 text-sm leading-relaxed text-neutral-300">
-            {loading
+            {loadingWeekly
               ? "Generating your weekly reflection..."
               : weekly?.summary ||
                 "No weekly reflection available yet."}
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+          <div className="text-sm font-medium text-white">
+            Pattern insights
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {loadingInsights ? (
+              <p className="text-sm text-neutral-400">
+                Generating insights...
+              </p>
+            ) : insights?.insights?.length ? (
+              insights.insights.map((insight, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm leading-relaxed text-neutral-300"
+                >
+                  {insight}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-neutral-500">
+                No insights available yet.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
