@@ -6,6 +6,7 @@ import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import MoodChart from "./MoodChart";
 import MoodTimeline from "./MoodTimeline";
+import MoodStreak from "./MoodStreak";
 
 type WeeklySummaryResponse = {
   summary: string;
@@ -173,6 +174,16 @@ export default function StatsPage() {
                 No insights available yet.
               </p>
             )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+          <div className="text-sm font-medium text-white">
+            Recent streak
+          </div>
+
+          <div className="mt-4">
+            <MoodStreak items={items} />
           </div>
         </div>
 
