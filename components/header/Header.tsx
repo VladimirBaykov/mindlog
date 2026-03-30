@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import { useHeader } from "./HeaderContext";
 
 export function Header() {
@@ -19,34 +24,29 @@ export function Header() {
 
   const { scrollY } = useScroll();
 
-  // Height shrink
-  const height = useTransform(scrollY, [0, 80], [72, 60]);
-
-  // Softer blur curve
+  const height = useTransform(scrollY, [0, 96], [74, 60]);
   const backdrop = useTransform(
     scrollY,
-    [0, 80],
-    ["blur(6px)", "blur(14px)"]
+    [0, 96],
+    ["blur(8px)", "blur(18px)"]
   );
-
-  // More premium opacity curve
   const bgColor = useTransform(
     scrollY,
-    [0, 80],
-    ["rgba(10,10,10,0.55)", "rgba(10,10,10,0.92)"]
+    [0, 96],
+    ["rgba(10,10,10,0.52)", "rgba(10,10,10,0.94)"]
   );
-
-  // Title scale
-  const scale = useTransform(scrollY, [0, 80], [1, 0.96]);
-
-  // Title opacity shift
+  const borderOpacity = useTransform(
+    scrollY,
+    [0, 96],
+    [0.04, 0.1]
+  );
+  const scale = useTransform(scrollY, [0, 96], [1, 0.965]);
   const titleOpacity = useTransform(
     scrollY,
-    [0, 40],
-    [0.85, 1]
+    [0, 48],
+    [0.84, 1]
   );
 
-  // close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (
@@ -81,81 +81,85 @@ export function Header() {
       }}
       className="fixed top-0 left-0 right-0 z-50"
     >
-      {/* subtle gradient depth */}
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/[0.04] to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.045] via-white/[0.015] to-transparent" />
 
-      {/* hairline separator */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-white/[0.06]" />
+      <motion.div
+        style={{
+          opacity: borderOpacity,
+        }}
+        className="absolute bottom-0 left-0 right-0 h-px bg-white"
+      />
 
       <div className="relative mx-auto flex h-full max-w-xl items-center justify-between px-4">
-        {/* LEFT */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-[72px] items-center gap-2">
           {leftSlot}
         </div>
 
-        {/* CENTER */}
         <motion.div
           style={{ scale, opacity: titleOpacity }}
-          className="flex flex-col items-center"
+          className="flex flex-1 flex-col items-center px-3 text-center"
         >
           {title && (
-            <span className="text-sm font-medium text-white">
+            <span className="truncate text-sm font-medium text-white">
               {title}
             </span>
           )}
           {subtitle && (
-            <span className="text-xs text-neutral-400 capitalize">
+            <span className="truncate text-xs capitalize text-neutral-400">
               {subtitle}
             </span>
           )}
         </motion.div>
 
-        {/* RIGHT */}
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex min-w-[72px] items-center justify-end gap-2">
           {rightSlot}
 
           {menuItems && menuItems.length > 0 && (
             <>
               <button
                 onClick={() => setOpen((v) => !v)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-all hover:bg-neutral-800 hover:text-white active:scale-95"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-all duration-200 hover:bg-neutral-800/80 hover:text-white active:scale-95"
               >
                 ⋯
               </button>
 
-              {open && (
-                <motion.div
-                  ref={menuRef}
-                  initial={{ opacity: 0, scale: 0.96, y: -6 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 30,
-                  }}
-                  className="absolute right-0 top-10 w-44 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 shadow-2xl origin-top-right"
-                >
-                  {menuItems.map((item, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setOpen(false);
-                        item.onClick();
-                      }}
-                      className={`w-full px-4 py-2 text-left text-sm transition ${
-                        item.danger
-                          ? "text-red-400 hover:bg-red-500/10"
-                          : item.highlight
-                          ? "text-blue-400 hover:bg-blue-500/10"
-                          : "text-neutral-200 hover:bg-neutral-800"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
+              <AnimatePresence>
+                {open && (
+                  <motion.div
+                    ref={menuRef}
+                    initial={{ opacity: 0, scale: 0.96, y: -8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 420,
+                      damping: 30,
+                    }}
+                    className="absolute right-0 top-10 origin-top-right overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
+                  >
+                    <div className="min-w-[180px] py-1.5">
+                      {menuItems.map((item, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setOpen(false);
+                            item.onClick();
+                          }}
+                          className={`w-full px-4 py-2.5 text-left text-sm transition ${
+                            item.danger
+                              ? "text-red-400 hover:bg-red-500/10"
+                              : item.highlight
+                              ? "text-blue-400 hover:bg-blue-500/10"
+                              : "text-neutral-200 hover:bg-neutral-800/90"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </>
           )}
         </div>

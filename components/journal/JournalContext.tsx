@@ -8,6 +8,7 @@ import {
   useCallback,
 } from "react";
 import { useToast } from "@/components/ui/ToastContext";
+import { supabase } from "@/lib/supabase-browser";
 
 type Message = {
   role: "user" | "assistant";
@@ -117,8 +118,17 @@ export function JournalProvider({
   const [offset, setOffset] = useState(0);
   const [pendingDeletes, setPendingDeletes] =
     useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
 
   const { showUndo, showError } = useToast();
+
+  const resetJournalState = useCallback(() => {
+    setItems([]);
+    setHasMore(false);
+    setOffset(0);
+    setPendingDeletes(new Set());
+  }, []);
 
   const fetchPage = useCallback(
     async (nextOffset: number) => {
@@ -153,12 +163,10 @@ export function JournalProvider({
       setHasMore(firstPage.hasMore);
       setOffset(firstPage.nextOffset);
     } catch {
-      setItems([]);
-      setHasMore(false);
-      setOffset(0);
+      resetJournalState();
       showError("Failed to load journal");
     }
-  }, [fetchPage, showError]);
+  }, [fetchPage, resetJournalState, showError]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -178,15 +186,66 @@ export function JournalProvider({
   }, [fetchPage, hasMore, loadingMore, offset, showError]);
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
-  }, [refresh]);
+    let mounted = true;
+
+    async function bootstrap() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!mounted) return;
+
+        const nextUserId = user?.id ?? null;
+        setCurrentUserId(nextUserId);
+
+        if (nextUserId) {
+          await refresh();
+        } else {
+          resetJournalState();
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    bootstrap();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        const nextUserId = session?.user?.id ?? null;
+
+        setLoading(true);
+
+        if (!nextUserId) {
+          setCurrentUserId(null);
+          resetJournalState();
+          setLoading(false);
+          return;
+        }
+
+        if (nextUserId !== currentUserId) {
+          setCurrentUserId(nextUserId);
+          resetJournalState();
+          await refresh();
+        }
+
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [currentUserId, refresh, resetJournalState]);
 
   const addItem = useCallback((item: JournalItem | RawJournalItem) => {
     const normalized = normalizeItem(item);
 
-    setItems((prev) =>
-      mergeUnique([normalized], prev)
-    );
+    setItems((prev) => mergeUnique([normalized], prev));
   }, []);
 
   const updateItem = useCallback(
@@ -244,9 +303,7 @@ export function JournalProvider({
         if (!res.ok) throw new Error();
       } catch {
         showError("Delete failed");
-        setItems((prev) =>
-          mergeUnique(prev, [item])
-        );
+        setItems((prev) => mergeUnique(prev, [item]));
       } finally {
         setPendingDeletes((prev) => {
           const next = new Set(prev);
