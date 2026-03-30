@@ -7,6 +7,7 @@ import { useJournal } from "@/components/journal/JournalContext";
 import MoodChart from "./MoodChart";
 import MoodTimeline from "./MoodTimeline";
 import MoodStreak from "./MoodStreak";
+import LockedFeatureCard from "@/components/ui/LockedFeatureCard";
 
 type WeeklySummaryResponse = {
   summary: string;
@@ -51,6 +52,10 @@ export default function StatsPage() {
         {
           label: "Profile",
           onClick: () => router.push("/profile"),
+        },
+        {
+          label: "Upgrade",
+          onClick: () => router.push("/upgrade"),
         },
       ],
     });
@@ -206,6 +211,16 @@ export default function StatsPage() {
             <MoodChart items={items} />
           </div>
         </div>
+
+        <LockedFeatureCard
+          title="Deep emotional trends"
+          description="Pro will unlock longer-range pattern detection, stronger summaries, and richer emotional analytics over time."
+        />
+
+        <LockedFeatureCard
+          title="Export reflection reports"
+          description="Pro will let users export personal summaries and journal analytics as polished downloadable reports."
+        />
       </div>
     </div>
   );

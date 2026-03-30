@@ -47,6 +47,10 @@ export default function ProfilePage() {
           onClick: () => router.push("/stats"),
         },
         {
+          label: "Upgrade",
+          onClick: () => router.push("/upgrade"),
+        },
+        {
           label: "New conversation",
           onClick: () => router.push("/"),
         },
@@ -110,13 +114,12 @@ export default function ProfilePage() {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-            <div className="text-sm font-medium text-white">
-              Plan
-            </div>
-
-            <div className="mt-4 flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-base font-medium capitalize text-white">
+                <div className="text-sm font-medium text-white">
+                  Plan
+                </div>
+                <div className="mt-2 text-base font-medium capitalize text-white">
                   {usage?.plan || "free"} plan
                 </div>
                 <p className="mt-1 text-sm text-neutral-400">
@@ -138,6 +141,13 @@ export default function ProfilePage() {
                   : "You’ve reached the current free plan limit."}
               </p>
             )}
+
+            <button
+              onClick={() => router.push("/upgrade")}
+              className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-medium text-black transition hover:opacity-90"
+            >
+              Upgrade to Pro
+            </button>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
