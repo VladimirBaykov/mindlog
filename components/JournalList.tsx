@@ -1,13 +1,22 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useJournal } from "@/components/journal/JournalContext";
+import {
+  useJournal,
+  type JournalItem,
+} from "@/components/journal/JournalContext";
 import { moodConfig } from "@/lib/journal/moodMap";
 import { SwipeableItem } from "@/components/ui/SwipeableItem";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
+
+type MoodKey = keyof typeof moodConfig;
+
+function isMoodKey(value: string | null | undefined): value is MoodKey {
+  return Boolean(value && value in moodConfig);
+}
 
 export default function JournalList() {
   const {
@@ -24,7 +33,7 @@ export default function JournalList() {
   const pathname = usePathname();
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const deletedItemRef = useRef<any>(null);
+  const deletedItemRef = useRef<JournalItem | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeId = pathname?.startsWith("/journal/")
@@ -39,7 +48,7 @@ export default function JournalList() {
     return <JournalEmpty />;
   }
 
-  const handleSwipeDelete = (item: any) => {
+  const handleSwipeDelete = (item: JournalItem) => {
     deletedItemRef.current = item;
 
     deleteItem(item.id);
@@ -52,7 +61,7 @@ export default function JournalList() {
     }, 4000);
   };
 
-  const handleUndo = (e: React.MouseEvent) => {
+  const handleUndo = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
 
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -70,17 +79,15 @@ export default function JournalList() {
       <motion.div layout className="space-y-3">
         <AnimatePresence>
           {items.map((item) => {
-            const mood =
-              item.mood && moodConfig[item.mood]
-                ? moodConfig[item.mood]
-                : moodConfig.calm;
+            const mood = isMoodKey(item.mood)
+              ? moodConfig[item.mood]
+              : moodConfig.calm;
 
             const isActive = item.id === activeId;
 
             const preview =
-              item.messages?.find(
-                (m: any) => m.role === "user"
-              )?.content || "No preview available";
+              item.messages.find((m) => m.role === "user")?.content ??
+              "No preview available";
 
             return (
               <motion.div
@@ -102,10 +109,8 @@ export default function JournalList() {
                     onClick={() => {
                       if (isActive) return;
 
-                      const id = item.id;
-
                       setTimeout(() => {
-                        router.push(`/journal/${id}`);
+                        router.push(`/journal/${item.id}`);
                       }, 90);
                     }}
                     className={`
@@ -130,11 +135,9 @@ export default function JournalList() {
                       </span>
                     </div>
 
-                    {preview && (
-                      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-neutral-400">
-                        {preview}
-                      </p>
-                    )}
+                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-neutral-400">
+                      {preview}
+                    </p>
 
                     <div className="mt-3 flex items-center gap-2 text-xs text-neutral-500">
                       <span
