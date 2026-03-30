@@ -6,6 +6,8 @@ import { moodConfig } from "@/lib/journal/moodMap";
 import { SwipeableItem } from "@/components/ui/SwipeableItem";
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import JournalEmpty from "@/components/JournalEmpty";
+import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 
 export default function JournalList() {
   const {
@@ -30,19 +32,11 @@ export default function JournalList() {
     : null;
 
   if (loading) {
-    return (
-      <p className="text-sm text-neutral-400">
-        Loading conversations…
-      </p>
-    );
+    return <JournalSkeleton />;
   }
 
   if (items.length === 0) {
-    return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-neutral-500">
-        You don’t have any saved conversations yet.
-      </div>
-    );
+    return <JournalEmpty />;
   }
 
   const handleSwipeDelete = (item: any) => {
@@ -102,9 +96,7 @@ export default function JournalList() {
                 }}
               >
                 <SwipeableItem
-                  onSwipeDelete={() =>
-                    handleSwipeDelete(item)
-                  }
+                  onSwipeDelete={() => handleSwipeDelete(item)}
                 >
                   <motion.div
                     onClick={() => {
@@ -117,22 +109,19 @@ export default function JournalList() {
                       }, 90);
                     }}
                     className={`
-                      w-full
-                      rounded-2xl
-                      px-4 py-2.5
-                      border
+                      w-full rounded-2xl border px-4 py-3
                       transition-all duration-200 ease-out
                       ${
                         isActive
                           ? "border-white/15 bg-neutral-800"
                           : "border-white/5 bg-neutral-900"
                       }
-                      hover:border-white/10
+                      hover:border-white/10 hover:bg-neutral-900/90
                       active:scale-[0.985]
                     `}
                   >
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-white truncate">
+                      <h3 className="truncate text-sm font-medium text-white">
                         {item.title || "Conversation"}
                       </h3>
 
@@ -141,11 +130,13 @@ export default function JournalList() {
                       </span>
                     </div>
 
-                    <p className="mt-2 line-clamp-2 text-xs text-neutral-400">
-                      {preview}
-                    </p>
+                    {preview && (
+                      <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-neutral-400">
+                        {preview}
+                      </p>
+                    )}
 
-                    <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
+                    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-500">
                       <span
                         className={`h-2 w-2 rounded-full ${mood.color}`}
                       />
