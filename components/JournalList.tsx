@@ -14,7 +14,9 @@ import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 
 type MoodKey = keyof typeof moodConfig;
 
-function isMoodKey(value: string | null | undefined): value is MoodKey {
+function isMoodKey(
+  value: string | null | undefined
+): value is MoodKey {
   return Boolean(value && value in moodConfig);
 }
 
