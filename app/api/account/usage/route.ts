@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { FREE_JOURNAL_LIMIT, getCurrentPlan } from "@/lib/plans";
+import { getJournalLimit } from "@/lib/plans";
+import { resolveUserSubscription } from "@/lib/billing";
 
 export async function GET() {
   try {
@@ -17,7 +18,10 @@ export async function GET() {
       );
     }
 
-    const plan = getCurrentPlan();
+    const subscription = await resolveUserSubscription(
+      supabase,
+      user.id
+    );
 
     const { count, error } = await supabase
       .from("journals")
@@ -33,18 +37,20 @@ export async function GET() {
     }
 
     const used = count ?? 0;
-    const limit = plan === "free" ? FREE_JOURNAL_LIMIT : null;
+    const limit = getJournalLimit(subscription.isPro ? "pro" : "free");
     const remaining =
       typeof limit === "number" ? Math.max(0, limit - used) : null;
     const canSave =
       typeof limit === "number" ? used < limit : true;
 
     return NextResponse.json({
-      plan,
+      plan: subscription.isPro ? "pro" : "free",
+      status: subscription.status,
       used,
       limit,
       remaining,
       canSave,
+      currentPeriodEnd: subscription.currentPeriodEnd,
     });
   } catch (e: any) {
     console.error("ACCOUNT USAGE ERROR:", e);

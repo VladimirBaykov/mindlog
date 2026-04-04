@@ -13,10 +13,19 @@ type UserInfo = {
 
 type UsageInfo = {
   plan: "free" | "pro";
+  status?: string;
   used: number;
   limit: number | null;
   remaining: number | null;
   canSave: boolean;
+  currentPeriodEnd?: string | null;
+} | null;
+
+type SubscriptionInfo = {
+  plan: "free" | "pro";
+  status: string;
+  currentPeriodEnd: string | null;
+  isPro: boolean;
 } | null;
 
 export default function ProfilePage() {
@@ -29,6 +38,9 @@ export default function ProfilePage() {
   });
 
   const [usage, setUsage] = useState<UsageInfo>(null);
+  const [subscription, setSubscription] =
+    useState<SubscriptionInfo>(null);
+  const [loadingPortal, setLoadingPortal] = useState(false);
 
   useEffect(() => {
     setHeader({
@@ -96,9 +108,50 @@ export default function ProfilePage() {
       }
     }
 
+    async function loadSubscription() {
+      try {
+        const res = await fetch("/api/account/subscription", {
+          cache: "no-store",
+        });
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        setSubscription(data);
+      } catch (err) {
+        console.error("Subscription load failed:", err);
+      }
+    }
+
     loadUser();
     loadUsage();
+    loadSubscription();
   }, []);
+
+  async function handlePortal() {
+    try {
+      setLoadingPortal(true);
+
+      const res = await fetch("/api/billing/portal", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw new Error("Portal failed");
+      }
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Portal scaffold failed");
+    } finally {
+      setLoadingPortal(false);
+    }
+  }
 
   return (
     <AuthGate>
@@ -120,7 +173,7 @@ export default function ProfilePage() {
                   Plan
                 </div>
                 <div className="mt-2 text-base font-medium capitalize text-white">
-                  {usage?.plan || "free"} plan
+                  {subscription?.isPro ? "pro" : "free"} plan
                 </div>
                 <p className="mt-1 text-sm text-neutral-400">
                   {usage?.limit
@@ -130,7 +183,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
-                Pro coming soon
+                {subscription?.status || "inactive"}
               </div>
             </div>
 
@@ -142,12 +195,31 @@ export default function ProfilePage() {
               </p>
             )}
 
-            <button
-              onClick={() => router.push("/upgrade")}
-              className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
-            >
-              Upgrade to Pro
-            </button>
+            {subscription?.currentPeriodEnd && (
+              <p className="mt-2 text-xs text-neutral-500">
+                Current period ends:{" "}
+                {new Date(
+                  subscription.currentPeriodEnd
+                ).toLocaleDateString()}
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={() => router.push("/upgrade")}
+                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                Upgrade to Pro
+              </button>
+
+              <button
+                onClick={handlePortal}
+                disabled={loadingPortal}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+              >
+                {loadingPortal ? "Opening..." : "Manage billing"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">

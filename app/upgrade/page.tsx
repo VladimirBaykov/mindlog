@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
@@ -8,6 +8,8 @@ import { useHeader } from "@/components/header/HeaderContext";
 export default function UpgradePage() {
   const router = useRouter();
   const { setHeader, resetHeader } = useHeader();
+
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
 
   useEffect(() => {
     setHeader({
@@ -35,6 +37,31 @@ export default function UpgradePage() {
     return () => resetHeader();
   }, [router, resetHeader, setHeader]);
 
+  async function handleCheckout() {
+    try {
+      setLoadingCheckout(true);
+
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw new Error("Checkout failed");
+      }
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Checkout scaffold failed");
+    } finally {
+      setLoadingCheckout(false);
+    }
+  }
+
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
@@ -54,10 +81,11 @@ export default function UpgradePage() {
             </p>
 
             <button
-              onClick={() => router.push("/profile")}
-              className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              onClick={handleCheckout}
+              disabled={loadingCheckout}
+              className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
             >
-              Upgrade flow coming soon
+              {loadingCheckout ? "Preparing checkout..." : "Continue to checkout"}
             </button>
           </div>
 
@@ -94,12 +122,12 @@ export default function UpgradePage() {
 
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-4">
             <div className="text-sm font-medium text-white">
-              Billing is not connected yet
+              Stripe is not connected yet
             </div>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              This page is your product foundation for the future Stripe flow.
-              The next monetization step will be wiring real checkout and plan
-              activation.
+              This flow now has the correct billing architecture scaffold.
+              The next step is replacing the placeholder route with real Stripe
+              checkout + webhook plan activation.
             </p>
           </div>
         </div>
