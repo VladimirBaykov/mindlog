@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { ensureSubscriptionRow } from "@/lib/billing";
+import {
+  ensureSubscriptionRow,
+  resolveUserSubscription,
+} from "@/lib/billing";
+import { getStripe, getAppUrl } from "@/lib/stripe";
+
+export const runtime = "nodejs";
 
 export async function POST() {
   try {
     const supabase = await createSupabaseServerClient();
+    const stripe = getStripe();
 
     const {
       data: { user },
@@ -18,12 +25,25 @@ export async function POST() {
     }
 
     await ensureSubscriptionRow(supabase, user.id);
+    const subscription = await resolveUserSubscription(
+      supabase,
+      user.id
+    );
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    if (!subscription.stripeCustomerId) {
+      return NextResponse.json(
+        { error: "No Stripe customer found for this account yet" },
+        { status: 400 }
+      );
+    }
+
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: subscription.stripeCustomerId,
+      return_url: `${getAppUrl()}/profile`,
+    });
 
     return NextResponse.json({
-      url: `${baseUrl}/profile?mock_portal=1`,
+      url: portal.url,
     });
   } catch (e: any) {
     console.error("BILLING PORTAL ERROR:", e);

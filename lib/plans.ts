@@ -8,7 +8,9 @@ export type FeatureKey =
 
 export const FREE_JOURNAL_LIMIT = 20;
 
-export function normalizePlan(value: string | null | undefined): PlanTier {
+export function normalizePlan(
+  value: string | null | undefined
+): PlanTier {
   return value === "pro" ? "pro" : "free";
 }
 
@@ -34,4 +36,17 @@ export function hasFeatureAccess(
     default:
       return false;
   }
+}
+
+export function getPlanFromStripePriceId(
+  priceId: string | null | undefined
+): PlanTier {
+  const monthly = process.env.STRIPE_PRICE_PRO_MONTHLY;
+  const yearly = process.env.STRIPE_PRICE_PRO_YEARLY;
+
+  if (priceId && (priceId === monthly || priceId === yearly)) {
+    return "pro";
+  }
+
+  return "free";
 }
