@@ -1,5 +1,12 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import AuthGate from "@/components/AuthGate";
+import Chat from "@/components/Chat";
 
 export default function ChatPage() {
-  redirect("/");
+  return (
+    <AuthGate>
+      <Chat />
+    </AuthGate>
+  );
 }

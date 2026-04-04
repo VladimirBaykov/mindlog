@@ -18,7 +18,7 @@ export default function JournalEmpty() {
 
       <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Link
-          href="/"
+          href="/chat"
           className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
         >
           Start a new conversation
