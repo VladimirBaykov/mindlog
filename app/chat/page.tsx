@@ -6,7 +6,9 @@ import Chat from "@/components/Chat";
 export default function ChatPage() {
   return (
     <AuthGate>
-      <Chat />
+      <main className="h-screen bg-black text-white">
+        <Chat />
+      </main>
     </AuthGate>
   );
 }

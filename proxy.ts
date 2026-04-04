@@ -45,7 +45,7 @@ export async function proxy(req: NextRequest) {
   }
 
   if (user && pathname === "/") {
-    return NextResponse.redirect(new URL("/journal", req.url));
+    return NextResponse.redirect(new URL("/chat", req.url));
   }
 
   return res;
