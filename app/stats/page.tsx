@@ -30,8 +30,7 @@ export default function StatsPage() {
     useState<InsightsResponse | null>(null);
 
   const [loadingWeekly, setLoadingWeekly] = useState(true);
-  const [loadingInsights, setLoadingInsights] =
-    useState(true);
+  const [loadingInsights, setLoadingInsights] = useState(true);
 
   useEffect(() => {
     setHeader({
@@ -47,7 +46,7 @@ export default function StatsPage() {
       menuItems: [
         {
           label: "New conversation",
-          onClick: () => router.push("/"),
+          onClick: () => router.push("/chat"),
         },
         {
           label: "Profile",
@@ -70,9 +69,7 @@ export default function StatsPage() {
         return res.json();
       })
       .then((data) => setWeekly(data))
-      .catch((err) => {
-        console.error("Stats load error:", err);
-      })
+      .catch((err) => console.error("Stats load error:", err))
       .finally(() => setLoadingWeekly(false));
   }, []);
 
@@ -83,9 +80,7 @@ export default function StatsPage() {
         return res.json();
       })
       .then((data) => setInsights(data))
-      .catch((err) => {
-        console.error("Insights load error:", err);
-      })
+      .catch((err) => console.error("Insights load error:", err))
       .finally(() => setLoadingInsights(false));
   }, []);
 
@@ -110,7 +105,6 @@ export default function StatsPage() {
 
   const lastEntryDate = useMemo(() => {
     if (!items.length) return "No entries yet";
-
     return new Date(items[0].createdAt).toLocaleDateString();
   }, [items]);
 
@@ -118,27 +112,27 @@ export default function StatsPage() {
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Total entries
             </div>
-            <div className="mt-2 text-2xl font-semibold">
+            <div className="mt-2 text-3xl font-semibold text-white">
               {totalEntries}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Top mood
             </div>
-            <div className="mt-2 text-2xl font-semibold capitalize">
+            <div className="mt-2 text-3xl font-semibold capitalize text-white">
               {mostCommonMood}
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-medium text-white">
               Weekly reflection
             </div>
@@ -147,7 +141,7 @@ export default function StatsPage() {
             </div>
           </div>
 
-          <p className="mt-3 text-sm leading-relaxed text-neutral-300">
+          <p className="mt-4 text-sm leading-relaxed text-neutral-300">
             {loadingWeekly
               ? "Generating your weekly reflection..."
               : weekly?.summary ||
@@ -155,21 +149,29 @@ export default function StatsPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Pattern insights
           </div>
 
           <div className="mt-4 space-y-3">
             {loadingInsights ? (
-              <p className="text-sm text-neutral-400">
-                Generating insights...
-              </p>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4"
+                  >
+                    <div className="h-3 w-full animate-pulse rounded-full bg-white/[0.05]" />
+                    <div className="mt-2 h-3 w-4/5 animate-pulse rounded-full bg-white/[0.05]" />
+                  </div>
+                ))}
+              </div>
             ) : insights?.insights?.length ? (
               insights.insights.map((insight, idx) => (
                 <div
                   key={idx}
-                  className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm leading-relaxed text-neutral-300"
+                  className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
                 >
                   {insight}
                 </div>
@@ -182,7 +184,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Recent streak
           </div>
@@ -192,7 +194,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Mood timeline
           </div>
@@ -202,7 +204,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Mood distribution
           </div>

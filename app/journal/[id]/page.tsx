@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import { moodConfig } from "@/lib/journal/moodMap";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Message = {
   role: "user" | "assistant";
@@ -98,7 +98,7 @@ export default function JournalEntryPage() {
         },
         {
           label: "New conversation",
-          onClick: () => router.push("/"),
+          onClick: () => router.push("/chat"),
         },
       ],
     });
@@ -108,54 +108,129 @@ export default function JournalEntryPage() {
 
   if (loading) {
     return (
-      <p className="px-4 pt-24 text-sm text-neutral-400">
-        Loading conversation…
-      </p>
+      <div className="min-h-screen bg-black text-white">
+        <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-[24px] border border-white/8 bg-white/[0.03] px-4 py-4"
+            >
+              <div className="h-4 w-2/3 animate-pulse rounded-full bg-white/[0.08]" />
+              <div className="mt-3 h-3 w-full animate-pulse rounded-full bg-white/[0.05]" />
+              <div className="mt-2 h-3 w-4/5 animate-pulse rounded-full bg-white/[0.05]" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
   if (!item) {
     return (
-      <p className="px-4 pt-24 text-sm text-neutral-500">
-        Conversation not found.
-      </p>
+      <div className="min-h-screen bg-black text-white">
+        <div className="mx-auto max-w-xl px-4 pt-24 pb-24">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
+              ⊘
+            </div>
+
+            <h2 className="mt-4 text-lg font-medium text-white">
+              Conversation not found
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
+              This entry may have been deleted, moved, or is no longer available.
+            </p>
+
+            <button
+              onClick={() => router.push("/journal")}
+              className="mt-6 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+            >
+              Back to journal
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
+  const mood =
+    item.mood && moodConfig[item.mood]
+      ? moodConfig[item.mood]
+      : moodConfig.calm;
+
   return (
-    <div className="relative min-h-screen overscroll-y-contain">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-24 bg-gradient-to-b from-[#0a0a0a] to-transparent" />
+    <div className="relative min-h-screen bg-black text-white">
+      <div className="pointer-events-none fixed top-0 left-0 right-0 z-30 h-24 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="mx-auto max-w-xl px-4 py-6 pt-24 space-y-5"
+        className="mx-auto max-w-xl px-4 pt-24 pb-24"
       >
-        {normalizedMessages.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-neutral-400">
-            No messages in this entry yet.
+        <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-lg font-medium text-white">
+                {item.title || "Conversation"}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
+                <span className={`h-2 w-2 rounded-full ${mood.color}`} />
+                <span>{mood.label}</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-neutral-500">
+              {new Date(
+                item.created_at || item.createdAt || Date.now()
+              ).toLocaleDateString()}
+            </div>
           </div>
-        ) : (
-          normalizedMessages.map((msg, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.25,
-                delay: idx * 0.02,
-              }}
-              className={`max-w-[78%] break-words rounded-2xl px-4 py-3.5 text-[14.5px] leading-relaxed ${
-                msg.role === "user"
-                  ? "ml-auto bg-neutral-800 text-white"
-                  : "mr-auto bg-neutral-900 text-neutral-200"
-              }`}
-            >
-              {msg.content}
-            </motion.div>
-          ))
-        )}
+        </div>
+
+        <div className="space-y-3">
+          <AnimatePresence initial={false}>
+            {normalizedMessages.length === 0 ? (
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5 text-sm text-neutral-400">
+                No messages in this entry yet.
+              </div>
+            ) : (
+              normalizedMessages.map((msg, idx) => {
+                const isUser = msg.role === "user";
+                const previous = normalizedMessages[idx - 1];
+                const groupedWithPrevious =
+                  previous && previous.role === msg.role;
+
+                return (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 8, scale: 0.985 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.22,
+                      delay: idx * 0.015,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    className={`flex ${
+                      isUser ? "justify-end" : "justify-start"
+                    } ${groupedWithPrevious ? "pt-1" : "pt-3"}`}
+                  >
+                    <div
+                      className={`max-w-[78%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.55] ${
+                        isUser
+                          ? "border-white/[0.08] bg-white/[0.07] text-white"
+                          : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </AnimatePresence>
+        </div>
       </motion.div>
     </div>
   );
