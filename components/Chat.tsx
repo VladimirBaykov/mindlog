@@ -8,14 +8,6 @@ import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
-type UsageState = {
-  plan: "free" | "pro";
-  used: number;
-  limit: number | null;
-  remaining: number | null;
-  canSave: boolean;
-} | null;
-
 export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -24,42 +16,21 @@ export default function Chat() {
   const [isSaved, setIsSaved] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(false);
-  const [usage, setUsage] = useState<UsageState>(null);
-  const [usageLoading, setUsageLoading] = useState(true);
 
   const { setHeader, resetHeader } = useHeader();
   const { addItem } = useJournal();
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    async function loadUsage() {
-      try {
-        const res = await fetch("/api/account/usage", {
-          cache: "no-store",
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        setUsage(data);
-      } catch (err) {
-        console.error("Usage load failed:", err);
-      } finally {
-        setUsageLoading(false);
-      }
-    }
-
-    loadUsage();
-  }, []);
-
-  // smooth scroll
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
   }, [messages, loading]);
 
-  // auto grow textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -69,7 +40,6 @@ export default function Chat() {
     el.style.height = Math.min(scrollHeight, 160) + "px";
   }, [input]);
 
-  // header
   useEffect(() => {
     setHeader({
       title: "New conversation",
@@ -86,6 +56,7 @@ export default function Chat() {
               window.location.href = "/journal";
               return;
             }
+
             setPendingNavigation(true);
             setShowCloseConfirm(true);
           },
@@ -109,30 +80,8 @@ export default function Chat() {
     setIsSaved(false);
   }
 
-  async function refreshUsage() {
-    try {
-      const res = await fetch("/api/account/usage", {
-        cache: "no-store",
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-      setUsage(data);
-    } catch (err) {
-      console.error("Usage refresh failed:", err);
-    }
-  }
-
   async function closeConversation() {
     if (messages.length === 0 || isSaved) return;
-
-    if (usage && !usage.canSave) {
-      alert(
-        "You’ve reached the free plan limit for saved entries. Upgrade support can be added next."
-      );
-      return;
-    }
 
     try {
       const res = await fetch("/api/conversation/close", {
@@ -148,7 +97,6 @@ export default function Chat() {
       addItem(conversation);
       setIsSaved(true);
       resetChat();
-      await refreshUsage();
 
       if (pendingNavigation) {
         window.location.href = "/journal";
@@ -203,72 +151,111 @@ export default function Chat() {
     }
   }
 
+  const showEmptyState = messages.length === 0 && !loading;
+
   return (
-    <div className="relative flex min-h-screen flex-col overscroll-y-contain">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-24 bg-gradient-to-b from-[#0a0a0a] to-transparent" />
+    <div className="relative flex min-h-screen flex-col bg-black text-white">
+      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-28 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
 
-      <div className="flex-1 overflow-y-auto px-4 pt-28 pb-32 space-y-3">
-        {!usageLoading && usage?.plan === "free" && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-neutral-300">
-            <div className="flex items-center justify-between gap-3">
-              <span>Free plan</span>
-              <span className="text-neutral-500">
-                {usage.used}/{usage.limit} saved entries
-              </span>
-            </div>
-
-            {usage.remaining !== null && (
-              <p className="mt-2 text-xs text-neutral-500">
-                {usage.remaining > 0
-                  ? `${usage.remaining} saves remaining on your current plan.`
-                  : "You’ve reached your current save limit."}
-              </p>
-            )}
-          </div>
-        )}
-
-        <AnimatePresence initial={false}>
-          {messages.map((msg) => (
+      <div
+        ref={scrollerRef}
+        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-28 pb-36"
+      >
+        <div className="mx-auto max-w-xl">
+          {showEmptyState && (
             <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18 }}
-              className={`max-w-[70%] break-words rounded-xl px-2.5 py-1.5 text-[14px] ${
-                msg.role === "user"
-                  ? "ml-auto border border-white/[0.06] bg-white/[0.06] text-white"
-                  : "mr-auto border border-white/[0.05] bg-white/[0.04] text-neutral-200"
-              }`}
+              transition={{ duration: 0.28 }}
+              className="px-1 pt-8 pb-10"
             >
-              {msg.content}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <div className="max-w-md">
+                <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
+                  MindLog
+                </div>
 
-        <AnimatePresence>
-          {loading && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="mr-auto flex items-center gap-2 rounded-xl border border-white/[0.05] bg-white/[0.04] px-2.5 py-1.5 text-sm text-neutral-400"
-            >
-              <span>MindLog is thinking</span>
+                <h1 className="mt-5 text-3xl font-semibold leading-tight text-white">
+                  A quiet space
+                  <br />
+                  to reflect clearly.
+                </h1>
 
-              <div className="flex gap-1">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.2s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.1s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400" />
+                <p className="mt-4 max-w-sm text-sm leading-relaxed text-neutral-400">
+                  Start with whatever feels present. When you’re ready,
+                  close the conversation and save it to your journal.
+                </p>
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
 
-        <div ref={bottomRef} />
+          <div className="space-y-3">
+            <AnimatePresence initial={false}>
+              {messages.map((msg, index) => {
+                const isUser = msg.role === "user";
+                const previous = messages[index - 1];
+                const groupedWithPrevious =
+                  previous && previous.role === msg.role;
+
+                return (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.22,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    className={`flex ${
+                      isUser ? "justify-end" : "justify-start"
+                    } ${groupedWithPrevious ? "pt-1" : "pt-3"}`}
+                  >
+                    <div
+                      className={`max-w-[78%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.55] shadow-[0_0_0_1px_rgba(255,255,255,0.01)] ${
+                        isUser
+                          ? "border-white/[0.08] bg-white/[0.07] text-white"
+                          : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {loading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{
+                    duration: 0.2,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  className="flex justify-start pt-3"
+                >
+                  <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
+                    <span>MindLog is thinking</span>
+
+                    <div className="flex gap-1">
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.2s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.1s]" />
+                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400" />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-[#0a0a0a] px-4 py-3">
+      <div className="pointer-events-none fixed bottom-20 left-0 right-0 z-30 h-20 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent" />
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 px-4 py-3 backdrop-blur-xl">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -276,25 +263,27 @@ export default function Chat() {
           }}
           className="mx-auto flex max-w-xl items-end gap-2"
         >
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder="Write what’s on your mind…"
-            className="max-h-40 flex-1 resize-none overflow-y-auto rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white outline-none placeholder-neutral-500"
-          />
+          <div className="flex-1 rounded-[24px] border border-white/10 bg-neutral-900/90 px-3 py-2 shadow-[0_0_0_1px_rgba(255,255,255,0.015)]">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Write what’s on your mind…"
+              className="max-h-40 w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-[14.5px] leading-[1.5] text-white outline-none placeholder-neutral-500"
+            />
+          </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-40"
+            disabled={loading || !input.trim()}
+            className="rounded-[20px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-200 hover:opacity-90 disabled:opacity-40"
           >
             Send
           </button>
@@ -304,14 +293,8 @@ export default function Chat() {
       <ConfirmModal
         open={showCloseConfirm}
         title="Close this conversation?"
-        description={
-          usage && !usage.canSave
-            ? "You’ve reached the free plan save limit."
-            : "It will be saved to your journal."
-        }
-        confirmLabel={
-          usage && !usage.canSave ? "Limit reached" : "Close & save"
-        }
+        description="It will be saved to your journal."
+        confirmLabel="Close & save"
         danger={false}
         onCancel={() => {
           setShowCloseConfirm(false);
