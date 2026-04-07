@@ -233,9 +233,99 @@ export default function StatsPage() {
 
   const isPro = subscription?.isPro ?? false;
 
+  const milestoneLabel = useMemo(() => {
+    if (totalEntries === 0) return "Start with your first entry";
+    if (totalEntries < 3) return "You’re building early momentum";
+    if (totalEntries < 7) return "A pattern is starting to form";
+    if (totalEntries < 15) return "Your reflection history is growing";
+    return "You’ve built a meaningful reflection archive";
+  }, [totalEntries]);
+
+  if (!items.length) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
+              ◌
+            </div>
+
+            <h1 className="mt-4 text-2xl font-semibold text-white">
+              Your stats will grow with your journal
+            </h1>
+
+            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
+              Save your first reflection to unlock mood trends, streaks,
+              and early signals about your inner patterns.
+            </p>
+
+            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <button
+                onClick={() => router.push("/chat")}
+                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                Start first reflection
+              </button>
+
+              <button
+                onClick={() => router.push("/journal")}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+              >
+                Go to journal
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Mood distribution
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                See which emotional tones show up most often over time.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Reflection streaks
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                Build a calmer rhythm by returning to reflection
+                regularly.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                AI insight layer
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                Pro unlocks deeper summaries and stronger emotional
+                pattern detection.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+            Progress
+          </div>
+          <div className="mt-3 text-lg font-medium text-white">
+            {milestoneLabel}
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            Last entry: {lastEntryDate}
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">

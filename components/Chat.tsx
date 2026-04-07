@@ -299,12 +299,20 @@ export default function Chat() {
 
       addItem(conversation);
       setIsSaved(true);
-      resetChat();
       await loadUsage();
 
+      const successUrl = `/journal?celebrate=1&entry=${encodeURIComponent(
+        conversation.id
+      )}`;
+
+      resetChat();
+
       if (pendingNavigation) {
-        window.location.href = "/journal";
+        window.location.href = successUrl;
+        return;
       }
+
+      window.location.href = successUrl;
     } catch (err) {
       console.error(err);
     } finally {
