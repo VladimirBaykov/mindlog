@@ -5,7 +5,11 @@ import {
   resolveUserSubscription,
   setStripeCustomerId,
 } from "@/lib/billing";
-import { getStripe, getAppUrl } from "@/lib/stripe";
+import {
+  getStripe,
+  getAppUrl,
+  assertStripePriceId,
+} from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -29,17 +33,17 @@ export async function POST(req: Request) {
     const billingInterval =
       body?.interval === "yearly" ? "yearly" : "monthly";
 
-    const priceId =
+    const rawPriceId =
       billingInterval === "yearly"
         ? process.env.STRIPE_PRICE_PRO_YEARLY
         : process.env.STRIPE_PRICE_PRO_MONTHLY;
 
-    if (!priceId) {
-      return NextResponse.json(
-        { error: "Missing Stripe price configuration" },
-        { status: 500 }
-      );
-    }
+    const priceId = assertStripePriceId(
+      rawPriceId,
+      billingInterval === "yearly"
+        ? "STRIPE_PRICE_PRO_YEARLY"
+        : "STRIPE_PRICE_PRO_MONTHLY"
+    );
 
     await ensureSubscriptionRow(supabase, user.id);
     const subscription = await resolveUserSubscription(

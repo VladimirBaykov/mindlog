@@ -43,20 +43,26 @@ export default function UpgradePage() {
 
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          interval: "monthly",
+        }),
       });
 
-      if (!res.ok) {
-        throw new Error("Checkout failed");
-      }
-
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Checkout failed");
+      }
 
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Checkout scaffold failed");
+      alert(err.message || "Checkout failed");
     } finally {
       setLoadingCheckout(false);
     }
@@ -85,7 +91,9 @@ export default function UpgradePage() {
               disabled={loadingCheckout}
               className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
             >
-              {loadingCheckout ? "Preparing checkout..." : "Continue to checkout"}
+              {loadingCheckout
+                ? "Preparing checkout..."
+                : "Continue to checkout"}
             </button>
           </div>
 
@@ -122,12 +130,11 @@ export default function UpgradePage() {
 
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-4">
             <div className="text-sm font-medium text-white">
-              Stripe is not connected yet
+              Stripe integration enabled
             </div>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              This flow now has the correct billing architecture scaffold.
-              The next step is replacing the placeholder route with real Stripe
-              checkout + webhook plan activation.
+              This flow uses real Stripe checkout. Webhook sync will activate
+              Pro automatically after successful payment.
             </p>
           </div>
         </div>

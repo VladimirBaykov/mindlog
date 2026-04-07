@@ -8,9 +8,7 @@ export function getStripe() {
   }
 
   if (!stripeInstance) {
-    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-02-24.acacia",
-    });
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
   }
 
   return stripeInstance;
@@ -18,4 +16,27 @@ export function getStripe() {
 
 export function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
+
+export function assertStripePriceId(
+  value: string | undefined,
+  envName: string
+) {
+  if (!value) {
+    throw new Error(`Missing ${envName}`);
+  }
+
+  if (value.startsWith("prod_")) {
+    throw new Error(
+      `${envName} must be a Stripe Price ID (price_...), not a Product ID (prod_...)`
+    );
+  }
+
+  if (!value.startsWith("price_")) {
+    throw new Error(
+      `${envName} must start with price_...`
+    );
+  }
+
+  return value;
 }

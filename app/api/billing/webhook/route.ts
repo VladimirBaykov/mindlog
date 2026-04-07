@@ -29,19 +29,13 @@ function getAdminSupabase() {
 }
 
 function getUserIdFromSubscription(subscription: Stripe.Subscription) {
-  return (
-    subscription.metadata?.supabase_user_id ||
-    null
-  );
+  return subscription.metadata?.supabase_user_id || null;
 }
 
 function getUserIdFromCheckoutSession(
   session: Stripe.Checkout.Session
 ) {
-  return (
-    session.metadata?.supabase_user_id ||
-    null
-  );
+  return session.metadata?.supabase_user_id || null;
 }
 
 export async function POST(req: Request) {
@@ -141,6 +135,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true });
   } catch (e: any) {
     console.error("STRIPE WEBHOOK ERROR:", e);
+
     return new NextResponse(
       `Webhook Error: ${e.message || "Unknown error"}`,
       { status: 400 }

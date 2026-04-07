@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 
 export default function BillingSuccessPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setHeader, resetHeader } = useHeader();
 
   useEffect(() => {
@@ -25,6 +26,8 @@ export default function BillingSuccessPage() {
     return () => resetHeader();
   }, [router, setHeader, resetHeader]);
 
+  const sessionId = searchParams.get("session_id");
+
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
@@ -35,13 +38,19 @@ export default function BillingSuccessPage() {
             </div>
 
             <h1 className="mt-4 text-2xl font-semibold text-white">
-              Billing scaffold is working
+              Checkout completed
             </h1>
 
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
-              This is a placeholder success screen. The next step is wiring
-              real Stripe checkout and webhook-based plan activation.
+              Stripe checkout completed. If webhook delivery is configured,
+              your Pro plan should sync automatically in a moment.
             </p>
+
+            {sessionId && (
+              <p className="mt-3 break-all text-xs text-neutral-500">
+                Session: {sessionId}
+              </p>
+            )}
 
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <button

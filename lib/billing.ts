@@ -1,4 +1,7 @@
-import { normalizePlan, getPlanFromStripePriceId } from "@/lib/plans";
+import {
+  normalizePlan,
+  getPlanFromStripePriceId,
+} from "@/lib/plans";
 
 export type SubscriptionRow = {
   id: string;

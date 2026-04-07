@@ -136,18 +136,18 @@ export default function ProfilePage() {
         method: "POST",
       });
 
-      if (!res.ok) {
-        throw new Error("Portal failed");
-      }
-
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Portal failed");
+      }
 
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Portal scaffold failed");
+      alert(err.message || "Portal failed");
     } finally {
       setLoadingPortal(false);
     }
