@@ -8,6 +8,25 @@ import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 
+type UsageInfo = {
+  plan: "free" | "pro";
+  status?: string;
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  canSave: boolean;
+  currentPeriodEnd?: string | null;
+};
+
+type CloseErrorResponse = {
+  error?: string;
+  code?: string;
+  upgradeUrl?: string;
+  used?: number;
+  limit?: number | null;
+  canSave?: boolean;
+};
+
 export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -16,6 +35,9 @@ export default function Chat() {
   const [isSaved, setIsSaved] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(false);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [limitError, setLimitError] = useState<string | null>(null);
 
   const { setHeader, resetHeader } = useHeader();
   const { addItem } = useJournal();
@@ -39,6 +61,32 @@ export default function Chat() {
     const scrollHeight = el.scrollHeight;
     el.style.height = Math.min(scrollHeight, 160) + "px";
   }, [input]);
+
+  async function loadUsage() {
+    try {
+      setUsageLoading(true);
+
+      const res = await fetch("/api/account/usage", {
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to load usage");
+      }
+
+      const data = (await res.json()) as UsageInfo;
+      setUsage(data);
+    } catch (error) {
+      console.error("Usage load failed:", error);
+      setUsage(null);
+    } finally {
+      setUsageLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadUsage();
+  }, []);
 
   useEffect(() => {
     setHeader({
@@ -78,10 +126,13 @@ export default function Chat() {
     setLoading(false);
     setChatState("empty");
     setIsSaved(false);
+    setLimitError(null);
   }
 
   async function closeConversation() {
     if (messages.length === 0 || isSaved) return;
+
+    setLimitError(null);
 
     try {
       const res = await fetch("/api/conversation/close", {
@@ -90,19 +141,39 @@ export default function Chat() {
         body: JSON.stringify({ messages }),
       });
 
-      if (!res.ok) throw new Error("Close failed");
+      if (res.status === 403) {
+        const data = (await res.json()) as CloseErrorResponse;
+
+        if (data.code === "FREE_LIMIT_REACHED") {
+          setLimitError(
+            data.limit
+              ? `You’ve reached your free plan limit of ${data.limit} saved entries. Upgrade to Pro to keep saving conversations.`
+              : "You’ve reached your current plan limit."
+          );
+
+          await loadUsage();
+          return;
+        }
+      }
+
+      if (!res.ok) {
+        throw new Error("Close failed");
+      }
 
       const conversation = await res.json();
 
       addItem(conversation);
       setIsSaved(true);
       resetChat();
+      await loadUsage();
 
       if (pendingNavigation) {
         window.location.href = "/journal";
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setPendingNavigation(false);
     }
   }
 
@@ -120,6 +191,7 @@ export default function Chat() {
     setMessages(nextMessages);
     setInput("");
     setLoading(true);
+    setChatState("active");
 
     try {
       const res = await fetch("/api/chat", {
@@ -184,8 +256,77 @@ export default function Chat() {
                   Start with whatever feels present. When you’re ready,
                   close the conversation and save it to your journal.
                 </p>
+
+                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                      Plan
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300 capitalize">
+                      {usageLoading
+                        ? "loading"
+                        : usage?.plan || "free"}
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-sm text-neutral-300">
+                    {usageLoading
+                      ? "Checking your journal usage..."
+                      : usage?.limit
+                      ? `${usage.used}/${usage.limit} saved entries used`
+                      : "Unlimited saved entries available"}
+                  </p>
+
+                  {typeof usage?.remaining === "number" && (
+                    <p className="mt-2 text-xs text-neutral-500">
+                      {usage.remaining > 0
+                        ? `${usage.remaining} saves remaining on your current plan.`
+                        : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
+                    </p>
+                  )}
+                </div>
+
+                {limitError && (
+                  <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
+                    <div className="text-sm font-medium text-white">
+                      Save limit reached
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                      {limitError}
+                    </p>
+
+                    <button
+                      onClick={() => {
+                        window.location.href = "/upgrade";
+                      }}
+                      className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                    >
+                      Upgrade to Pro
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
+          )}
+
+          {!showEmptyState && limitError && (
+            <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Save limit reached
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                {limitError}
+              </p>
+
+              <button
+                onClick={() => {
+                  window.location.href = "/upgrade";
+                }}
+                className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
           )}
 
           <div className="space-y-3">
@@ -293,8 +434,14 @@ export default function Chat() {
       <ConfirmModal
         open={showCloseConfirm}
         title="Close this conversation?"
-        description="It will be saved to your journal."
-        confirmLabel="Close & save"
+        description={
+          usage?.canSave === false
+            ? "You’ve reached your free plan save limit. Upgrade to Pro to save this conversation."
+            : "It will be saved to your journal."
+        }
+        confirmLabel={
+          usage?.canSave === false ? "Upgrade to Pro" : "Close & save"
+        }
         danger={false}
         onCancel={() => {
           setShowCloseConfirm(false);
@@ -302,6 +449,12 @@ export default function Chat() {
         }}
         onConfirm={() => {
           setShowCloseConfirm(false);
+
+          if (usage?.canSave === false) {
+            window.location.href = "/upgrade";
+            return;
+          }
+
           closeConversation();
         }}
       />

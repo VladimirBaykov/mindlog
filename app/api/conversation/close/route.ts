@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { cookies } from "next/headers";
+import { resolveUserSubscription } from "@/lib/billing";
+import { getJournalLimit } from "@/lib/plans";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -57,10 +58,22 @@ calm, reflective, heavy, anxious, hopeful
   return res.choices[0].message.content?.trim()?.toLowerCase();
 }
 
+function isValidMessagesArray(value: unknown): value is Message[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        (item.role === "user" || item.role === "assistant") &&
+        typeof item.content === "string"
+    )
+  );
+}
+
 export async function POST(req: Request) {
   try {
-    // SERVER AUTH
-    const cookieStore = cookies();
     const supabase = await createSupabaseServerClient();
 
     const {
@@ -74,21 +87,65 @@ export async function POST(req: Request) {
       );
     }
 
-    const { messages } = await req.json();
-    if (!messages || !messages.length) {
+    const body = await req.json().catch(() => null);
+    const messages = body?.messages;
+
+    if (!isValidMessagesArray(messages)) {
       return NextResponse.json(
-        { error: "No messages provided" },
+        { error: "No valid messages provided" },
         { status: 400 }
       );
     }
 
-    // FALLBACK TITLE
-    const firstUserMessage =
-      messages.find((m: Message) => m.role === "user")?.content;
+    const subscription = await resolveUserSubscription(
+      supabase,
+      user.id
+    );
+
+    const journalLimit = getJournalLimit(subscription.plan);
+
+    if (typeof journalLimit === "number") {
+      const { count, error: countError } = await supabase
+        .from("journals")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
+
+      if (countError) {
+        console.error("Journal count error:", countError);
+
+        return NextResponse.json(
+          { error: "Failed to check save limit" },
+          { status: 500 }
+        );
+      }
+
+      const used = count ?? 0;
+
+      if (used >= journalLimit) {
+        return NextResponse.json(
+          {
+            error: "Free plan save limit reached",
+            code: "FREE_LIMIT_REACHED",
+            plan: subscription.plan,
+            used,
+            limit: journalLimit,
+            remaining: 0,
+            canSave: false,
+            upgradeUrl: "/upgrade",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    const firstUserMessage = messages.find(
+      (m) => m.role === "user"
+    )?.content;
+
     const fallbackTitle =
       firstUserMessage?.slice(0, 48) || "Conversation";
 
-    // Generate AI metadata
     let title = fallbackTitle;
     let mood = "calm";
 
@@ -104,7 +161,6 @@ export async function POST(req: Request) {
       console.warn("AI metadata failed:", e);
     }
 
-    // INSERT TO SUPABASE
     const { data, error } = await supabase
       .from("journals")
       .insert([
@@ -120,6 +176,7 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("Supabase insert error:", error);
+
       return NextResponse.json(
         { error: "Failed to save conversation" },
         { status: 500 }
@@ -129,6 +186,7 @@ export async function POST(req: Request) {
     return NextResponse.json(data);
   } catch (e) {
     console.error("CLOSE CONVERSATION ERROR:", e);
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
