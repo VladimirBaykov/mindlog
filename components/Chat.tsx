@@ -18,15 +18,21 @@ type UsageInfo = {
   remaining: number | null;
   canSave: boolean;
   currentPeriodEnd?: string | null;
+  ai?: {
+    maxMessagesPerConversation: number;
+    maxCharactersPerMessage: number;
+    maxTotalInputCharacters: number;
+  };
 };
 
-type CloseErrorResponse = {
+type ApiErrorResponse = {
   error?: string;
   code?: string;
-  upgradeUrl?: string;
+  upgradeUrl?: string | null;
   used?: number;
   limit?: number | null;
   canSave?: boolean;
+  plan?: "free" | "pro";
 };
 
 type GoalOption =
@@ -68,6 +74,9 @@ export default function Chat() {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
   const [limitError, setLimitError] = useState<string | null>(
+    null
+  );
+  const [chatError, setChatError] = useState<string | null>(
     null
   );
   const [starterApplied, setStarterApplied] = useState(false);
@@ -256,11 +265,13 @@ export default function Chat() {
     setChatState("empty");
     setIsSaved(false);
     setLimitError(null);
+    setChatError(null);
   }
 
   function applySuggestedPrompt(prompt: string) {
     setInput(prompt);
     setChatState("active");
+    setChatError(null);
     textareaRef.current?.focus();
   }
 
@@ -277,7 +288,7 @@ export default function Chat() {
       });
 
       if (res.status === 403) {
-        const data = (await res.json()) as CloseErrorResponse;
+        const data = (await res.json()) as ApiErrorResponse;
 
         if (data.code === "FREE_LIMIT_REACHED") {
           setLimitError(
@@ -323,13 +334,56 @@ export default function Chat() {
   async function sendMessage() {
     if (!input.trim() || loading) return;
 
+    setChatError(null);
+
+    const currentInput = input.trim();
+
+    if (
+      usage?.ai?.maxCharactersPerMessage &&
+      currentInput.length > usage.ai.maxCharactersPerMessage
+    ) {
+      setChatError(
+        `This message is too long for your current plan. Maximum length: ${usage.ai.maxCharactersPerMessage} characters.`
+      );
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: input.trim(),
+      content: currentInput,
     };
 
     const nextMessages = [...messages, userMessage];
+
+    if (
+      usage?.ai?.maxMessagesPerConversation &&
+      nextMessages.length > usage.ai.maxMessagesPerConversation
+    ) {
+      setChatError(
+        usage.plan === "free"
+          ? `You’ve reached the free plan conversation depth limit (${usage.ai.maxMessagesPerConversation} messages). Upgrade to Pro for deeper conversations.`
+          : `This conversation has reached its current depth limit (${usage.ai.maxMessagesPerConversation} messages).`
+      );
+      return;
+    }
+
+    const totalInputCharacters = nextMessages.reduce(
+      (sum, message) => sum + message.content.length,
+      0
+    );
+
+    if (
+      usage?.ai?.maxTotalInputCharacters &&
+      totalInputCharacters > usage.ai.maxTotalInputCharacters
+    ) {
+      setChatError(
+        usage.plan === "free"
+          ? "You’ve reached the free plan context limit for this conversation. Upgrade to Pro or start a new reflection."
+          : "This conversation has become too large. Start a new reflection to continue clearly."
+      );
+      return;
+    }
 
     setMessages(nextMessages);
     setInput("");
@@ -343,28 +397,69 @@ export default function Chat() {
         body: JSON.stringify({ messages: nextMessages }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const text = await res.text();
+        const apiError = data as ApiErrorResponse | null;
+
+        if (apiError?.code === "CHAT_DEPTH_LIMIT") {
+          setChatError(
+            apiError.plan === "free"
+              ? `You’ve reached the free plan conversation depth limit (${apiError.limit} messages). Upgrade to Pro for deeper conversations.`
+              : "This conversation has reached its depth limit."
+          );
+          setMessages(messages);
+          return;
+        }
+
+        if (apiError?.code === "MESSAGE_TOO_LONG") {
+          setChatError(
+            apiError.limit
+              ? `This message is too long. Maximum length: ${apiError.limit} characters.`
+              : "This message is too long."
+          );
+          setMessages(messages);
+          return;
+        }
+
+        if (apiError?.code === "TOTAL_CONTEXT_LIMIT") {
+          setChatError(
+            apiError.plan === "free"
+              ? "You’ve reached the free plan context limit. Upgrade to Pro or start a new conversation."
+              : "This conversation is too large to continue in one thread. Start a new reflection."
+          );
+          setMessages(messages);
+          return;
+        }
+
+        const text =
+          apiError?.error || "Something went wrong while sending.";
         console.error("API error:", text);
+        setChatError(text);
+        setMessages(messages);
         return;
       }
-
-      const data = await res.json();
 
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: data.reply,
+          content:
+            (data as { reply?: string })?.reply ||
+            "I’m here with you.",
         },
       ]);
 
-      if (data.chatState) {
-        setChatState(data.chatState);
+      if ((data as { chatState?: ChatState })?.chatState) {
+        setChatState((data as { chatState: ChatState }).chatState);
       }
     } catch (err) {
       console.error(err);
+      setChatError(
+        "Something went quiet for a moment. Want to try again?"
+      );
+      setMessages(messages);
     } finally {
       setLoading(false);
     }
@@ -443,6 +538,18 @@ export default function Chat() {
                         : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
                     </p>
                   )}
+
+                  {usage?.ai && (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                        AI depth
+                      </div>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                        {usage.ai.maxMessagesPerConversation} messages per conversation · up to{" "}
+                        {usage.ai.maxCharactersPerMessage} characters per message
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-5">
@@ -482,27 +589,84 @@ export default function Chat() {
                     </button>
                   </div>
                 )}
+
+                {chatError && (
+                  <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
+                    <div className="text-sm font-medium text-white">
+                      Conversation limit reached
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                      {chatError}
+                    </p>
+
+                    {usage?.plan === "free" && (
+                      <button
+                        onClick={() => {
+                          window.location.href = "/upgrade";
+                        }}
+                        className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                      >
+                        Upgrade to Pro
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
 
-          {!showEmptyState && limitError && (
-            <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
-              <div className="text-sm font-medium text-white">
-                Save limit reached
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                {limitError}
-              </p>
+          {!showEmptyState && (limitError || chatError) && (
+            <div className="mb-4 space-y-3">
+              {limitError && (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    Save limit reached
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                    {limitError}
+                  </p>
 
-              <button
-                onClick={() => {
-                  window.location.href = "/upgrade";
-                }}
-                className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-              >
-                Upgrade to Pro
-              </button>
+                  <button
+                    onClick={() => {
+                      window.location.href = "/upgrade";
+                    }}
+                    className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                  >
+                    Upgrade to Pro
+                  </button>
+                </div>
+              )}
+
+              {chatError && (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    AI conversation limit
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                    {chatError}
+                  </p>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    {usage?.plan === "free" && (
+                      <button
+                        onClick={() => {
+                          window.location.href = "/upgrade";
+                        }}
+                        className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                      >
+                        Upgrade to Pro
+                      </button>
+                    )}
+
+                    <button
+                      onClick={resetChat}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                    >
+                      Start new conversation
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -586,7 +750,10 @@ export default function Chat() {
               ref={textareaRef}
               rows={1}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (chatError) setChatError(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();

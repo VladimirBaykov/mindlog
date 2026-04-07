@@ -6,6 +6,12 @@ export type FeatureKey =
   | "ai_insights"
   | "pdf_export";
 
+export type ChatUsageLimits = {
+  maxMessagesPerConversation: number;
+  maxCharactersPerMessage: number;
+  maxTotalInputCharacters: number;
+};
+
 export const FREE_JOURNAL_LIMIT = 20;
 
 export function normalizePlan(
@@ -16,6 +22,24 @@ export function normalizePlan(
 
 export function getJournalLimit(plan: PlanTier): number | null {
   return plan === "pro" ? null : FREE_JOURNAL_LIMIT;
+}
+
+export function getChatUsageLimits(
+  plan: PlanTier
+): ChatUsageLimits {
+  if (plan === "pro") {
+    return {
+      maxMessagesPerConversation: 40,
+      maxCharactersPerMessage: 4000,
+      maxTotalInputCharacters: 24000,
+    };
+  }
+
+  return {
+    maxMessagesPerConversation: 16,
+    maxCharactersPerMessage: 1200,
+    maxTotalInputCharacters: 8000,
+  };
 }
 
 export function hasFeatureAccess(

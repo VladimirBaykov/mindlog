@@ -11,6 +11,8 @@ import { getStateOverlay } from "@/lib/prompts/stateOverlay";
 import { detectIntent } from "@/lib/intent/detectIntent";
 import { resolveChatState } from "@/lib/state/resolveChatState";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { resolveUserSubscription } from "@/lib/billing";
+import { getChatUsageLimits } from "@/lib/plans";
 
 type GoalOption =
   | "process_emotions"
@@ -98,10 +100,56 @@ function buildPreferenceOverlay(params: {
   ].join("\n");
 }
 
+function isValidRole(
+  value: unknown
+): value is ChatMessage["role"] {
+  return value === "user" || value === "assistant";
+}
+
+function normalizeMessages(input: unknown): ChatMessage[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input
+    .filter(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        isValidRole((item as ChatMessage).role) &&
+        typeof (item as ChatMessage).content === "string"
+    )
+    .map((item, index) => ({
+      id:
+        typeof (item as ChatMessage).id === "string"
+          ? (item as ChatMessage).id
+          : `msg-${index}`,
+      role: (item as ChatMessage).role,
+      content: (item as ChatMessage).content.trim(),
+    }))
+    .filter((item) => item.content.length > 0);
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const messages: ChatMessage[] = body.messages ?? [];
+    const supabase = await createSupabaseServerClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          error: "Unauthorized",
+          code: "UNAUTHORIZED",
+        },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const messages = normalizeMessages(body.messages);
 
     if (!messages.length) {
       return NextResponse.json({
@@ -110,15 +158,71 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const subscription = await resolveUserSubscription(
+      supabase,
+      user.id
+    );
+
+    const plan = subscription.isPro ? "pro" : "free";
+    const limits = getChatUsageLimits(plan);
+
+    if (messages.length > limits.maxMessagesPerConversation) {
+      return NextResponse.json(
+        {
+          error:
+            plan === "free"
+              ? "Free plan conversation depth reached"
+              : "Conversation is too long",
+          code: "CHAT_DEPTH_LIMIT",
+          plan,
+          limit: limits.maxMessagesPerConversation,
+          upgradeUrl: plan === "free" ? "/upgrade" : null,
+        },
+        { status: 403 }
+      );
+    }
+
+    const longestMessage = messages.reduce(
+      (max, message) => Math.max(max, message.content.length),
+      0
+    );
+
+    if (longestMessage > limits.maxCharactersPerMessage) {
+      return NextResponse.json(
+        {
+          error: "A message is too long",
+          code: "MESSAGE_TOO_LONG",
+          plan,
+          limit: limits.maxCharactersPerMessage,
+        },
+        { status: 400 }
+      );
+    }
+
+    const totalCharacters = messages.reduce(
+      (sum, message) => sum + message.content.length,
+      0
+    );
+
+    if (totalCharacters > limits.maxTotalInputCharacters) {
+      return NextResponse.json(
+        {
+          error:
+            plan === "free"
+              ? "Free plan context limit reached"
+              : "Conversation context is too large",
+          code: "TOTAL_CONTEXT_LIMIT",
+          plan,
+          limit: limits.maxTotalInputCharacters,
+          upgradeUrl: plan === "free" ? "/upgrade" : null,
+        },
+        { status: 403 }
+      );
+    }
+
     let preferenceOverlay = "";
 
     try {
-      const supabase = await createSupabaseServerClient();
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
       const goal =
         (user?.user_metadata?.onboarding_goal as GoalOption) ??
         null;
@@ -148,6 +252,10 @@ export async function POST(req: NextRequest) {
       BASE_SYSTEM_PROMPT,
       getStateOverlay(chatState),
       preferenceOverlay,
+      `Plan context: ${plan}.`,
+      plan === "free"
+        ? "Free plan guidance: keep responses helpful, concise, and focused. Do not over-extend or produce unnecessarily long answers."
+        : "Pro plan guidance: deeper reflection is allowed when it genuinely helps the user.",
     ]
       .filter(Boolean)
       .join("\n\n");
