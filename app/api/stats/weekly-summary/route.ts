@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { resolveUserSubscription } from "@/lib/billing";
+import { hasFeatureAccess } from "@/lib/plans";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,33 @@ export async function GET() {
       );
     }
 
+    const subscription = await resolveUserSubscription(
+      supabase,
+      user.id
+    );
+
+    const canAccess = hasFeatureAccess(
+      subscription.plan,
+      "weekly_summary"
+    );
+
+    if (!canAccess) {
+      return NextResponse.json(
+        {
+          error: "Pro feature locked",
+          code: "PRO_REQUIRED",
+          locked: true,
+          feature: "weekly_summary",
+          upgradeUrl: "/upgrade",
+          summary:
+            "Weekly reflection is available on MindLog Pro. Upgrade to unlock deeper 7-day summaries and stronger reflection patterns.",
+          totalEntries: null,
+          moods: null,
+        },
+        { status: 403 }
+      );
+    }
+
     const since = new Date();
     since.setDate(since.getDate() - 7);
 
@@ -61,7 +90,8 @@ export async function GET() {
         summary:
           "No entries yet this week. Once you write a few reflections, your weekly summary will appear here.",
         totalEntries: 0,
-        moods: [],
+        moods: {},
+        locked: false,
       });
     }
 
@@ -120,6 +150,7 @@ export async function GET() {
       summary,
       totalEntries: entries.length,
       moods: moodCount,
+      locked: false,
     });
   } catch (e: any) {
     console.error("WEEKLY SUMMARY ERROR:", e);

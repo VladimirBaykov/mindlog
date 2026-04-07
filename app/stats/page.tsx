@@ -11,12 +11,27 @@ import LockedFeatureCard from "@/components/ui/LockedFeatureCard";
 
 type WeeklySummaryResponse = {
   summary: string;
-  totalEntries: number;
-  moods: Record<string, number>;
+  totalEntries: number | null;
+  moods: Record<string, number> | null;
+  locked?: boolean;
+  code?: string;
+  feature?: string;
+  upgradeUrl?: string;
 };
 
 type InsightsResponse = {
   insights: string[];
+  locked?: boolean;
+  code?: string;
+  feature?: string;
+  upgradeUrl?: string;
+};
+
+type SubscriptionResponse = {
+  plan: "free" | "pro";
+  status: string;
+  currentPeriodEnd: string | null;
+  isPro: boolean;
 };
 
 export default function StatsPage() {
@@ -24,13 +39,18 @@ export default function StatsPage() {
   const { items } = useJournal();
   const { setHeader, resetHeader } = useHeader();
 
+  const [subscription, setSubscription] =
+    useState<SubscriptionResponse | null>(null);
+
   const [weekly, setWeekly] =
     useState<WeeklySummaryResponse | null>(null);
   const [insights, setInsights] =
     useState<InsightsResponse | null>(null);
 
-  const [loadingWeekly, setLoadingWeekly] = useState(true);
-  const [loadingInsights, setLoadingInsights] = useState(true);
+  const [loadingSubscription, setLoadingSubscription] =
+    useState(true);
+  const [loadingWeekly, setLoadingWeekly] = useState(false);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   useEffect(() => {
     setHeader({
@@ -63,26 +83,129 @@ export default function StatsPage() {
   }, [router, setHeader, resetHeader]);
 
   useEffect(() => {
-    fetch("/api/stats/weekly-summary")
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed");
-        return res.json();
-      })
-      .then((data) => setWeekly(data))
-      .catch((err) => console.error("Stats load error:", err))
-      .finally(() => setLoadingWeekly(false));
+    let cancelled = false;
+
+    async function loadSubscription() {
+      try {
+        setLoadingSubscription(true);
+
+        const res = await fetch("/api/account/subscription", {
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to load subscription");
+        }
+
+        const data = (await res.json()) as SubscriptionResponse;
+
+        if (!cancelled) {
+          setSubscription(data);
+        }
+      } catch (error) {
+        console.error("Subscription load error:", error);
+
+        if (!cancelled) {
+          setSubscription({
+            plan: "free",
+            status: "inactive",
+            currentPeriodEnd: null,
+            isPro: false,
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSubscription(false);
+        }
+      }
+    }
+
+    loadSubscription();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    fetch("/api/stats/insights")
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed");
-        return res.json();
-      })
-      .then((data) => setInsights(data))
-      .catch((err) => console.error("Insights load error:", err))
-      .finally(() => setLoadingInsights(false));
-  }, []);
+    if (loadingSubscription || !subscription?.isPro) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadWeekly() {
+      try {
+        setLoadingWeekly(true);
+
+        const res = await fetch("/api/stats/weekly-summary", {
+          cache: "no-store",
+        });
+
+        const data = await res.json();
+
+        if (!cancelled) {
+          setWeekly(data);
+        }
+
+        if (!res.ok && res.status !== 403) {
+          throw new Error("Failed to load weekly summary");
+        }
+      } catch (err) {
+        console.error("Stats load error:", err);
+      } finally {
+        if (!cancelled) {
+          setLoadingWeekly(false);
+        }
+      }
+    }
+
+    loadWeekly();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadingSubscription, subscription?.isPro]);
+
+  useEffect(() => {
+    if (loadingSubscription || !subscription?.isPro) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadInsights() {
+      try {
+        setLoadingInsights(true);
+
+        const res = await fetch("/api/stats/insights", {
+          cache: "no-store",
+        });
+
+        const data = await res.json();
+
+        if (!cancelled) {
+          setInsights(data);
+        }
+
+        if (!res.ok && res.status !== 403) {
+          throw new Error("Failed to load insights");
+        }
+      } catch (err) {
+        console.error("Insights load error:", err);
+      } finally {
+        if (!cancelled) {
+          setLoadingInsights(false);
+        }
+      }
+    }
+
+    loadInsights();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadingSubscription, subscription?.isPro]);
 
   const totalEntries = items.length;
 
@@ -107,6 +230,8 @@ export default function StatsPage() {
     if (!items.length) return "No entries yet";
     return new Date(items[0].createdAt).toLocaleDateString();
   }, [items]);
+
+  const isPro = subscription?.isPro ?? false;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -141,12 +266,23 @@ export default function StatsPage() {
             </div>
           </div>
 
-          <p className="mt-4 text-sm leading-relaxed text-neutral-300">
-            {loadingWeekly
-              ? "Generating your weekly reflection..."
-              : weekly?.summary ||
+          {loadingSubscription || loadingWeekly ? (
+            <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+              Generating your weekly reflection...
+            </p>
+          ) : isPro ? (
+            <p className="mt-4 text-sm leading-relaxed text-neutral-300">
+              {weekly?.summary ||
                 "No weekly reflection available yet."}
-          </p>
+            </p>
+          ) : (
+            <div className="mt-4">
+              <LockedFeatureCard
+                title="Weekly reflection summary"
+                description="Pro unlocks a 7-day reflective summary based on your recent journal activity, emotional patterns, and recurring themes."
+              />
+            </div>
+          )}
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
@@ -155,7 +291,7 @@ export default function StatsPage() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {loadingInsights ? (
+            {loadingSubscription || loadingInsights ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div
@@ -167,19 +303,26 @@ export default function StatsPage() {
                   </div>
                 ))}
               </div>
-            ) : insights?.insights?.length ? (
-              insights.insights.map((insight, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
-                >
-                  {insight}
-                </div>
-              ))
+            ) : isPro ? (
+              insights?.insights?.length ? (
+                insights.insights.map((insight, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
+                  >
+                    {insight}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-neutral-500">
+                  No insights available yet.
+                </p>
+              )
             ) : (
-              <p className="text-sm text-neutral-500">
-                No insights available yet.
-              </p>
+              <LockedFeatureCard
+                title="AI emotional pattern insights"
+                description="Pro unlocks deeper emotional signals, recurring themes, and more meaningful reflection guidance generated from your journal history."
+              />
             )}
           </div>
         </div>
@@ -214,15 +357,19 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <LockedFeatureCard
-          title="Deep emotional trends"
-          description="Pro will unlock longer-range pattern detection, stronger summaries, and richer emotional analytics over time."
-        />
+        {!isPro && !loadingSubscription && (
+          <>
+            <LockedFeatureCard
+              title="Deep emotional trends"
+              description="Pro will unlock longer-range pattern detection, stronger summaries, and richer emotional analytics over time."
+            />
 
-        <LockedFeatureCard
-          title="Export reflection reports"
-          description="Pro will let users export personal summaries and journal analytics as polished downloadable reports."
-        />
+            <LockedFeatureCard
+              title="Export reflection reports"
+              description="Pro will let users export personal summaries and journal analytics as polished downloadable reports."
+            />
+          </>
+        )}
       </div>
     </div>
   );

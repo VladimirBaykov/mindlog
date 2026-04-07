@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { resolveUserSubscription } from "@/lib/billing";
+import { hasFeatureAccess } from "@/lib/plans";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,30 @@ export async function GET() {
       );
     }
 
+    const subscription = await resolveUserSubscription(
+      supabase,
+      user.id
+    );
+
+    const canAccess = hasFeatureAccess(
+      subscription.plan,
+      "ai_insights"
+    );
+
+    if (!canAccess) {
+      return NextResponse.json(
+        {
+          error: "Pro feature locked",
+          code: "PRO_REQUIRED",
+          locked: true,
+          feature: "ai_insights",
+          upgradeUrl: "/upgrade",
+          insights: [],
+        },
+        { status: 403 }
+      );
+    }
+
     const since = new Date();
     since.setDate(since.getDate() - 14);
 
@@ -62,6 +88,7 @@ export async function GET() {
         insights: [
           "No insights yet — write a few reflections and MindLog will start surfacing patterns.",
         ],
+        locked: false,
       });
     }
 
@@ -119,7 +146,10 @@ export async function GET() {
       console.warn("Insights AI failed:", aiError);
     }
 
-    return NextResponse.json({ insights });
+    return NextResponse.json({
+      insights,
+      locked: false,
+    });
   } catch (e: any) {
     console.error("INSIGHTS ERROR:", e);
 

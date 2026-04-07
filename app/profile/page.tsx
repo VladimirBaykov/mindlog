@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const [subscription, setSubscription] =
     useState<SubscriptionInfo>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [refreshingPlan, setRefreshingPlan] = useState(false);
 
   useEffect(() => {
     setHeader({
@@ -81,51 +82,59 @@ export default function ProfilePage() {
     return () => resetHeader();
   }, [router, resetHeader, setHeader]);
 
-  useEffect(() => {
-    async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  async function loadUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      setUserInfo({
-        email: user?.email ?? null,
-        id: user?.id ?? null,
+    setUserInfo({
+      email: user?.email ?? null,
+      id: user?.id ?? null,
+    });
+  }
+
+  async function loadUsage() {
+    try {
+      const res = await fetch("/api/account/usage", {
+        cache: "no-store",
       });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setUsage(data);
+    } catch (err) {
+      console.error("Usage load failed:", err);
     }
+  }
 
-    async function loadUsage() {
-      try {
-        const res = await fetch("/api/account/usage", {
-          cache: "no-store",
-        });
+  async function loadSubscription() {
+    try {
+      const res = await fetch("/api/account/subscription", {
+        cache: "no-store",
+      });
 
-        if (!res.ok) return;
+      if (!res.ok) return;
 
-        const data = await res.json();
-        setUsage(data);
-      } catch (err) {
-        console.error("Usage load failed:", err);
-      }
+      const data = await res.json();
+      setSubscription(data);
+    } catch (err) {
+      console.error("Subscription load failed:", err);
     }
+  }
 
-    async function loadSubscription() {
-      try {
-        const res = await fetch("/api/account/subscription", {
-          cache: "no-store",
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        setSubscription(data);
-      } catch (err) {
-        console.error("Subscription load failed:", err);
-      }
+  async function refreshPlanStatus() {
+    try {
+      setRefreshingPlan(true);
+      await Promise.all([loadUsage(), loadSubscription()]);
+    } finally {
+      setRefreshingPlan(false);
     }
+  }
 
+  useEffect(() => {
     loadUser();
-    loadUsage();
-    loadSubscription();
+    refreshPlanStatus();
   }, []);
 
   async function handlePortal() {
@@ -153,6 +162,8 @@ export default function ProfilePage() {
     }
   }
 
+  const isPro = subscription?.isPro ?? false;
+
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
@@ -173,7 +184,7 @@ export default function ProfilePage() {
                   Plan
                 </div>
                 <div className="mt-2 text-base font-medium capitalize text-white">
-                  {subscription?.isPro ? "pro" : "free"} plan
+                  {isPro ? "pro" : "free"} plan
                 </div>
                 <p className="mt-1 text-sm text-neutral-400">
                   {usage?.limit
@@ -205,21 +216,40 @@ export default function ProfilePage() {
             )}
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => router.push("/upgrade")}
-                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
-              >
-                Upgrade to Pro
-              </button>
+              {!isPro ? (
+                <button
+                  onClick={() => router.push("/upgrade")}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                >
+                  Upgrade to Pro
+                </button>
+              ) : (
+                <button
+                  onClick={handlePortal}
+                  disabled={loadingPortal}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {loadingPortal ? "Opening..." : "Manage billing"}
+                </button>
+              )}
 
               <button
-                onClick={handlePortal}
-                disabled={loadingPortal}
+                onClick={refreshPlanStatus}
+                disabled={refreshingPlan}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
-                {loadingPortal ? "Opening..." : "Manage billing"}
+                {refreshingPlan
+                  ? "Refreshing..."
+                  : "Refresh plan status"}
               </button>
             </div>
+
+            {!isPro && (
+              <p className="mt-3 text-xs text-neutral-500">
+                If you’ve just completed checkout, use refresh after the
+                Stripe webhook sync finishes.
+              </p>
+            )}
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
