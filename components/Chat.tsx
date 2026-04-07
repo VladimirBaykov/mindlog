@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "@/types/chat";
 import type { ChatState } from "@/types/chatState";
@@ -27,17 +28,31 @@ type CloseErrorResponse = {
   canSave?: boolean;
 };
 
+const suggestedPrompts = [
+  "I’ve been feeling emotionally scattered today and want help untangling it.",
+  "Help me reflect on what has been draining my energy lately.",
+  "I want to understand a pattern I keep repeating in my thoughts.",
+];
+
 export default function Chat() {
+  const searchParams = useSearchParams();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [chatState, setChatState] = useState<ChatState>("empty");
+  const [chatState, setChatState] =
+    useState<ChatState>("empty");
   const [isSaved, setIsSaved] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] =
+    useState(false);
+  const [pendingNavigation, setPendingNavigation] =
+    useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
-  const [limitError, setLimitError] = useState<string | null>(null);
+  const [limitError, setLimitError] = useState<string | null>(
+    null
+  );
+  const [starterApplied, setStarterApplied] = useState(false);
 
   const { setHeader, resetHeader } = useHeader();
   const { addItem } = useJournal();
@@ -45,6 +60,8 @@ export default function Chat() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  const starter = searchParams.get("starter");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -61,6 +78,19 @@ export default function Chat() {
     const scrollHeight = el.scrollHeight;
     el.style.height = Math.min(scrollHeight, 160) + "px";
   }, [input]);
+
+  useEffect(() => {
+    if (
+      starter &&
+      !starterApplied &&
+      messages.length === 0 &&
+      !input.trim()
+    ) {
+      setInput(starter);
+      setStarterApplied(true);
+      setChatState("active");
+    }
+  }, [starter, starterApplied, messages.length, input]);
 
   async function loadUsage() {
     try {
@@ -127,6 +157,12 @@ export default function Chat() {
     setChatState("empty");
     setIsSaved(false);
     setLimitError(null);
+  }
+
+  function applySuggestedPrompt(prompt: string) {
+    setInput(prompt);
+    setChatState("active");
+    textareaRef.current?.focus();
   }
 
   async function closeConversation() {
@@ -257,6 +293,18 @@ export default function Chat() {
                   close the conversation and save it to your journal.
                 </p>
 
+                {starter && (
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <div className="text-sm font-medium text-white">
+                      Your first starter is ready
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                      We pre-filled a reflection prompt from onboarding.
+                      You can send it as-is or edit it first.
+                    </p>
+                  </div>
+                )}
+
                 <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs uppercase tracking-[0.18em] text-neutral-500">
@@ -284,6 +332,24 @@ export default function Chat() {
                         : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
                     </p>
                   )}
+                </div>
+
+                <div className="mt-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                    Try a starter
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {suggestedPrompts.map((prompt) => (
+                      <button
+                        key={prompt}
+                        onClick={() => applySuggestedPrompt(prompt)}
+                        className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-left text-xs leading-relaxed text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {limitError && (

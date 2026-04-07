@@ -20,6 +20,11 @@ export default function SignUp() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          onboarding_completed: false,
+        },
+      },
     });
 
     setLoading(false);
@@ -30,7 +35,7 @@ export default function SignUp() {
     }
 
     router.refresh();
-    router.push("/journal");
+    router.push("/welcome");
   };
 
   return (
@@ -55,7 +60,9 @@ export default function SignUp() {
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-[380px] space-y-5">
             <div>
-              <h1 className="text-3xl font-semibold">Create account</h1>
+              <h1 className="text-3xl font-semibold">
+                Create account
+              </h1>
               <p className="mt-2 text-sm text-zinc-400">
                 Start building your private reflection space.
               </p>

@@ -33,19 +33,45 @@ export async function proxy(req: NextRequest) {
     pathname === "/sign-in" || pathname === "/sign-up";
 
   const isPublicPage = pathname === "/";
+  const isApiRoute = pathname.startsWith("/api");
+  const isWelcomePage = pathname === "/welcome";
 
-  const isProtectedPage = !isPublicPage && !isAuthPage;
+  const onboardingCompleted = Boolean(
+    user?.user_metadata?.onboarding_completed
+  );
+
+  const isProtectedPage =
+    !isPublicPage && !isAuthPage && !isApiRoute;
 
   if (!user && isProtectedPage) {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
   if (user && isAuthPage) {
-    return NextResponse.redirect(new URL("/journal", req.url));
+    return NextResponse.redirect(
+      new URL(
+        onboardingCompleted ? "/journal" : "/welcome",
+        req.url
+      )
+    );
   }
 
   if (user && pathname === "/") {
-    return NextResponse.redirect(new URL("/chat", req.url));
+    return NextResponse.redirect(
+      new URL(
+        onboardingCompleted ? "/chat" : "/welcome",
+        req.url
+      )
+    );
+  }
+
+  if (
+    user &&
+    !onboardingCompleted &&
+    !isWelcomePage &&
+    !isApiRoute
+  ) {
+    return NextResponse.redirect(new URL("/welcome", req.url));
   }
 
   return res;
