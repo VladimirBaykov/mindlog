@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 type SubscriptionInfo = {
   plan: "free" | "pro";
@@ -83,6 +84,16 @@ export default function UpgradePage() {
     try {
       setLoadingCheckout(true);
 
+      await trackClientEvent({
+        eventName: "upgrade_checkout_started",
+        page: "/upgrade",
+        metadata: {
+          interval: billingInterval,
+          currentPlan: subscription?.isPro ? "pro" : "free",
+          currentStatus: subscription?.status || "inactive",
+        },
+      });
+
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: {
@@ -113,6 +124,16 @@ export default function UpgradePage() {
   async function handlePortal() {
     try {
       setLoadingPortal(true);
+
+      await trackClientEvent({
+        eventName: "billing_portal_opened",
+        page: "/upgrade",
+        metadata: {
+          from: "upgrade_page",
+          currentPlan: subscription?.isPro ? "pro" : "free",
+          currentStatus: subscription?.status || "inactive",
+        },
+      });
 
       const res = await fetch("/api/billing/portal", {
         method: "POST",

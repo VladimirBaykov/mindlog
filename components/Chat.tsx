@@ -9,6 +9,7 @@ import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import { supabase } from "@/lib/supabase-browser";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 type UsageInfo = {
   plan: "free" | "pro";
@@ -273,6 +274,16 @@ export default function Chat() {
     setChatState("active");
     setChatError(null);
     textareaRef.current?.focus();
+
+    trackClientEvent({
+      eventName: "chat_starter_selected",
+      page: "/chat",
+      metadata: {
+        prompt,
+        goal: preferences.goal,
+        moodPreference: preferences.moodPreference,
+      },
+    });
   }
 
   async function closeConversation() {
@@ -298,6 +309,17 @@ export default function Chat() {
           );
 
           await loadUsage();
+
+          await trackClientEvent({
+            eventName: "chat_limit_hit",
+            page: "/chat",
+            metadata: {
+              type: "save_limit",
+              plan: usage?.plan || "free",
+              limit: data.limit,
+            },
+          });
+
           return;
         }
       }
@@ -311,6 +333,17 @@ export default function Chat() {
       addItem(conversation);
       setIsSaved(true);
       await loadUsage();
+
+      await trackClientEvent({
+        eventName: "conversation_saved",
+        page: "/chat",
+        metadata: {
+          conversationId: conversation.id,
+          messageCount: messages.length,
+          goal: preferences.goal,
+          plan: usage?.plan || "free",
+        },
+      });
 
       const successUrl = `/journal?celebrate=1&entry=${encodeURIComponent(
         conversation.id
@@ -342,9 +375,20 @@ export default function Chat() {
       usage?.ai?.maxCharactersPerMessage &&
       currentInput.length > usage.ai.maxCharactersPerMessage
     ) {
-      setChatError(
-        `This message is too long for your current plan. Maximum length: ${usage.ai.maxCharactersPerMessage} characters.`
-      );
+      const message = `This message is too long for your current plan. Maximum length: ${usage.ai.maxCharactersPerMessage} characters.`;
+      setChatError(message);
+
+      await trackClientEvent({
+        eventName: "chat_limit_hit",
+        page: "/chat",
+        metadata: {
+          type: "message_too_long",
+          plan: usage?.plan || "free",
+          attemptedLength: currentInput.length,
+          limit: usage.ai.maxCharactersPerMessage,
+        },
+      });
+
       return;
     }
 
@@ -360,11 +404,24 @@ export default function Chat() {
       usage?.ai?.maxMessagesPerConversation &&
       nextMessages.length > usage.ai.maxMessagesPerConversation
     ) {
-      setChatError(
+      const message =
         usage.plan === "free"
           ? `You’ve reached the free plan conversation depth limit (${usage.ai.maxMessagesPerConversation} messages). Upgrade to Pro for deeper conversations.`
-          : `This conversation has reached its current depth limit (${usage.ai.maxMessagesPerConversation} messages).`
-      );
+          : `This conversation has reached its current depth limit (${usage.ai.maxMessagesPerConversation} messages).`;
+
+      setChatError(message);
+
+      await trackClientEvent({
+        eventName: "chat_limit_hit",
+        page: "/chat",
+        metadata: {
+          type: "conversation_depth",
+          plan: usage.plan,
+          attemptedMessages: nextMessages.length,
+          limit: usage.ai.maxMessagesPerConversation,
+        },
+      });
+
       return;
     }
 
@@ -377,12 +434,39 @@ export default function Chat() {
       usage?.ai?.maxTotalInputCharacters &&
       totalInputCharacters > usage.ai.maxTotalInputCharacters
     ) {
-      setChatError(
+      const message =
         usage.plan === "free"
           ? "You’ve reached the free plan context limit for this conversation. Upgrade to Pro or start a new reflection."
-          : "This conversation has become too large. Start a new reflection to continue clearly."
-      );
+          : "This conversation has become too large. Start a new reflection to continue clearly.";
+
+      setChatError(message);
+
+      await trackClientEvent({
+        eventName: "chat_limit_hit",
+        page: "/chat",
+        metadata: {
+          type: "total_context",
+          plan: usage.plan,
+          attemptedCharacters: totalInputCharacters,
+          limit: usage.ai.maxTotalInputCharacters,
+        },
+      });
+
       return;
+    }
+
+    if (messages.length === 0) {
+      await trackClientEvent({
+        eventName: "chat_started",
+        page: "/chat",
+        metadata: {
+          source: starter ? "onboarding_starter" : "manual",
+          goal: preferences.goal,
+          moodPreference: preferences.moodPreference,
+          notifications: preferences.notifications,
+          plan: usage?.plan || "free",
+        },
+      });
     }
 
     setMessages(nextMessages);
@@ -409,6 +493,17 @@ export default function Chat() {
               : "This conversation has reached its depth limit."
           );
           setMessages(messages);
+
+          await trackClientEvent({
+            eventName: "chat_limit_hit",
+            page: "/chat",
+            metadata: {
+              type: "chat_depth_limit_api",
+              plan: apiError.plan,
+              limit: apiError.limit,
+            },
+          });
+
           return;
         }
 
@@ -419,6 +514,17 @@ export default function Chat() {
               : "This message is too long."
           );
           setMessages(messages);
+
+          await trackClientEvent({
+            eventName: "chat_limit_hit",
+            page: "/chat",
+            metadata: {
+              type: "message_too_long_api",
+              plan: apiError.plan || usage?.plan || "free",
+              limit: apiError.limit,
+            },
+          });
+
           return;
         }
 
@@ -429,6 +535,17 @@ export default function Chat() {
               : "This conversation is too large to continue in one thread. Start a new reflection."
           );
           setMessages(messages);
+
+          await trackClientEvent({
+            eventName: "chat_limit_hit",
+            page: "/chat",
+            metadata: {
+              type: "total_context_limit_api",
+              plan: apiError.plan,
+              limit: apiError.limit,
+            },
+          });
+
           return;
         }
 
@@ -545,8 +662,10 @@ export default function Chat() {
                         AI depth
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                        {usage.ai.maxMessagesPerConversation} messages per conversation · up to{" "}
-                        {usage.ai.maxCharactersPerMessage} characters per message
+                        {usage.ai.maxMessagesPerConversation} messages
+                        per conversation · up to{" "}
+                        {usage.ai.maxCharactersPerMessage} characters
+                        per message
                       </p>
                     </div>
                   )}
