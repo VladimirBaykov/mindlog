@@ -33,13 +33,35 @@ function getSubscriptionId(
   subscription:
     | string
     | Stripe.Subscription
+    | Stripe.Response<Stripe.Subscription>
     | null
     | undefined
 ) {
   if (!subscription) return null;
-  return typeof subscription === "string"
-    ? subscription
-    : subscription.id;
+
+  if (typeof subscription === "string") {
+    return subscription;
+  }
+
+  return subscription.id;
+}
+
+function getCurrentPeriodEnd(
+  subscription:
+    | Stripe.Subscription
+    | Stripe.Response<Stripe.Subscription>
+    | null
+    | undefined
+) {
+  if (!subscription) return null;
+
+  const raw = subscription as unknown as {
+    current_period_end?: number | null;
+  };
+
+  return typeof raw.current_period_end === "number"
+    ? raw.current_period_end
+    : null;
 }
 
 async function resolveUserIdForSubscriptionEvent(params: {
@@ -128,7 +150,7 @@ async function resolveUserIdForCheckoutEvent(params: {
 
     return resolveUserIdForSubscriptionEvent({
       supabase: params.supabase,
-      subscription,
+      subscription: subscription as Stripe.Subscription,
     });
   }
 
@@ -198,7 +220,7 @@ export async function POST(req: Request) {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscription.id,
           status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end,
+          currentPeriodEnd: getCurrentPeriodEnd(subscription),
           priceId,
         });
 
@@ -236,7 +258,7 @@ export async function POST(req: Request) {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscription.id,
           status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end,
+          currentPeriodEnd: getCurrentPeriodEnd(subscription),
           priceId,
         });
 

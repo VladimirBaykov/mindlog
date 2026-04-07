@@ -19,6 +19,11 @@ type UsageInfo = {
   remaining: number | null;
   canSave: boolean;
   currentPeriodEnd?: string | null;
+  ai?: {
+    maxMessagesPerConversation: number;
+    maxCharactersPerMessage: number;
+    maxTotalInputCharacters: number;
+  };
 } | null;
 
 type SubscriptionInfo = {
@@ -50,32 +55,6 @@ type PreferencesState = {
   goal: GoalOption;
   moodPreference: MoodOption;
   notifications: NotificationOption;
-};
-
-const goalLabels: Record<
-  Exclude<GoalOption, null>,
-  string
-> = {
-  process_emotions: "Process emotions",
-  build_consistency: "Build consistency",
-  understand_patterns: "Understand patterns",
-};
-
-const moodLabels: Record<
-  Exclude<MoodOption, null>,
-  string
-> = {
-  gentle: "Gentle",
-  balanced: "Balanced",
-  direct: "Direct",
-};
-
-const notificationLabels: Record<
-  Exclude<NotificationOption, null>,
-  string
-> = {
-  yes: "Yes, later",
-  not_now: "Not now",
 };
 
 const goalOptions: {
@@ -381,6 +360,76 @@ export default function ProfilePage() {
     }
   }, [preferences.goal]);
 
+  const billingSummary = useMemo(() => {
+    const status = subscription?.status || "inactive";
+
+    switch (status) {
+      case "active":
+        return {
+          title: "Billing is healthy",
+          description:
+            "Your subscription is active and Pro access is currently unlocked.",
+          tone: "ok",
+        };
+      case "past_due":
+        return {
+          title: "Payment issue detected",
+          description:
+            "Your subscription is still on record, but Stripe marked it as past due. Open billing to review payment details.",
+          tone: "warn",
+        };
+      case "unpaid":
+        return {
+          title: "Subscription payment failed",
+          description:
+            "Stripe marked this subscription as unpaid. Billing management may be needed to restore full access.",
+          tone: "warn",
+        };
+      case "canceled":
+        return {
+          title: "Subscription canceled",
+          description:
+            "Your subscription was canceled. Free plan remains available, and you can upgrade again anytime.",
+          tone: "neutral",
+        };
+      case "paused":
+        return {
+          title: "Subscription paused",
+          description:
+            "Your billing record is paused right now. Review billing settings for the current subscription state.",
+          tone: "neutral",
+        };
+      case "incomplete":
+        return {
+          title: "Checkout not fully completed",
+          description:
+            "A billing session may have started, but the subscription did not fully activate yet.",
+          tone: "warn",
+        };
+      case "expired":
+        return {
+          title: "Subscription expired",
+          description:
+            "This subscription is no longer active. You can start a new upgrade flow anytime.",
+          tone: "neutral",
+        };
+      default:
+        return {
+          title: "No active subscription",
+          description:
+            "You are currently on the free plan. Upgrade whenever you want deeper reflection features.",
+          tone: "neutral",
+        };
+    }
+  }, [subscription?.status]);
+
+  const billingToneClasses =
+    billingSummary.tone === "warn"
+      ? "border-amber-500/20 bg-amber-500/10"
+      : billingSummary.tone === "ok"
+      ? "border-emerald-500/20 bg-emerald-500/10"
+      : "border-white/10 bg-white/[0.03]";
+
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
@@ -432,6 +481,20 @@ export default function ProfilePage() {
               </p>
             )}
 
+            {usage?.ai && (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  AI depth
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                  {usage.ai.maxMessagesPerConversation} messages per
+                  conversation · up to{" "}
+                  {usage.ai.maxCharactersPerMessage} characters per
+                  message
+                </p>
+              </div>
+            )}
+
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               {!isPro ? (
                 <button
@@ -467,6 +530,39 @@ export default function ProfilePage() {
                 the Stripe webhook sync finishes.
               </p>
             )}
+          </div>
+
+          <div className={`rounded-3xl border px-5 py-5 ${billingToneClasses}`}>
+            <div className="text-sm font-medium text-white">
+              {billingSummary.title}
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+              {billingSummary.description}
+            </p>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={refreshPlanStatus}
+                disabled={refreshingPlan}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+              >
+                {refreshingPlan
+                  ? "Refreshing..."
+                  : "Refresh billing state"}
+              </button>
+
+              {(subscription?.status === "past_due" ||
+                subscription?.status === "unpaid" ||
+                isPro) && (
+                <button
+                  onClick={handlePortal}
+                  disabled={loadingPortal}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {loadingPortal ? "Opening..." : "Open billing"}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
