@@ -22,6 +22,13 @@ type JournalItem = {
   content?: Message[];
 };
 
+type SubscriptionInfo = {
+  plan: "free" | "pro";
+  status: string;
+  currentPeriodEnd: string | null;
+  isPro: boolean;
+} | null;
+
 export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -30,6 +37,10 @@ export default function JournalEntryPage() {
 
   const [item, setItem] = useState<JournalItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] =
+    useState<SubscriptionInfo>(null);
+  const [loadingSubscription, setLoadingSubscription] =
+    useState(true);
 
   useEffect(() => {
     fetch(`/api/journal/${id}`)
@@ -40,6 +51,18 @@ export default function JournalEntryPage() {
       .then((data) => setItem(data))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    fetch("/api/account/subscription", {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => setSubscription(data))
+      .finally(() => setLoadingSubscription(false));
+  }, []);
 
   const normalizedMessages = useMemo(() => {
     if (!item) return [];
@@ -68,6 +91,12 @@ export default function JournalEntryPage() {
         </button>
       ),
       menuItems: [
+        {
+          label: subscription?.isPro
+            ? "Export to PDF"
+            : "Export to PDF (Pro)",
+          onClick: () => router.push(`/journal/${id}/export`),
+        },
         {
           label: "Rename",
           onClick: async () => {
@@ -104,7 +133,16 @@ export default function JournalEntryPage() {
     });
 
     return () => resetHeader();
-  }, [item, id, router, setHeader, resetHeader, updateItem, deleteItem]);
+  }, [
+    item,
+    id,
+    router,
+    setHeader,
+    resetHeader,
+    updateItem,
+    deleteItem,
+    subscription?.isPro,
+  ]);
 
   if (loading) {
     return (
@@ -139,7 +177,8 @@ export default function JournalEntryPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
-              This entry may have been deleted, moved, or is no longer available.
+              This entry may have been deleted, moved, or is no longer
+              available.
             </p>
 
             <button
@@ -185,6 +224,34 @@ export default function JournalEntryPage() {
               {new Date(
                 item.created_at || item.createdAt || Date.now()
               ).toLocaleDateString()}
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-medium text-white">
+                  Export this reflection
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                  {loadingSubscription
+                    ? "Checking your plan..."
+                    : subscription?.isPro
+                    ? "Open a clean export view and save it as a PDF."
+                    : "PDF export is available on Pro."}
+                </p>
+              </div>
+
+              <button
+                onClick={() => router.push(`/journal/${id}/export`)}
+                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                {loadingSubscription
+                  ? "Open export"
+                  : subscription?.isPro
+                  ? "Export to PDF"
+                  : "Unlock PDF export"}
+              </button>
             </div>
           </div>
         </div>
