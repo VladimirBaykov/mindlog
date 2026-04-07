@@ -140,6 +140,7 @@ export default function ProfilePage() {
     useState<SubscriptionInfo>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [refreshingPlan, setRefreshingPlan] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [preferences, setPreferences] =
     useState<PreferencesState>({
@@ -202,6 +203,14 @@ export default function ProfilePage() {
       email: user?.email ?? null,
       id: user?.id ?? null,
     });
+
+    const email = user?.email?.toLowerCase() || "";
+    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+
+    setIsAdmin(Boolean(email && adminEmails.includes(email)));
 
     setPreferences({
       onboardingCompleted: Boolean(
@@ -564,6 +573,27 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+
+          {isAdmin && (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+              <div className="text-sm font-medium text-white">
+                Admin tools
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                Internal visibility for analytics, billing states, and
+                product activity.
+              </p>
+
+              <div className="mt-4">
+                <button
+                  onClick={() => router.push("/debug")}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                >
+                  Open debug metrics
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="flex items-center justify-between gap-3">
