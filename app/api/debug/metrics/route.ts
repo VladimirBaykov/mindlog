@@ -26,6 +26,11 @@ type SubscriptionRow = {
   updated_at: string;
 };
 
+type JournalAggregateRow = {
+  user_id: string;
+  count: number;
+};
+
 function getSinceDate(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -37,6 +42,72 @@ function groupCounts<T extends string>(values: T[]) {
     acc[value] = (acc[value] || 0) + 1;
     return acc;
   }, {});
+}
+
+function bucketUsersByEventDays(
+  events: AnalyticsRow[],
+  eventName: string
+) {
+  const now = Date.now();
+  const userLastSeen = new Map<string, number>();
+
+  for (const event of events) {
+    if (event.event_name !== eventName) continue;
+
+    const timestamp = new Date(event.created_at).getTime();
+    const existing = userLastSeen.get(event.user_id);
+
+    if (!existing || timestamp > existing) {
+      userLastSeen.set(event.user_id, timestamp);
+    }
+  }
+
+  const buckets = {
+    d1: 0,
+    d3: 0,
+    d7: 0,
+    d14: 0,
+    d30: 0,
+  };
+
+  for (const [, ts] of userLastSeen) {
+    const diffDays = (now - ts) / (1000 * 60 * 60 * 24);
+
+    if (diffDays <= 1) buckets.d1 += 1;
+    if (diffDays <= 3) buckets.d3 += 1;
+    if (diffDays <= 7) buckets.d7 += 1;
+    if (diffDays <= 14) buckets.d14 += 1;
+    if (diffDays <= 30) buckets.d30 += 1;
+  }
+
+  return buckets;
+}
+
+function buildRepeatSaverStats(events: AnalyticsRow[]) {
+  const saveCounts = events
+    .filter((event) => event.event_name === "conversation_saved")
+    .reduce<Record<string, number>>((acc, event) => {
+      acc[event.user_id] = (acc[event.user_id] || 0) + 1;
+      return acc;
+    }, {});
+
+  const counts = Object.values(saveCounts);
+
+  return {
+    usersWith1Save: counts.filter((count) => count >= 1).length,
+    usersWith2Saves: counts.filter((count) => count >= 2).length,
+    usersWith3Saves: counts.filter((count) => count >= 3).length,
+    usersWith5Saves: counts.filter((count) => count >= 5).length,
+  };
+}
+
+function buildTopSavers(
+  rows: JournalAggregateRow[],
+  limit = 10
+) {
+  return rows
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }
 
 export async function GET() {
@@ -66,6 +137,7 @@ export async function GET() {
       analytics7dResult,
       analytics30dResult,
       recentEventsResult,
+      journalsPerUserResult,
     ] = await Promise.all([
       adminSupabase
         .from("journals")
@@ -96,13 +168,18 @@ export async function GET() {
         .select("id, user_id, event_name, page, metadata, created_at")
         .gte("created_at", since30d)
         .order("created_at", { ascending: false })
-        .limit(2000),
+        .limit(3000),
 
       adminSupabase
         .from("analytics_events")
         .select("id, user_id, event_name, page, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(30),
+
+      adminSupabase
+        .from("journals")
+        .select("user_id")
+        .is("deleted_at", null),
     ]);
 
     if (journalsTotalResult.error) throw journalsTotalResult.error;
@@ -111,6 +188,7 @@ export async function GET() {
     if (analytics7dResult.error) throw analytics7dResult.error;
     if (analytics30dResult.error) throw analytics30dResult.error;
     if (recentEventsResult.error) throw recentEventsResult.error;
+    if (journalsPerUserResult.error) throw journalsPerUserResult.error;
 
     const subscriptions =
       (subscriptionsResult.data as SubscriptionRow[]) ?? [];
@@ -121,6 +199,24 @@ export async function GET() {
       (analytics30dResult.data as AnalyticsRow[]) ?? [];
     const recentEvents =
       (recentEventsResult.data as AnalyticsRow[]) ?? [];
+
+    const journalRows =
+      (journalsPerUserResult.data as Array<{ user_id: string }>) ?? [];
+
+    const journalCountsByUser = journalRows.reduce<
+      Record<string, number>
+    >((acc, row) => {
+      acc[row.user_id] = (acc[row.user_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const journalAggregates: JournalAggregateRow[] =
+      Object.entries(journalCountsByUser).map(
+        ([user_id, count]) => ({
+          user_id,
+          count,
+        })
+      );
 
     const activeSubscriptions = subscriptions.filter(
       (item) => item.plan === "pro" && item.status === "active"
@@ -163,6 +259,19 @@ export async function GET() {
         eventCounts7d["billing_portal_opened"] || 0,
     };
 
+    const retention = {
+      saversActiveBuckets: bucketUsersByEventDays(
+        analytics30d,
+        "conversation_saved"
+      ),
+      startersActiveBuckets: bucketUsersByEventDays(
+        analytics30d,
+        "chat_started"
+      ),
+      repeatSavers30d: buildRepeatSaverStats(analytics30d),
+      topSavers: buildTopSavers(journalAggregates, 10),
+    };
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       journals: {
@@ -184,6 +293,7 @@ export async function GET() {
         eventCounts30d,
         conversionSignals,
       },
+      retention,
       recentEvents,
     });
   } catch (e: any) {

@@ -33,6 +33,32 @@ type DebugMetricsResponse = {
       portalOpened7d: number;
     };
   };
+  retention: {
+    saversActiveBuckets: {
+      d1: number;
+      d3: number;
+      d7: number;
+      d14: number;
+      d30: number;
+    };
+    startersActiveBuckets: {
+      d1: number;
+      d3: number;
+      d7: number;
+      d14: number;
+      d30: number;
+    };
+    repeatSavers30d: {
+      usersWith1Save: number;
+      usersWith2Saves: number;
+      usersWith3Saves: number;
+      usersWith5Saves: number;
+    };
+    topSavers: Array<{
+      user_id: string;
+      count: number;
+    }>;
+  };
   recentEvents: Array<{
     id: string;
     user_id: string;
@@ -204,7 +230,8 @@ export default function DebugPage() {
                 Internal ops snapshot
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                Product, billing, and analytics signals from Supabase.
+                Product, billing, analytics, and retention signals from
+                Supabase.
               </p>
             </div>
 
@@ -404,6 +431,108 @@ export default function DebugPage() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-sm font-medium text-white">
+                Saver activity buckets
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["D1", metrics?.retention.saversActiveBuckets.d1 ?? 0],
+                  ["D3", metrics?.retention.saversActiveBuckets.d3 ?? 0],
+                  ["D7", metrics?.retention.saversActiveBuckets.d7 ?? 0],
+                  ["D14", metrics?.retention.saversActiveBuckets.d14 ?? 0],
+                  ["D30", metrics?.retention.saversActiveBuckets.d30 ?? 0],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4"
+                  >
+                    <div className="text-xs text-neutral-500">
+                      {label} savers
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-sm font-medium text-white">
+                Repeat saver depth · 30 days
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-xs text-neutral-500">
+                    Users with 1+ saves
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    {metrics?.retention.repeatSavers30d.usersWith1Save ?? 0}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-xs text-neutral-500">
+                    Users with 2+ saves
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    {metrics?.retention.repeatSavers30d.usersWith2Saves ?? 0}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-xs text-neutral-500">
+                    Users with 3+ saves
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    {metrics?.retention.repeatSavers30d.usersWith3Saves ?? 0}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-xs text-neutral-500">
+                    Users with 5+ saves
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    {metrics?.retention.repeatSavers30d.usersWith5Saves ?? 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-sm font-medium text-white">
+              Top savers
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {metrics?.retention.topSavers.length ? (
+                metrics.retention.topSavers.map((row) => (
+                  <div
+                    key={row.user_id}
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
+                  >
+                    <span className="truncate text-sm text-neutral-300">
+                      {row.user_id}
+                    </span>
+                    <span className="text-sm font-medium text-white">
+                      {row.count}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-neutral-500">
+                  No saver data yet.
+                </p>
+              )}
             </div>
           </div>
 
