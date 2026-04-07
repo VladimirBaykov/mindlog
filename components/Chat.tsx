@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "@/types/chat";
@@ -8,6 +8,7 @@ import type { ChatState } from "@/types/chatState";
 import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import { supabase } from "@/lib/supabase-browser";
 
 type UsageInfo = {
   plan: "free" | "pro";
@@ -28,11 +29,28 @@ type CloseErrorResponse = {
   canSave?: boolean;
 };
 
-const suggestedPrompts = [
-  "I’ve been feeling emotionally scattered today and want help untangling it.",
-  "Help me reflect on what has been draining my energy lately.",
-  "I want to understand a pattern I keep repeating in my thoughts.",
-];
+type GoalOption =
+  | "process_emotions"
+  | "build_consistency"
+  | "understand_patterns"
+  | null;
+
+type MoodOption =
+  | "gentle"
+  | "balanced"
+  | "direct"
+  | null;
+
+type NotificationOption =
+  | "yes"
+  | "not_now"
+  | null;
+
+type UserPreferences = {
+  goal: GoalOption;
+  moodPreference: MoodOption;
+  notifications: NotificationOption;
+};
 
 export default function Chat() {
   const searchParams = useSearchParams();
@@ -53,6 +71,12 @@ export default function Chat() {
     null
   );
   const [starterApplied, setStarterApplied] = useState(false);
+  const [preferences, setPreferences] =
+    useState<UserPreferences>({
+      goal: null,
+      moodPreference: null,
+      notifications: null,
+    });
 
   const { setHeader, resetHeader } = useHeader();
   const { addItem } = useJournal();
@@ -91,6 +115,81 @@ export default function Chat() {
       setChatState("active");
     }
   }, [starter, starterApplied, messages.length, input]);
+
+  useEffect(() => {
+    async function loadPreferences() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        setPreferences({
+          goal:
+            (user?.user_metadata?.onboarding_goal as GoalOption) ??
+            null,
+          moodPreference:
+            (user?.user_metadata
+              ?.onboarding_mood_preference as MoodOption) ?? null,
+          notifications:
+            (user?.user_metadata
+              ?.onboarding_notifications as NotificationOption) ??
+            null,
+        });
+      } catch (error) {
+        console.error("Preference load failed:", error);
+      }
+    }
+
+    loadPreferences();
+  }, []);
+
+  const suggestedPrompts = useMemo(() => {
+    if (preferences.goal === "process_emotions") {
+      return [
+        "I’ve been feeling emotionally heavy lately and want help understanding what’s underneath it.",
+        "Something has been sitting with me all day, and I want to gently unpack what I’m really feeling.",
+        "Help me reflect on an emotion I keep carrying but haven’t fully named yet.",
+      ];
+    }
+
+    if (preferences.goal === "build_consistency") {
+      return [
+        "Help me do a calm end-of-day reflection so I can build a steady habit.",
+        "I want a simple check-in about how today felt and what I should notice.",
+        "Let’s start with a small reflection so I can keep showing up consistently.",
+      ];
+    }
+
+    if (preferences.goal === "understand_patterns") {
+      return [
+        "I want to understand a pattern I keep repeating in my thoughts and reactions.",
+        "Help me notice what emotional theme keeps showing up for me lately.",
+        "I think I’ve been reacting in a familiar way again — help me reflect on that pattern.",
+      ];
+    }
+
+    return [
+      "I’ve been feeling emotionally scattered today and want help untangling it.",
+      "Help me reflect on what has been draining my energy lately.",
+      "I want to understand a pattern I keep repeating in my thoughts.",
+    ];
+  }, [preferences.goal]);
+
+  const guidanceLabel = useMemo(() => {
+    if (preferences.moodPreference === "gentle") {
+      return "Gentle reflection tone active";
+    }
+
+    if (preferences.moodPreference === "balanced") {
+      return "Balanced reflection tone active";
+    }
+
+    if (preferences.moodPreference === "direct") {
+      return "Direct reflection tone active";
+    }
+
+    return "Your reflection space";
+  }, [preferences.moodPreference]);
 
   async function loadUsage() {
     try {
@@ -252,6 +351,10 @@ export default function Chat() {
           content: data.reply,
         },
       ]);
+
+      if (data.chatState) {
+        setChatState(data.chatState);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -279,7 +382,7 @@ export default function Chat() {
             >
               <div className="max-w-md">
                 <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
-                  MindLog
+                  {guidanceLabel}
                 </div>
 
                 <h1 className="mt-5 text-3xl font-semibold leading-tight text-white">
@@ -336,7 +439,7 @@ export default function Chat() {
 
                 <div className="mt-5">
                   <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                    Try a starter
+                    Suggested starters
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-2">
