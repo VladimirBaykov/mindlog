@@ -24,32 +24,64 @@ export type ResolvedSubscription = {
   isPro: boolean;
 };
 
-export async function ensureSubscriptionRow(
+async function fetchSubscriptionRow(
   supabase: any,
   userId: string
-): Promise<SubscriptionRow> {
+): Promise<SubscriptionRow | null> {
   const { data, error } = await supabase
     .from("subscriptions")
-    .upsert(
-      [
-        {
-          user_id: userId,
-          plan: "free",
-          status: "inactive",
-        },
-      ],
-      {
-        onConflict: "user_id",
-      }
-    )
     .select("*")
-    .single();
+    .eq("user_id", userId)
+    .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  return data as SubscriptionRow;
+  return (data as SubscriptionRow | null) ?? null;
+}
+
+export async function ensureSubscriptionRow(
+  supabase: any,
+  userId: string
+): Promise<SubscriptionRow> {
+  const existing = await fetchSubscriptionRow(supabase, userId);
+
+  if (existing) {
+    return existing;
+  }
+
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .insert([
+      {
+        user_id: userId,
+        plan: "free",
+        status: "inactive",
+      },
+    ])
+    .select("*")
+    .single();
+
+  if (!error && data) {
+    return data as SubscriptionRow;
+  }
+
+  const duplicateInsert =
+    error?.code === "23505" ||
+    String(error?.message || "")
+      .toLowerCase()
+      .includes("duplicate");
+
+  if (duplicateInsert) {
+    const afterRace = await fetchSubscriptionRow(supabase, userId);
+
+    if (afterRace) {
+      return afterRace;
+    }
+  }
+
+  throw error;
 }
 
 export async function resolveUserSubscription(
@@ -114,7 +146,9 @@ export async function syncSubscriptionFromStripe(
           stripe_customer_id: params.stripeCustomerId,
           stripe_subscription_id: params.stripeSubscriptionId,
           current_period_end: params.currentPeriodEnd
-            ? new Date(params.currentPeriodEnd * 1000).toISOString()
+            ? new Date(
+                params.currentPeriodEnd * 1000
+              ).toISOString()
             : null,
         },
       ],

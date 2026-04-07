@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   ensureSubscriptionRow,
   resolveUserSubscription,
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 export async function POST() {
   try {
     const supabase = await createSupabaseServerClient();
+    const adminSupabase = createSupabaseAdminClient();
     const stripe = getStripe();
 
     const {
@@ -24,15 +26,18 @@ export async function POST() {
       );
     }
 
-    await ensureSubscriptionRow(supabase, user.id);
+    await ensureSubscriptionRow(adminSupabase, user.id);
+
     const subscription = await resolveUserSubscription(
-      supabase,
+      adminSupabase,
       user.id
     );
 
     if (!subscription.stripeCustomerId) {
       return NextResponse.json(
-        { error: "No Stripe customer found for this account yet" },
+        {
+          error: "No Stripe customer found for this account yet",
+        },
         { status: 400 }
       );
     }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   ensureSubscriptionRow,
   resolveUserSubscription,
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   try {
     const supabase = await createSupabaseServerClient();
+    const adminSupabase = createSupabaseAdminClient();
     const stripe = getStripe();
 
     const {
@@ -45,9 +47,10 @@ export async function POST(req: Request) {
         : "STRIPE_PRICE_PRO_MONTHLY"
     );
 
-    await ensureSubscriptionRow(supabase, user.id);
+    await ensureSubscriptionRow(adminSupabase, user.id);
+
     const subscription = await resolveUserSubscription(
-      supabase,
+      adminSupabase,
       user.id
     );
 
@@ -71,7 +74,12 @@ export async function POST(req: Request) {
       });
 
       stripeCustomerId = customer.id;
-      await setStripeCustomerId(supabase, user.id, customer.id);
+
+      await setStripeCustomerId(
+        adminSupabase,
+        user.id,
+        customer.id
+      );
     }
 
     const session = await stripe.checkout.sessions.create({
