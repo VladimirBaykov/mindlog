@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
@@ -28,6 +28,125 @@ type SubscriptionInfo = {
   isPro: boolean;
 } | null;
 
+type GoalOption =
+  | "process_emotions"
+  | "build_consistency"
+  | "understand_patterns"
+  | null;
+
+type MoodOption =
+  | "gentle"
+  | "balanced"
+  | "direct"
+  | null;
+
+type NotificationOption =
+  | "yes"
+  | "not_now"
+  | null;
+
+type PreferencesState = {
+  onboardingCompleted: boolean;
+  goal: GoalOption;
+  moodPreference: MoodOption;
+  notifications: NotificationOption;
+};
+
+const goalLabels: Record<
+  Exclude<GoalOption, null>,
+  string
+> = {
+  process_emotions: "Process emotions",
+  build_consistency: "Build consistency",
+  understand_patterns: "Understand patterns",
+};
+
+const moodLabels: Record<
+  Exclude<MoodOption, null>,
+  string
+> = {
+  gentle: "Gentle",
+  balanced: "Balanced",
+  direct: "Direct",
+};
+
+const notificationLabels: Record<
+  Exclude<NotificationOption, null>,
+  string
+> = {
+  yes: "Yes, later",
+  not_now: "Not now",
+};
+
+const goalOptions: {
+  value: Exclude<GoalOption, null>;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "process_emotions",
+    title: "Process emotions",
+    description:
+      "Use MindLog as a calm space to unpack what you’re feeling.",
+  },
+  {
+    value: "build_consistency",
+    title: "Build consistency",
+    description:
+      "Create a simple reflective habit you can return to regularly.",
+  },
+  {
+    value: "understand_patterns",
+    title: "Understand patterns",
+    description:
+      "Notice emotional themes and recurring inner patterns over time.",
+  },
+];
+
+const moodOptions: {
+  value: Exclude<MoodOption, null>;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "gentle",
+    title: "Gentle",
+    description:
+      "Softer reflective prompts and calmer conversational tone.",
+  },
+  {
+    value: "balanced",
+    title: "Balanced",
+    description:
+      "A neutral middle ground between support and clarity.",
+  },
+  {
+    value: "direct",
+    title: "Direct",
+    description:
+      "A slightly clearer, more focused reflective style.",
+  },
+];
+
+const notificationOptions: {
+  value: Exclude<NotificationOption, null>;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "yes",
+    title: "Yes, later",
+    description:
+      "You’d like gentle reminders once notification settings exist.",
+  },
+  {
+    value: "not_now",
+    title: "Not now",
+    description:
+      "You want to keep the experience quiet for now.",
+  },
+];
+
 export default function ProfilePage() {
   const router = useRouter();
   const { setHeader, resetHeader } = useHeader();
@@ -42,6 +161,19 @@ export default function ProfilePage() {
     useState<SubscriptionInfo>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [refreshingPlan, setRefreshingPlan] = useState(false);
+
+  const [preferences, setPreferences] =
+    useState<PreferencesState>({
+      onboardingCompleted: false,
+      goal: null,
+      moodPreference: null,
+      notifications: null,
+    });
+
+  const [savingPreferences, setSavingPreferences] =
+    useState(false);
+  const [restartingOnboarding, setRestartingOnboarding] =
+    useState(false);
 
   useEffect(() => {
     setHeader({
@@ -90,6 +222,22 @@ export default function ProfilePage() {
     setUserInfo({
       email: user?.email ?? null,
       id: user?.id ?? null,
+    });
+
+    setPreferences({
+      onboardingCompleted: Boolean(
+        user?.user_metadata?.onboarding_completed
+      ),
+      goal:
+        (user?.user_metadata
+          ?.onboarding_goal as GoalOption) ?? null,
+      moodPreference:
+        (user?.user_metadata
+          ?.onboarding_mood_preference as MoodOption) ?? null,
+      notifications:
+        (user?.user_metadata
+          ?.onboarding_notifications as NotificationOption) ??
+        null,
     });
   }
 
@@ -162,7 +310,76 @@ export default function ProfilePage() {
     }
   }
 
+  async function savePreferences() {
+    if (savingPreferences) return;
+
+    try {
+      setSavingPreferences(true);
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          onboarding_completed:
+            preferences.onboardingCompleted,
+          onboarding_goal: preferences.goal,
+          onboarding_mood_preference:
+            preferences.moodPreference,
+          onboarding_notifications:
+            preferences.notifications,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      await loadUser();
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Failed to save preferences");
+    } finally {
+      setSavingPreferences(false);
+    }
+  }
+
+  async function restartOnboarding() {
+    if (restartingOnboarding) return;
+
+    try {
+      setRestartingOnboarding(true);
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          onboarding_completed: false,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      router.push("/welcome");
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Failed to restart onboarding");
+    } finally {
+      setRestartingOnboarding(false);
+    }
+  }
+
   const isPro = subscription?.isPro ?? false;
+
+  const starterPreview = useMemo(() => {
+    switch (preferences.goal) {
+      case "process_emotions":
+        return "I want to talk through what I’ve been feeling lately, because something feels emotionally heavy and I want to understand it more clearly.";
+      case "build_consistency":
+        return "I want to start a simple reflection habit, so help me begin with a calm check-in about how today has felt.";
+      case "understand_patterns":
+        return "I want to understand my recurring emotional patterns better, especially what keeps showing up in my thoughts and reactions.";
+      default:
+        return "Your onboarding starter will appear here once you choose a direction.";
+    }
+  }, [preferences.goal]);
 
   return (
     <AuthGate>
@@ -246,10 +463,176 @@ export default function ProfilePage() {
 
             {!isPro && (
               <p className="mt-3 text-xs text-neutral-500">
-                If you’ve just completed checkout, use refresh after the
-                Stripe webhook sync finishes.
+                If you’ve just completed checkout, use refresh after
+                the Stripe webhook sync finishes.
               </p>
             )}
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-white">
+                  Reflection preferences
+                </div>
+                <p className="mt-1 text-sm text-neutral-400">
+                  Update the same preferences you chose during
+                  onboarding.
+                </p>
+              </div>
+
+              <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
+                {preferences.onboardingCompleted
+                  ? "completed"
+                  : "incomplete"}
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-5">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  What are you here for?
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {goalOptions.map((option) => {
+                    const selected =
+                      preferences.goal === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() =>
+                          setPreferences((prev) => ({
+                            ...prev,
+                            goal: option.value,
+                          }))
+                        }
+                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                          selected
+                            ? "border-white/20 bg-white/[0.08]"
+                            : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-white">
+                          {option.title}
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                          {option.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Preferred tone
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {moodOptions.map((option) => {
+                    const selected =
+                      preferences.moodPreference ===
+                      option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() =>
+                          setPreferences((prev) => ({
+                            ...prev,
+                            moodPreference: option.value,
+                          }))
+                        }
+                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                          selected
+                            ? "border-white/20 bg-white/[0.08]"
+                            : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-white">
+                          {option.title}
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                          {option.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Reminders later
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {notificationOptions.map((option) => {
+                    const selected =
+                      preferences.notifications ===
+                      option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() =>
+                          setPreferences((prev) => ({
+                            ...prev,
+                            notifications: option.value,
+                          }))
+                        }
+                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                          selected
+                            ? "border-white/20 bg-white/[0.08]"
+                            : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-white">
+                          {option.title}
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                          {option.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+                <div className="text-sm font-medium text-white">
+                  Current starter preview
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+                  {starterPreview}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={savePreferences}
+                  disabled={savingPreferences}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingPreferences
+                    ? "Saving..."
+                    : "Save preferences"}
+                </button>
+
+                <button
+                  onClick={restartOnboarding}
+                  disabled={restartingOnboarding}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                >
+                  {restartingOnboarding
+                    ? "Opening..."
+                    : "Run onboarding again"}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
