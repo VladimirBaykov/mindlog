@@ -24,6 +24,32 @@ export type ResolvedSubscription = {
   isPro: boolean;
 };
 
+function mapStripeStatusToAppStatus(status: string | null | undefined) {
+  switch (status) {
+    case "active":
+    case "trialing":
+      return "active";
+    case "past_due":
+      return "past_due";
+    case "unpaid":
+      return "unpaid";
+    case "canceled":
+      return "canceled";
+    case "incomplete":
+      return "incomplete";
+    case "incomplete_expired":
+      return "expired";
+    case "paused":
+      return "paused";
+    default:
+      return status || "inactive";
+  }
+}
+
+function shouldTreatAsPro(status: string | null | undefined) {
+  return status === "active" || status === "trialing";
+}
+
 async function fetchSubscriptionRow(
   supabase: any,
   userId: string
@@ -119,6 +145,40 @@ export async function setStripeCustomerId(
   if (error) throw error;
 }
 
+export async function findUserIdByStripeCustomerId(
+  supabase: any,
+  stripeCustomerId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("user_id")
+    .eq("stripe_customer_id", stripeCustomerId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.user_id ?? null;
+}
+
+export async function findUserIdByStripeSubscriptionId(
+  supabase: any,
+  stripeSubscriptionId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("user_id")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.user_id ?? null;
+}
+
 export async function syncSubscriptionFromStripe(
   supabase: any,
   params: {
@@ -130,7 +190,13 @@ export async function syncSubscriptionFromStripe(
     priceId: string | null;
   }
 ) {
-  const plan = getPlanFromStripePriceId(params.priceId);
+  const normalizedStatus = mapStripeStatusToAppStatus(
+    params.status
+  );
+
+  const plan = shouldTreatAsPro(params.status)
+    ? getPlanFromStripePriceId(params.priceId)
+    : "free";
 
   const { error } = await supabase
     .from("subscriptions")
@@ -139,10 +205,7 @@ export async function syncSubscriptionFromStripe(
         {
           user_id: params.userId,
           plan,
-          status:
-            params.status === "active" || params.status === "trialing"
-              ? "active"
-              : params.status,
+          status: normalizedStatus,
           stripe_customer_id: params.stripeCustomerId,
           stripe_subscription_id: params.stripeSubscriptionId,
           current_period_end: params.currentPeriodEnd
