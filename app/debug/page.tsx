@@ -70,6 +70,15 @@ type DebugMetricsResponse = {
     conversationSavedDaily30d: DailyPoint[];
     checkoutStartedDaily30d: DailyPoint[];
   };
+  funnel: {
+    onboardingCompleted30d: number;
+    chatStarted30d: number;
+    conversationSaved30d: number;
+    checkoutStarted30d: number;
+    onboardingToChatPercent: number;
+    chatToSavePercent: number;
+    saveToCheckoutPercent: number;
+  };
   recentEvents: Array<{
     id: string;
     user_id: string;
@@ -338,6 +347,59 @@ export default function DebugPage() {
               </div>
               <div className="mt-3 text-3xl font-semibold text-white">
                 {metrics?.analytics.uniqueActiveUsers7d ?? 0}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-sm font-medium text-white">
+              30-day conversion funnel
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Onboarding completed
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-white">
+                  {metrics?.funnel.onboardingCompleted30d ?? 0}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Chat started
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-white">
+                  {metrics?.funnel.chatStarted30d ?? 0}
+                </div>
+                <div className="mt-2 text-xs text-neutral-500">
+                  {metrics?.funnel.onboardingToChatPercent ?? 0}% of onboarding
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Conversation saved
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-white">
+                  {metrics?.funnel.conversationSaved30d ?? 0}
+                </div>
+                <div className="mt-2 text-xs text-neutral-500">
+                  {metrics?.funnel.chatToSavePercent ?? 0}% of chat starters
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Checkout started
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-white">
+                  {metrics?.funnel.checkoutStarted30d ?? 0}
+                </div>
+                <div className="mt-2 text-xs text-neutral-500">
+                  {metrics?.funnel.saveToCheckoutPercent ?? 0}% of savers
+                </div>
               </div>
             </div>
           </div>

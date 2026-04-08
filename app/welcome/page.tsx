@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { supabase } from "@/lib/supabase-browser";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 type Step = 0 | 1 | 2;
 
@@ -177,6 +178,17 @@ export default function WelcomePage() {
         throw error;
       }
 
+      await trackClientEvent({
+        eventName: "onboarding_completed",
+        page: "/welcome",
+        metadata: {
+          goal,
+          moodPreference,
+          notifications,
+          skipped: false,
+        },
+      });
+
       router.push(
         `/chat?starter=${encodeURIComponent(starterTemplate)}`
       );
@@ -208,6 +220,17 @@ export default function WelcomePage() {
       if (error) {
         throw error;
       }
+
+      await trackClientEvent({
+        eventName: "onboarding_completed",
+        page: "/welcome",
+        metadata: {
+          goal,
+          moodPreference,
+          notifications,
+          skipped: true,
+        },
+      });
 
       router.push("/chat");
     } catch (error: any) {

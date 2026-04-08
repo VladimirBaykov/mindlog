@@ -1,4 +1,5 @@
 export type AnalyticsEventName =
+  | "onboarding_completed"
   | "chat_started"
   | "chat_starter_selected"
   | "chat_limit_hit"
@@ -43,7 +44,10 @@ function sanitizeValue(value: unknown, depth = 0): JsonValue {
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>)
       .slice(0, 20)
-      .map(([key, val]) => [key.slice(0, 60), sanitizeValue(val, depth + 1)]);
+      .map(([key, val]) => [
+        key.slice(0, 60),
+        sanitizeValue(val, depth + 1),
+      ]);
 
     return Object.fromEntries(entries);
   }

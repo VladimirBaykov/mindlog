@@ -169,6 +169,52 @@ function isMissingAnalyticsTableError(error: any) {
   );
 }
 
+function buildFunnel(analytics30d: AnalyticsRow[]) {
+  const onboardingUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "onboarding_completed")
+      .map((event) => event.user_id)
+  );
+
+  const chatStartedUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "chat_started")
+      .map((event) => event.user_id)
+  );
+
+  const savedUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "conversation_saved")
+      .map((event) => event.user_id)
+  );
+
+  const checkoutUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "upgrade_checkout_started")
+      .map((event) => event.user_id)
+  );
+
+  const onboardingCount = onboardingUsers.size;
+  const chatStartedCount = chatStartedUsers.size;
+  const savedCount = savedUsers.size;
+  const checkoutCount = checkoutUsers.size;
+
+  function percent(part: number, total: number) {
+    if (!total) return 0;
+    return Math.round((part / total) * 100);
+  }
+
+  return {
+    onboardingCompleted30d: onboardingCount,
+    chatStarted30d: chatStartedCount,
+    conversationSaved30d: savedCount,
+    checkoutStarted30d: checkoutCount,
+    onboardingToChatPercent: percent(chatStartedCount, onboardingCount),
+    chatToSavePercent: percent(savedCount, chatStartedCount),
+    saveToCheckoutPercent: percent(checkoutCount, savedCount),
+  };
+}
+
 export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
@@ -225,14 +271,14 @@ export async function GET() {
         .select("id, user_id, event_name, page, metadata, created_at")
         .gte("created_at", since7d)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(700),
 
       adminSupabase
         .from("analytics_events")
         .select("id, user_id, event_name, page, metadata, created_at")
         .gte("created_at", since30d)
         .order("created_at", { ascending: false })
-        .limit(3000),
+        .limit(4000),
 
       adminSupabase
         .from("analytics_events")
@@ -287,7 +333,11 @@ export async function GET() {
     let analytics30d: AnalyticsRow[] = [];
     let recentEvents: AnalyticsRow[] = [];
 
-    if (analytics7dResult.error || analytics30dResult.error || recentEventsResult.error) {
+    if (
+      analytics7dResult.error ||
+      analytics30dResult.error ||
+      recentEventsResult.error
+    ) {
       const firstError =
         analytics7dResult.error ||
         analytics30dResult.error ||
@@ -364,6 +414,18 @@ export async function GET() {
         : buildDailySeriesFromTimestamps([], 30),
     };
 
+    const funnel = analyticsAvailable
+      ? buildFunnel(analytics30d)
+      : {
+          onboardingCompleted30d: 0,
+          chatStarted30d: 0,
+          conversationSaved30d: 0,
+          checkoutStarted30d: 0,
+          onboardingToChatPercent: 0,
+          chatToSavePercent: 0,
+          saveToCheckoutPercent: 0,
+        };
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       analyticsAvailable,
@@ -388,6 +450,7 @@ export async function GET() {
       },
       retention,
       trends,
+      funnel,
       recentEvents,
     });
   } catch (e: any) {

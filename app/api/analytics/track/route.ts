@@ -6,6 +6,7 @@ import {
 } from "@/lib/analytics";
 
 const allowedEvents = new Set<AnalyticsEventName>([
+  "onboarding_completed",
   "chat_started",
   "chat_starter_selected",
   "chat_limit_hit",
@@ -28,8 +29,8 @@ function isMissingAnalyticsTableError(error: any) {
 
   return (
     code === "PGRST205" ||
-    message.includes("analytics_events") &&
-      message.includes("schema cache")
+    (message.includes("analytics_events") &&
+      message.includes("schema cache"))
   );
 }
 
