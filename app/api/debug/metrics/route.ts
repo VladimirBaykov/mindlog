@@ -36,6 +36,23 @@ type DailyPoint = {
   count: number;
 };
 
+type FunnelStats = {
+  onboardingCompleted30d: number;
+  chatStarted30d: number;
+  conversationSaved30d: number;
+  checkoutStarted30d: number;
+  activeProCurrent: number;
+  onboardingToChatPercent: number;
+  chatToSavePercent: number;
+  saveToCheckoutPercent: number;
+  checkoutToActiveProPercent: number;
+};
+
+type DropoffGroup = {
+  count: number;
+  sampleUserIds: string[];
+};
+
 function getSinceDate(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -169,7 +186,14 @@ function isMissingAnalyticsTableError(error: any) {
   );
 }
 
-function buildFunnel(analytics30d: AnalyticsRow[]) {
+function sampleIds(ids: Set<string>, limit = 8) {
+  return Array.from(ids).slice(0, limit);
+}
+
+function buildFunnel(
+  analytics30d: AnalyticsRow[],
+  subscriptions: SubscriptionRow[]
+): FunnelStats {
   const onboardingUsers = new Set(
     analytics30d
       .filter((event) => event.event_name === "onboarding_completed")
@@ -194,10 +218,17 @@ function buildFunnel(analytics30d: AnalyticsRow[]) {
       .map((event) => event.user_id)
   );
 
+  const activeProUsers = new Set(
+    subscriptions
+      .filter((row) => row.plan === "pro" && row.status === "active")
+      .map((row) => row.user_id)
+  );
+
   const onboardingCount = onboardingUsers.size;
   const chatStartedCount = chatStartedUsers.size;
   const savedCount = savedUsers.size;
   const checkoutCount = checkoutUsers.size;
+  const activeProCount = activeProUsers.size;
 
   function percent(part: number, total: number) {
     if (!total) return 0;
@@ -209,9 +240,100 @@ function buildFunnel(analytics30d: AnalyticsRow[]) {
     chatStarted30d: chatStartedCount,
     conversationSaved30d: savedCount,
     checkoutStarted30d: checkoutCount,
-    onboardingToChatPercent: percent(chatStartedCount, onboardingCount),
+    activeProCurrent: activeProCount,
+    onboardingToChatPercent: percent(
+      chatStartedCount,
+      onboardingCount
+    ),
     chatToSavePercent: percent(savedCount, chatStartedCount),
     saveToCheckoutPercent: percent(checkoutCount, savedCount),
+    checkoutToActiveProPercent: percent(
+      activeProCount,
+      checkoutCount
+    ),
+  };
+}
+
+function buildDropoffs(
+  analytics30d: AnalyticsRow[],
+  subscriptions: SubscriptionRow[]
+) {
+  const onboardingUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "onboarding_completed")
+      .map((event) => event.user_id)
+  );
+
+  const chatStartedUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "chat_started")
+      .map((event) => event.user_id)
+  );
+
+  const savedUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "conversation_saved")
+      .map((event) => event.user_id)
+  );
+
+  const checkoutUsers = new Set(
+    analytics30d
+      .filter((event) => event.event_name === "upgrade_checkout_started")
+      .map((event) => event.user_id)
+  );
+
+  const activeProUsers = new Set(
+    subscriptions
+      .filter((row) => row.plan === "pro" && row.status === "active")
+      .map((row) => row.user_id)
+  );
+
+  const onboardingNoChat = new Set<string>();
+  const chatNoSave = new Set<string>();
+  const saveNoCheckout = new Set<string>();
+  const checkoutNoActivePro = new Set<string>();
+
+  for (const userId of onboardingUsers) {
+    if (!chatStartedUsers.has(userId)) {
+      onboardingNoChat.add(userId);
+    }
+  }
+
+  for (const userId of chatStartedUsers) {
+    if (!savedUsers.has(userId)) {
+      chatNoSave.add(userId);
+    }
+  }
+
+  for (const userId of savedUsers) {
+    if (!checkoutUsers.has(userId)) {
+      saveNoCheckout.add(userId);
+    }
+  }
+
+  for (const userId of checkoutUsers) {
+    if (!activeProUsers.has(userId)) {
+      checkoutNoActivePro.add(userId);
+    }
+  }
+
+  return {
+    onboardingCompletedNoChat: {
+      count: onboardingNoChat.size,
+      sampleUserIds: sampleIds(onboardingNoChat),
+    } satisfies DropoffGroup,
+    chatStartedNoSave: {
+      count: chatNoSave.size,
+      sampleUserIds: sampleIds(chatNoSave),
+    } satisfies DropoffGroup,
+    conversationSavedNoCheckout: {
+      count: saveNoCheckout.size,
+      sampleUserIds: sampleIds(saveNoCheckout),
+    } satisfies DropoffGroup,
+    checkoutStartedNoActivePro: {
+      count: checkoutNoActivePro.size,
+      sampleUserIds: sampleIds(checkoutNoActivePro),
+    } satisfies DropoffGroup,
   };
 }
 
@@ -278,7 +400,7 @@ export async function GET() {
         .select("id, user_id, event_name, page, metadata, created_at")
         .gte("created_at", since30d)
         .order("created_at", { ascending: false })
-        .limit(4000),
+        .limit(5000),
 
       adminSupabase
         .from("analytics_events")
@@ -407,23 +529,54 @@ export async function GET() {
         30
       ),
       conversationSavedDaily30d: analyticsAvailable
-        ? buildDailyEventSeries(analytics30d, "conversation_saved", 30)
+        ? buildDailyEventSeries(
+            analytics30d,
+            "conversation_saved",
+            30
+          )
         : buildDailySeriesFromTimestamps([], 30),
       checkoutStartedDaily30d: analyticsAvailable
-        ? buildDailyEventSeries(analytics30d, "upgrade_checkout_started", 30)
+        ? buildDailyEventSeries(
+            analytics30d,
+            "upgrade_checkout_started",
+            30
+          )
         : buildDailySeriesFromTimestamps([], 30),
     };
 
     const funnel = analyticsAvailable
-      ? buildFunnel(analytics30d)
+      ? buildFunnel(analytics30d, subscriptions)
       : {
           onboardingCompleted30d: 0,
           chatStarted30d: 0,
           conversationSaved30d: 0,
           checkoutStarted30d: 0,
+          activeProCurrent: activeSubscriptions,
           onboardingToChatPercent: 0,
           chatToSavePercent: 0,
           saveToCheckoutPercent: 0,
+          checkoutToActiveProPercent: 0,
+        };
+
+    const dropoffs = analyticsAvailable
+      ? buildDropoffs(analytics30d, subscriptions)
+      : {
+          onboardingCompletedNoChat: {
+            count: 0,
+            sampleUserIds: [],
+          },
+          chatStartedNoSave: {
+            count: 0,
+            sampleUserIds: [],
+          },
+          conversationSavedNoCheckout: {
+            count: 0,
+            sampleUserIds: [],
+          },
+          checkoutStartedNoActivePro: {
+            count: 0,
+            sampleUserIds: [],
+          },
         };
 
     return NextResponse.json({
@@ -451,6 +604,7 @@ export async function GET() {
       retention,
       trends,
       funnel,
+      dropoffs,
       recentEvents,
     });
   } catch (e: any) {

@@ -11,6 +11,11 @@ type DailyPoint = {
   count: number;
 };
 
+type DropoffGroup = {
+  count: number;
+  sampleUserIds: string[];
+};
+
 type DebugMetricsResponse = {
   generatedAt: string;
   analyticsAvailable: boolean;
@@ -75,9 +80,17 @@ type DebugMetricsResponse = {
     chatStarted30d: number;
     conversationSaved30d: number;
     checkoutStarted30d: number;
+    activeProCurrent: number;
     onboardingToChatPercent: number;
     chatToSavePercent: number;
     saveToCheckoutPercent: number;
+    checkoutToActiveProPercent: number;
+  };
+  dropoffs: {
+    onboardingCompletedNoChat: DropoffGroup;
+    chatStartedNoSave: DropoffGroup;
+    conversationSavedNoCheckout: DropoffGroup;
+    checkoutStartedNoActivePro: DropoffGroup;
   };
   recentEvents: Array<{
     id: string;
@@ -112,6 +125,47 @@ function Sparkline({
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+function DropoffCard({
+  title,
+  description,
+  group,
+}: {
+  title: string;
+  description: string;
+  group: DropoffGroup;
+}) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="text-sm font-medium text-white">{title}</div>
+      <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+        {description}
+      </p>
+
+      <div className="mt-4 text-3xl font-semibold text-white">
+        {group.count}
+      </div>
+
+      {group.sampleUserIds.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+            Sample users
+          </div>
+          <div className="mt-3 space-y-2">
+            {group.sampleUserIds.map((userId) => (
+              <div
+                key={userId}
+                className="truncate text-xs text-neutral-400"
+              >
+                {userId}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -306,14 +360,12 @@ export default function DebugPage() {
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-300">
                 The product is running, but <code>analytics_events</code>{" "}
-                is not available in Supabase yet. Apply the analytics
-                migration to start collecting events and unlock the full
-                debug dashboard.
+                is not available in Supabase yet.
               </p>
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                 Journals total
@@ -349,6 +401,15 @@ export default function DebugPage() {
                 {metrics?.analytics.uniqueActiveUsers7d ?? 0}
               </div>
             </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Events 30d
+              </div>
+              <div className="mt-3 text-3xl font-semibold text-white">
+                {metrics?.analytics.totalEvents30d ?? 0}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
@@ -356,7 +417,7 @@ export default function DebugPage() {
               30-day conversion funnel
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <div className="mt-4 grid gap-3 md:grid-cols-5">
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-xs text-neutral-500">
                   Onboarding completed
@@ -374,7 +435,7 @@ export default function DebugPage() {
                   {metrics?.funnel.chatStarted30d ?? 0}
                 </div>
                 <div className="mt-2 text-xs text-neutral-500">
-                  {metrics?.funnel.onboardingToChatPercent ?? 0}% of onboarding
+                  {metrics?.funnel.onboardingToChatPercent ?? 0}%
                 </div>
               </div>
 
@@ -386,7 +447,7 @@ export default function DebugPage() {
                   {metrics?.funnel.conversationSaved30d ?? 0}
                 </div>
                 <div className="mt-2 text-xs text-neutral-500">
-                  {metrics?.funnel.chatToSavePercent ?? 0}% of chat starters
+                  {metrics?.funnel.chatToSavePercent ?? 0}%
                 </div>
               </div>
 
@@ -398,10 +459,68 @@ export default function DebugPage() {
                   {metrics?.funnel.checkoutStarted30d ?? 0}
                 </div>
                 <div className="mt-2 text-xs text-neutral-500">
-                  {metrics?.funnel.saveToCheckoutPercent ?? 0}% of savers
+                  {metrics?.funnel.saveToCheckoutPercent ?? 0}%
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Active Pro current
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-white">
+                  {metrics?.funnel.activeProCurrent ?? 0}
+                </div>
+                <div className="mt-2 text-xs text-neutral-500">
+                  {metrics?.funnel.checkoutToActiveProPercent ?? 0}%
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <DropoffCard
+              title="Onboarding done, but no chat"
+              description="Users who completed onboarding in the last 30 days but never started a chat."
+              group={
+                metrics?.dropoffs.onboardingCompletedNoChat ?? {
+                  count: 0,
+                  sampleUserIds: [],
+                }
+              }
+            />
+
+            <DropoffCard
+              title="Chat started, but no save"
+              description="Users who started reflecting but never closed and saved a conversation."
+              group={
+                metrics?.dropoffs.chatStartedNoSave ?? {
+                  count: 0,
+                  sampleUserIds: [],
+                }
+              }
+            />
+
+            <DropoffCard
+              title="Saved, but no checkout"
+              description="Users who got value from the product but never started checkout."
+              group={
+                metrics?.dropoffs.conversationSavedNoCheckout ?? {
+                  count: 0,
+                  sampleUserIds: [],
+                }
+              }
+            />
+
+            <DropoffCard
+              title="Checkout started, but no active Pro"
+              description="Users who entered billing flow but do not currently have active Pro."
+              group={
+                metrics?.dropoffs.checkoutStartedNoActivePro ?? {
+                  count: 0,
+                  sampleUserIds: [],
+                }
+              }
+            />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
