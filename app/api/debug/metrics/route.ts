@@ -31,6 +31,11 @@ type JournalAggregateRow = {
   count: number;
 };
 
+type DailyPoint = {
+  date: string;
+  count: number;
+};
+
 function getSinceDate(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -110,6 +115,60 @@ function buildTopSavers(
     .slice(0, limit);
 }
 
+function formatDayKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildDailySeriesFromTimestamps(
+  timestamps: string[],
+  days: number
+): DailyPoint[] {
+  const counts: Record<string, number> = {};
+  const today = new Date();
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (days - 1 - i));
+    counts[formatDayKey(d)] = 0;
+  }
+
+  for (const timestamp of timestamps) {
+    const key = formatDayKey(new Date(timestamp));
+    if (key in counts) {
+      counts[key] += 1;
+    }
+  }
+
+  return Object.entries(counts).map(([date, count]) => ({
+    date,
+    count,
+  }));
+}
+
+function buildDailyEventSeries(
+  events: AnalyticsRow[],
+  eventName: string,
+  days: number
+) {
+  return buildDailySeriesFromTimestamps(
+    events
+      .filter((event) => event.event_name === eventName)
+      .map((event) => event.created_at),
+    days
+  );
+}
+
+function isMissingAnalyticsTableError(error: any) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "").toLowerCase();
+
+  return (
+    code === "PGRST205" ||
+    (message.includes("analytics_events") &&
+      message.includes("schema cache"))
+  );
+}
+
 export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
@@ -134,10 +193,10 @@ export async function GET() {
       journalsTotalResult,
       journals7dResult,
       subscriptionsResult,
+      journalsPerUserResult,
       analytics7dResult,
       analytics30dResult,
       recentEventsResult,
-      journalsPerUserResult,
     ] = await Promise.all([
       adminSupabase
         .from("journals")
@@ -155,6 +214,11 @@ export async function GET() {
         .select(
           "id, user_id, plan, status, stripe_customer_id, stripe_subscription_id, current_period_end, created_at, updated_at"
         ),
+
+      adminSupabase
+        .from("journals")
+        .select("user_id, created_at")
+        .is("deleted_at", null),
 
       adminSupabase
         .from("analytics_events")
@@ -175,33 +239,21 @@ export async function GET() {
         .select("id, user_id, event_name, page, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(30),
-
-      adminSupabase
-        .from("journals")
-        .select("user_id")
-        .is("deleted_at", null),
     ]);
 
     if (journalsTotalResult.error) throw journalsTotalResult.error;
     if (journals7dResult.error) throw journals7dResult.error;
     if (subscriptionsResult.error) throw subscriptionsResult.error;
-    if (analytics7dResult.error) throw analytics7dResult.error;
-    if (analytics30dResult.error) throw analytics30dResult.error;
-    if (recentEventsResult.error) throw recentEventsResult.error;
     if (journalsPerUserResult.error) throw journalsPerUserResult.error;
 
     const subscriptions =
       (subscriptionsResult.data as SubscriptionRow[]) ?? [];
 
-    const analytics7d =
-      (analytics7dResult.data as AnalyticsRow[]) ?? [];
-    const analytics30d =
-      (analytics30dResult.data as AnalyticsRow[]) ?? [];
-    const recentEvents =
-      (recentEventsResult.data as AnalyticsRow[]) ?? [];
-
     const journalRows =
-      (journalsPerUserResult.data as Array<{ user_id: string }>) ?? [];
+      (journalsPerUserResult.data as Array<{
+        user_id: string;
+        created_at: string;
+      }>) ?? [];
 
     const journalCountsByUser = journalRows.reduce<
       Record<string, number>
@@ -230,21 +282,43 @@ export async function GET() {
       subscriptions.map((item) => item.plan || "free")
     );
 
-    const eventCounts7d = groupCounts(
-      analytics7d.map((item) => item.event_name)
-    );
+    let analyticsAvailable = true;
+    let analytics7d: AnalyticsRow[] = [];
+    let analytics30d: AnalyticsRow[] = [];
+    let recentEvents: AnalyticsRow[] = [];
 
-    const eventCounts30d = groupCounts(
-      analytics30d.map((item) => item.event_name)
-    );
+    if (analytics7dResult.error || analytics30dResult.error || recentEventsResult.error) {
+      const firstError =
+        analytics7dResult.error ||
+        analytics30dResult.error ||
+        recentEventsResult.error;
 
-    const uniqueActiveUsers7d = new Set(
-      analytics7d.map((item) => item.user_id)
-    ).size;
+      if (isMissingAnalyticsTableError(firstError)) {
+        analyticsAvailable = false;
+      } else {
+        throw firstError;
+      }
+    } else {
+      analytics7d = (analytics7dResult.data as AnalyticsRow[]) ?? [];
+      analytics30d = (analytics30dResult.data as AnalyticsRow[]) ?? [];
+      recentEvents = (recentEventsResult.data as AnalyticsRow[]) ?? [];
+    }
 
-    const uniqueActiveUsers30d = new Set(
-      analytics30d.map((item) => item.user_id)
-    ).size;
+    const eventCounts7d = analyticsAvailable
+      ? groupCounts(analytics7d.map((item) => item.event_name))
+      : {};
+
+    const eventCounts30d = analyticsAvailable
+      ? groupCounts(analytics30d.map((item) => item.event_name))
+      : {};
+
+    const uniqueActiveUsers7d = analyticsAvailable
+      ? new Set(analytics7d.map((item) => item.user_id)).size
+      : 0;
+
+    const uniqueActiveUsers30d = analyticsAvailable
+      ? new Set(analytics30d.map((item) => item.user_id)).size
+      : 0;
 
     const conversionSignals = {
       checkoutStarts7d:
@@ -260,20 +334,39 @@ export async function GET() {
     };
 
     const retention = {
-      saversActiveBuckets: bucketUsersByEventDays(
-        analytics30d,
-        "conversation_saved"
-      ),
-      startersActiveBuckets: bucketUsersByEventDays(
-        analytics30d,
-        "chat_started"
-      ),
-      repeatSavers30d: buildRepeatSaverStats(analytics30d),
+      saversActiveBuckets: analyticsAvailable
+        ? bucketUsersByEventDays(analytics30d, "conversation_saved")
+        : { d1: 0, d3: 0, d7: 0, d14: 0, d30: 0 },
+      startersActiveBuckets: analyticsAvailable
+        ? bucketUsersByEventDays(analytics30d, "chat_started")
+        : { d1: 0, d3: 0, d7: 0, d14: 0, d30: 0 },
+      repeatSavers30d: analyticsAvailable
+        ? buildRepeatSaverStats(analytics30d)
+        : {
+            usersWith1Save: 0,
+            usersWith2Saves: 0,
+            usersWith3Saves: 0,
+            usersWith5Saves: 0,
+          },
       topSavers: buildTopSavers(journalAggregates, 10),
+    };
+
+    const trends = {
+      journalsDaily30d: buildDailySeriesFromTimestamps(
+        journalRows.map((row) => row.created_at),
+        30
+      ),
+      conversationSavedDaily30d: analyticsAvailable
+        ? buildDailyEventSeries(analytics30d, "conversation_saved", 30)
+        : buildDailySeriesFromTimestamps([], 30),
+      checkoutStartedDaily30d: analyticsAvailable
+        ? buildDailyEventSeries(analytics30d, "upgrade_checkout_started", 30)
+        : buildDailySeriesFromTimestamps([], 30),
     };
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
+      analyticsAvailable,
       journals: {
         total: journalsTotalResult.count ?? 0,
         last7d: journals7dResult.count ?? 0,
@@ -285,8 +378,8 @@ export async function GET() {
         byPlan: billingPlanCounts,
       },
       analytics: {
-        totalEvents7d: analytics7d.length,
-        totalEvents30d: analytics30d.length,
+        totalEvents7d: analyticsAvailable ? analytics7d.length : 0,
+        totalEvents30d: analyticsAvailable ? analytics30d.length : 0,
         uniqueActiveUsers7d,
         uniqueActiveUsers30d,
         eventCounts7d,
@@ -294,6 +387,7 @@ export async function GET() {
         conversionSignals,
       },
       retention,
+      trends,
       recentEvents,
     });
   } catch (e: any) {

@@ -6,8 +6,14 @@ import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 import { supabase } from "@/lib/supabase-browser";
 
+type DailyPoint = {
+  date: string;
+  count: number;
+};
+
 type DebugMetricsResponse = {
   generatedAt: string;
+  analyticsAvailable: boolean;
   journals: {
     total: number;
     last7d: number;
@@ -59,6 +65,11 @@ type DebugMetricsResponse = {
       count: number;
     }>;
   };
+  trends: {
+    journalsDaily30d: DailyPoint[];
+    conversationSavedDaily30d: DailyPoint[];
+    checkoutStartedDaily30d: DailyPoint[];
+  };
   recentEvents: Array<{
     id: string;
     user_id: string;
@@ -68,6 +79,33 @@ type DebugMetricsResponse = {
     created_at: string;
   }>;
 };
+
+function Sparkline({
+  points,
+}: {
+  points: DailyPoint[];
+}) {
+  const max = Math.max(...points.map((p) => p.count), 1);
+
+  return (
+    <div className="flex h-24 items-end gap-1">
+      {points.map((point) => (
+        <div
+          key={point.date}
+          className="flex min-w-0 flex-1 flex-col items-center justify-end"
+        >
+          <div
+            className="w-full rounded-t-sm bg-white/80"
+            style={{
+              height: `${Math.max(6, (point.count / max) * 100)}%`,
+            }}
+            title={`${point.date}: ${point.count}`}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function DebugPage() {
   const router = useRouter();
@@ -252,6 +290,20 @@ export default function DebugPage() {
             </div>
           </div>
 
+          {!metrics?.analyticsAvailable && (
+            <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 px-5 py-5">
+              <div className="text-sm font-medium text-white">
+                Analytics table is not active yet
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                The product is running, but <code>analytics_events</code>{" "}
+                is not available in Supabase yet. Apply the analytics
+                migration to start collecting events and unlock the full
+                debug dashboard.
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-4">
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
@@ -290,6 +342,39 @@ export default function DebugPage() {
             </div>
           </div>
 
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-sm font-medium text-white">
+                Journals daily · 30 days
+              </div>
+              <div className="mt-4">
+                <Sparkline points={metrics?.trends.journalsDaily30d ?? []} />
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-sm font-medium text-white">
+                Saves daily · 30 days
+              </div>
+              <div className="mt-4">
+                <Sparkline
+                  points={metrics?.trends.conversationSavedDaily30d ?? []}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="text-sm font-medium text-white">
+                Checkouts daily · 30 days
+              </div>
+              <div className="mt-4">
+                <Sparkline
+                  points={metrics?.trends.checkoutStartedDaily30d ?? []}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
               <div className="text-sm font-medium text-white">
@@ -302,8 +387,7 @@ export default function DebugPage() {
                     Checkout starts
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">
-                    {metrics?.analytics.conversionSignals
-                      .checkoutStarts7d ?? 0}
+                    {metrics?.analytics.conversionSignals.checkoutStarts7d ?? 0}
                   </div>
                 </div>
 
@@ -312,8 +396,7 @@ export default function DebugPage() {
                     Conversations saved
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">
-                    {metrics?.analytics.conversionSignals
-                      .conversationSaved7d ?? 0}
+                    {metrics?.analytics.conversionSignals.conversationSaved7d ?? 0}
                   </div>
                 </div>
 
@@ -322,8 +405,7 @@ export default function DebugPage() {
                     Export opens
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">
-                    {metrics?.analytics.conversionSignals
-                      .exportOpened7d ?? 0}
+                    {metrics?.analytics.conversionSignals.exportOpened7d ?? 0}
                   </div>
                 </div>
 
@@ -332,8 +414,7 @@ export default function DebugPage() {
                     Chat limits hit
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">
-                    {metrics?.analytics.conversionSignals
-                      .chatLimitsHit7d ?? 0}
+                    {metrics?.analytics.conversionSignals.chatLimitsHit7d ?? 0}
                   </div>
                 </div>
               </div>
@@ -364,72 +445,6 @@ export default function DebugPage() {
                     </div>
                   ))
                 )}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-              <div className="text-sm font-medium text-white">
-                Event counts · last 7 days
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {orderedEventCounts7d.length === 0 ? (
-                  <p className="text-sm text-neutral-500">
-                    No analytics events yet.
-                  </p>
-                ) : (
-                  orderedEventCounts7d.map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
-                    >
-                      <span className="text-sm text-neutral-300">
-                        {key}
-                      </span>
-                      <span className="text-sm font-medium text-white">
-                        {value}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-              <div className="text-sm font-medium text-white">
-                Product summary
-              </div>
-
-              <div className="mt-4 space-y-3 text-sm leading-relaxed text-neutral-300">
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                  7d active users:{" "}
-                  <span className="font-medium text-white">
-                    {metrics?.analytics.uniqueActiveUsers7d ?? 0}
-                  </span>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                  30d active users:{" "}
-                  <span className="font-medium text-white">
-                    {metrics?.analytics.uniqueActiveUsers30d ?? 0}
-                  </span>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                  Total subscriptions rows:{" "}
-                  <span className="font-medium text-white">
-                    {metrics?.subscriptions.total ?? 0}
-                  </span>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                  Total analytics events 30d:{" "}
-                  <span className="font-medium text-white">
-                    {metrics?.analytics.totalEvents30d ?? 0}
-                  </span>
-                </div>
               </div>
             </div>
           </div>
@@ -505,6 +520,34 @@ export default function DebugPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-sm font-medium text-white">
+              Event counts · last 7 days
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {orderedEventCounts7d.length === 0 ? (
+                <p className="text-sm text-neutral-500">
+                  No analytics events yet.
+                </p>
+              ) : (
+                orderedEventCounts7d.map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3"
+                  >
+                    <span className="text-sm text-neutral-300">
+                      {key}
+                    </span>
+                    <span className="text-sm font-medium text-white">
+                      {value}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
