@@ -59,6 +59,11 @@ type UserPreferences = {
   notifications: NotificationOption;
 };
 
+type CloseIntentSource =
+  | "header_close"
+  | "journal_nav"
+  | "save_nudge";
+
 export default function Chat() {
   const searchParams = useSearchParams();
 
@@ -81,6 +86,10 @@ export default function Chat() {
     null
   );
   const [starterApplied, setStarterApplied] = useState(false);
+  const [saveNudgeDismissed, setSaveNudgeDismissed] =
+    useState(false);
+  const [savePromptTracked, setSavePromptTracked] =
+    useState(false);
   const [preferences, setPreferences] =
     useState<UserPreferences>({
       goal: null,
@@ -201,6 +210,45 @@ export default function Chat() {
     return "Your reflection space";
   }, [preferences.moodPreference]);
 
+  const assistantMessageCount = useMemo(
+    () => messages.filter((msg) => msg.role === "assistant").length,
+    [messages]
+  );
+
+  const shouldShowSaveNudge =
+    messages.length >= 4 &&
+    assistantMessageCount >= 1 &&
+    !loading &&
+    !isSaved &&
+    !saveNudgeDismissed &&
+    !limitError;
+
+  useEffect(() => {
+    if (!shouldShowSaveNudge || savePromptTracked) {
+      return;
+    }
+
+    setSavePromptTracked(true);
+
+    trackClientEvent({
+      eventName: "save_prompt_shown",
+      page: "/chat",
+      metadata: {
+        messageCount: messages.length,
+        assistantMessageCount,
+        goal: preferences.goal,
+        plan: usage?.plan || "free",
+      },
+    });
+  }, [
+    shouldShowSaveNudge,
+    savePromptTracked,
+    messages.length,
+    assistantMessageCount,
+    preferences.goal,
+    usage?.plan,
+  ]);
+
   async function loadUsage() {
     try {
       setUsageLoading(true);
@@ -227,6 +275,33 @@ export default function Chat() {
     loadUsage();
   }, []);
 
+  async function openCloseFlow(source: CloseIntentSource) {
+    if (messages.length === 0 || isSaved) {
+      if (source === "journal_nav") {
+        window.location.href = "/journal";
+        return;
+      }
+
+      setShowCloseConfirm(true);
+      return;
+    }
+
+    await trackClientEvent({
+      eventName: "close_intent_started",
+      page: "/chat",
+      metadata: {
+        source,
+        messageCount: messages.length,
+        assistantMessageCount,
+        plan: usage?.plan || "free",
+        goal: preferences.goal,
+      },
+    });
+
+    setPendingNavigation(source === "journal_nav");
+    setShowCloseConfirm(true);
+  }
+
   useEffect(() => {
     setHeader({
       title: "New conversation",
@@ -239,25 +314,29 @@ export default function Chat() {
         {
           label: "Journal",
           onClick: () => {
-            if (messages.length === 0 || isSaved) {
-              window.location.href = "/journal";
-              return;
-            }
-
-            setPendingNavigation(true);
-            setShowCloseConfirm(true);
+            openCloseFlow("journal_nav");
           },
         },
         {
           label: "Close conversation",
           highlight: true,
-          onClick: () => setShowCloseConfirm(true),
+          onClick: () => {
+            openCloseFlow("header_close");
+          },
         },
       ],
     });
 
     return () => resetHeader();
-  }, [messages, isSaved, setHeader, resetHeader]);
+  }, [
+    messages,
+    isSaved,
+    setHeader,
+    resetHeader,
+    assistantMessageCount,
+    usage?.plan,
+    preferences.goal,
+  ]);
 
   function resetChat() {
     setMessages([]);
@@ -267,6 +346,8 @@ export default function Chat() {
     setIsSaved(false);
     setLimitError(null);
     setChatError(null);
+    setSaveNudgeDismissed(false);
+    setSavePromptTracked(false);
   }
 
   function applySuggestedPrompt(prompt: string) {
@@ -734,56 +815,103 @@ export default function Chat() {
             </motion.div>
           )}
 
-          {!showEmptyState && (limitError || chatError) && (
+          {!showEmptyState && (
             <div className="mb-4 space-y-3">
-              {limitError && (
-                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
-                  <div className="text-sm font-medium text-white">
-                    Save limit reached
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                    {limitError}
-                  </p>
+              {shouldShowSaveNudge && (
+                <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-white">
+                        This reflection is ready to save
+                      </div>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                        You already have enough context here to turn this
+                        conversation into a journal entry. Saving it now
+                        helps build your reflection history instead of
+                        losing the session.
+                      </p>
+                    </div>
 
-                  <button
-                    onClick={() => {
-                      window.location.href = "/upgrade";
-                    }}
-                    className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                  >
-                    Upgrade to Pro
-                  </button>
+                    <button
+                      onClick={() => setSaveNudgeDismissed(true)}
+                      className="text-sm text-neutral-400 transition hover:text-white"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      onClick={() => {
+                        openCloseFlow("save_nudge");
+                      }}
+                      className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                    >
+                      Close & save now
+                    </button>
+
+                    <button
+                      onClick={() => setSaveNudgeDismissed(true)}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                    >
+                      Keep reflecting
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {chatError && (
-                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
-                  <div className="text-sm font-medium text-white">
-                    AI conversation limit
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                    {chatError}
-                  </p>
+              {(limitError || chatError) && (
+                <div className="space-y-3">
+                  {limitError && (
+                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
+                      <div className="text-sm font-medium text-white">
+                        Save limit reached
+                      </div>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                        {limitError}
+                      </p>
 
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                    {usage?.plan === "free" && (
                       <button
                         onClick={() => {
                           window.location.href = "/upgrade";
                         }}
-                        className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                        className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                       >
                         Upgrade to Pro
                       </button>
-                    )}
+                    </div>
+                  )}
 
-                    <button
-                      onClick={resetChat}
-                      className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
-                    >
-                      Start new conversation
-                    </button>
-                  </div>
+                  {chatError && (
+                    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
+                      <div className="text-sm font-medium text-white">
+                        AI conversation limit
+                      </div>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                        {chatError}
+                      </p>
+
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        {usage?.plan === "free" && (
+                          <button
+                            onClick={() => {
+                              window.location.href = "/upgrade";
+                            }}
+                            className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                          >
+                            Upgrade to Pro
+                          </button>
+                        )}
+
+                        <button
+                          onClick={resetChat}
+                          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                        >
+                          Start new conversation
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

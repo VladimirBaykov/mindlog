@@ -3,6 +3,8 @@ export type AnalyticsEventName =
   | "chat_started"
   | "chat_starter_selected"
   | "chat_limit_hit"
+  | "save_prompt_shown"
+  | "close_intent_started"
   | "conversation_saved"
   | "upgrade_checkout_started"
   | "billing_portal_opened"
