@@ -6,6 +6,7 @@ import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
 import { moodConfig } from "@/lib/journal/moodMap";
 import { motion, AnimatePresence } from "framer-motion";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 type Message = {
   role: "user" | "assistant";
@@ -29,6 +30,21 @@ type SubscriptionInfo = {
   isPro: boolean;
 } | null;
 
+type UsageInfo = {
+  plan: "free" | "pro";
+  status?: string;
+  used: number;
+  limit: number | null;
+  remaining: number | null;
+  canSave: boolean;
+  currentPeriodEnd?: string | null;
+  ai?: {
+    maxMessagesPerConversation: number;
+    maxCharactersPerMessage: number;
+    maxTotalInputCharacters: number;
+  };
+} | null;
+
 export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -41,6 +57,9 @@ export default function JournalEntryPage() {
     useState<SubscriptionInfo>(null);
   const [loadingSubscription, setLoadingSubscription] =
     useState(true);
+  const [usage, setUsage] = useState<UsageInfo>(null);
+  const [loadingUsage, setLoadingUsage] = useState(true);
+  const [viewTracked, setViewTracked] = useState(false);
 
   useEffect(() => {
     fetch(`/api/journal/${id}`)
@@ -64,12 +83,62 @@ export default function JournalEntryPage() {
       .finally(() => setLoadingSubscription(false));
   }, []);
 
+  useEffect(() => {
+    fetch("/api/account/usage", {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data) => setUsage(data))
+      .finally(() => setLoadingUsage(false));
+  }, []);
+
   const normalizedMessages = useMemo(() => {
     if (!item) return [];
     if (Array.isArray(item.messages)) return item.messages;
     if (Array.isArray(item.content)) return item.content;
     return [];
   }, [item]);
+
+  const userMessageCount = useMemo(
+    () => normalizedMessages.filter((msg) => msg.role === "user").length,
+    [normalizedMessages]
+  );
+
+  const assistantMessageCount = useMemo(
+    () =>
+      normalizedMessages.filter((msg) => msg.role === "assistant").length,
+    [normalizedMessages]
+  );
+
+  useEffect(() => {
+    if (!item || viewTracked) return;
+
+    setViewTracked(true);
+
+    trackClientEvent({
+      eventName: "journal_entry_viewed",
+      page: `/journal/${id}`,
+      metadata: {
+        entryId: item.id,
+        mood: item.mood || "unknown",
+        messageCount: normalizedMessages.length,
+        userMessageCount,
+        assistantMessageCount,
+        plan: usage?.plan ?? null,
+      },
+    });
+  }, [
+    item,
+    viewTracked,
+    id,
+    normalizedMessages.length,
+    userMessageCount,
+    assistantMessageCount,
+    usage?.plan,
+  ]);
 
   useEffect(() => {
     if (!item) return;
@@ -95,7 +164,19 @@ export default function JournalEntryPage() {
           label: subscription?.isPro
             ? "Export to PDF"
             : "Export to PDF (Pro)",
-          onClick: () => router.push(`/journal/${id}/export`),
+          onClick: async () => {
+            await trackClientEvent({
+              eventName: "journal_entry_export_cta_clicked",
+              page: `/journal/${id}`,
+              metadata: {
+                entryId: item.id,
+                isPro: Boolean(subscription?.isPro),
+                plan: subscription?.plan || "free",
+              },
+            });
+
+            router.push(`/journal/${id}/export`);
+          },
         },
         {
           label: "Rename",
@@ -127,7 +208,18 @@ export default function JournalEntryPage() {
         },
         {
           label: "New conversation",
-          onClick: () => router.push("/chat"),
+          onClick: async () => {
+            await trackClientEvent({
+              eventName: "journal_entry_new_reflection_clicked",
+              page: `/journal/${id}`,
+              metadata: {
+                entryId: item.id,
+                plan: usage?.plan ?? subscription?.plan ?? null,
+              },
+            });
+
+            router.push("/chat");
+          },
         },
       ],
     });
@@ -142,6 +234,8 @@ export default function JournalEntryPage() {
     updateItem,
     deleteItem,
     subscription?.isPro,
+    subscription?.plan,
+    usage?.plan,
   ]);
 
   if (loading) {
@@ -198,6 +292,50 @@ export default function JournalEntryPage() {
       ? moodConfig[item.mood]
       : moodConfig.calm;
 
+  const createdDate = new Date(
+    item.created_at || item.createdAt || Date.now()
+  );
+
+  const reflectionStageCopy = (() => {
+    if (normalizedMessages.length <= 3) {
+      return "A short reflection snapshot you can return to later.";
+    }
+
+    if (normalizedMessages.length <= 8) {
+      return "A solid reflection entry with enough context to revisit meaningfully.";
+    }
+
+    return "A deeper reflection entry with enough texture to support pattern recognition over time.";
+  })();
+
+  const progressCopy = (() => {
+    if (loadingUsage) {
+      return "Updating your journal progress…";
+    }
+
+    if (!usage) {
+      return "Your private journal is growing over time.";
+    }
+
+    if (usage.limit === null) {
+      return `You currently have ${usage.used} saved reflection${
+        usage.used === 1 ? "" : "s"
+      } in your journal.`;
+    }
+
+    return `You currently have ${usage.used}/${usage.limit} saved reflection${
+      usage.used === 1 ? "" : "s"
+    } on your current plan.`;
+  })();
+
+  const nextActionCopy = (() => {
+    if (subscription?.isPro) {
+      return "Export this entry, continue reflecting, or review your stats to notice longer-term emotional patterns.";
+    }
+
+    return "Open export to preview Pro value, start another reflection, or keep building your history inside the journal.";
+  })();
+
   return (
     <div className="relative min-h-screen bg-black text-white">
       <div className="pointer-events-none fixed top-0 left-0 right-0 z-30 h-24 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
@@ -209,22 +347,73 @@ export default function JournalEntryPage() {
         className="mx-auto max-w-xl px-4 pt-24 pb-24"
       >
         <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-lg font-medium text-white">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
+                <span className={`h-2 w-2 rounded-full ${mood.color}`} />
+                {mood.label}
+              </div>
+
+              <div className="mt-4 text-xl font-medium text-white">
                 {item.title || "Conversation"}
               </div>
-              <div className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
-                <span className={`h-2 w-2 rounded-full ${mood.color}`} />
-                <span>{mood.label}</span>
+
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
+                {reflectionStageCopy}
+              </p>
+            </div>
+
+            <div className="text-right text-xs text-neutral-500">
+              <div>{createdDate.toLocaleDateString()}</div>
+              <div className="mt-1">
+                {createdDate.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Messages
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {normalizedMessages.length}
               </div>
             </div>
 
-            <div className="text-xs text-neutral-500">
-              {new Date(
-                item.created_at || item.createdAt || Date.now()
-              ).toLocaleDateString()}
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Your prompts
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {userMessageCount}
+              </div>
             </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                AI replies
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {assistantMessageCount}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+              Journal progress
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+              {progressCopy}
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+              The more entries you keep, the easier it becomes to notice
+              patterns, shifts, and recurring emotional themes.
+            </p>
           </div>
 
           <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
@@ -243,7 +432,19 @@ export default function JournalEntryPage() {
               </div>
 
               <button
-                onClick={() => router.push(`/journal/${id}/export`)}
+                onClick={async () => {
+                  await trackClientEvent({
+                    eventName: "journal_entry_export_cta_clicked",
+                    page: `/journal/${id}`,
+                    metadata: {
+                      entryId: item.id,
+                      isPro: Boolean(subscription?.isPro),
+                      plan: subscription?.plan || "free",
+                    },
+                  });
+
+                  router.push(`/journal/${id}/export`);
+                }}
                 className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 {loadingSubscription
@@ -251,6 +452,42 @@ export default function JournalEntryPage() {
                   : subscription?.isPro
                   ? "Export to PDF"
                   : "Unlock PDF export"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+            <div className="text-sm font-medium text-white">
+              What to do next
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              {nextActionCopy}
+            </p>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={async () => {
+                  await trackClientEvent({
+                    eventName: "journal_entry_new_reflection_clicked",
+                    page: `/journal/${id}`,
+                    metadata: {
+                      entryId: item.id,
+                      plan: usage?.plan ?? subscription?.plan ?? null,
+                    },
+                  });
+
+                  router.push("/chat");
+                }}
+                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                Start another reflection
+              </button>
+
+              <button
+                onClick={() => router.push("/stats")}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+              >
+                View reflection stats
               </button>
             </div>
           </div>
