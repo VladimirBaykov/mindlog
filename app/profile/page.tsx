@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 import { supabase } from "@/lib/supabase-browser";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 type UserInfo = {
   email: string | null;
@@ -141,6 +142,7 @@ export default function ProfilePage() {
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [refreshingPlan, setRefreshingPlan] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [viewTracked, setViewTracked] = useState(false);
 
   const [preferences, setPreferences] =
     useState<PreferencesState>({
@@ -259,9 +261,22 @@ export default function ProfilePage() {
     }
   }
 
-  async function refreshPlanStatus() {
+  async function refreshPlanStatus(source = "manual_refresh") {
     try {
       setRefreshingPlan(true);
+
+      await trackClientEvent({
+        eventName: "profile_refresh_plan_clicked",
+        page: "/profile",
+        metadata: {
+          source,
+          currentPlan: subscription?.plan ?? null,
+          currentStatus: subscription?.status ?? null,
+          used: usage?.used ?? null,
+          remaining: usage?.remaining ?? null,
+        },
+      });
+
       await Promise.all([loadUsage(), loadSubscription()]);
     } finally {
       setRefreshingPlan(false);
@@ -270,12 +285,40 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadUser();
-    refreshPlanStatus();
+    Promise.all([loadUsage(), loadSubscription()]);
   }, []);
 
-  async function handlePortal() {
+  useEffect(() => {
+    if (viewTracked) return;
+    if (!userInfo.email && !subscription && !usage) return;
+
+    setViewTracked(true);
+
+    trackClientEvent({
+      eventName: "profile_viewed",
+      page: "/profile",
+      metadata: {
+        currentPlan: subscription?.plan ?? null,
+        currentStatus: subscription?.status ?? null,
+        used: usage?.used ?? null,
+        remaining: usage?.remaining ?? null,
+      },
+    });
+  }, [viewTracked, userInfo.email, subscription, usage]);
+
+  async function handlePortal(source = "billing_card") {
     try {
       setLoadingPortal(true);
+
+      await trackClientEvent({
+        eventName: "profile_billing_clicked",
+        page: "/profile",
+        metadata: {
+          source,
+          currentPlan: subscription?.plan ?? null,
+          currentStatus: subscription?.status ?? null,
+        },
+      });
 
       const res = await fetch("/api/billing/portal", {
         method: "POST",
@@ -334,6 +377,15 @@ export default function ProfilePage() {
 
     try {
       setRestartingOnboarding(true);
+
+      await trackClientEvent({
+        eventName: "profile_onboarding_restart_clicked",
+        page: "/profile",
+        metadata: {
+          currentPlan: subscription?.plan ?? null,
+          currentStatus: subscription?.status ?? null,
+        },
+      });
 
       const { error } = await supabase.auth.updateUser({
         data: {
@@ -439,6 +491,40 @@ export default function ProfilePage() {
       ? "border-emerald-500/20 bg-emerald-500/10"
       : "border-white/10 bg-white/[0.03]";
 
+  const accountHealthCopy = useMemo(() => {
+    if (!usage && !subscription) {
+      return "Loading account health...";
+    }
+
+    if (isPro && subscription?.status === "active") {
+      return "Your account is in a healthy state. Pro access is active and billing looks good.";
+    }
+
+    if (!isPro && typeof usage?.remaining === "number" && usage.remaining <= 0) {
+      return "You’ve reached the free save limit. Upgrading now is the cleanest way to keep your reflection momentum going.";
+    }
+
+    if (!isPro && typeof usage?.remaining === "number" && usage.remaining <= 2) {
+      return `You only have ${usage.remaining} free save${
+        usage.remaining === 1 ? "" : "s"
+      } left.`;
+    }
+
+    if (subscription?.status === "past_due" || subscription?.status === "unpaid") {
+      return "Your account needs billing attention before Pro access can feel stable again.";
+    }
+
+    return "Your account is ready to keep growing with more reflections.";
+  }, [usage, subscription, isPro]);
+
+  const planValueCopy = useMemo(() => {
+    if (isPro) {
+      return "Unlimited history, deeper AI reflection, weekly summaries, premium insights, and export are available on your account.";
+    }
+
+    return "You can keep using MindLog on free, but Pro is where the journal starts feeling cumulative rather than capped.";
+  }, [isPro]);
+
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
@@ -449,6 +535,44 @@ export default function ProfilePage() {
             </div>
             <div className="mt-2 break-all text-base font-medium text-white">
               {userInfo.email || "Loading..."}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="text-sm font-medium text-white">
+              Account health
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              {accountHealthCopy}
+            </p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Plan
+                </div>
+                <div className="mt-2 text-lg font-semibold capitalize text-white">
+                  {subscription?.plan || "free"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Billing status
+                </div>
+                <div className="mt-2 text-lg font-semibold text-white">
+                  {subscription?.status || "inactive"}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs text-neutral-500">
+                  Saved entries
+                </div>
+                <div className="mt-2 text-lg font-semibold text-white">
+                  {usage?.used ?? "—"}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -472,6 +596,10 @@ export default function ProfilePage() {
                 {subscription?.status || "inactive"}
               </div>
             </div>
+
+            <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+              {planValueCopy}
+            </p>
 
             {typeof usage?.remaining === "number" && (
               <p className="mt-3 text-xs text-neutral-500">
@@ -507,14 +635,28 @@ export default function ProfilePage() {
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               {!isPro ? (
                 <button
-                  onClick={() => router.push("/upgrade")}
+                  onClick={async () => {
+                    await trackClientEvent({
+                      eventName: "profile_upgrade_clicked",
+                      page: "/profile",
+                      metadata: {
+                        source: "plan_card",
+                        currentPlan: subscription?.plan ?? null,
+                        currentStatus: subscription?.status ?? null,
+                        used: usage?.used ?? null,
+                        remaining: usage?.remaining ?? null,
+                      },
+                    });
+
+                    router.push("/upgrade");
+                  }}
                   className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Upgrade to Pro
                 </button>
               ) : (
                 <button
-                  onClick={handlePortal}
+                  onClick={() => handlePortal("plan_card")}
                   disabled={loadingPortal}
                   className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
                 >
@@ -523,7 +665,7 @@ export default function ProfilePage() {
               )}
 
               <button
-                onClick={refreshPlanStatus}
+                onClick={() => refreshPlanStatus("plan_card")}
                 disabled={refreshingPlan}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
@@ -551,7 +693,7 @@ export default function ProfilePage() {
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={refreshPlanStatus}
+                onClick={() => refreshPlanStatus("billing_state_card")}
                 disabled={refreshingPlan}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
@@ -564,7 +706,7 @@ export default function ProfilePage() {
                 subscription?.status === "unpaid" ||
                 isPro) && (
                 <button
-                  onClick={handlePortal}
+                  onClick={() => handlePortal("billing_state_card")}
                   disabled={loadingPortal}
                   className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
                 >
@@ -573,6 +715,60 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+
+          {!isPro && (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+              <div className="text-sm font-medium text-white">
+                Why Pro may be worth it now
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                {typeof usage?.remaining === "number" && usage.remaining <= 2
+                  ? "You are close to the free save limit. Pro keeps your momentum uninterrupted and unlocks the deeper product layer."
+                  : "Once your journal starts becoming a habit, unlimited history, summaries, premium insights, and export become much more meaningful."}
+              </p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    Unlimited journal growth
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                    Keep building history without worrying about save caps.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    Richer reflection layer
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                    Unlock summaries, insights, export, and deeper AI use.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  await trackClientEvent({
+                    eventName: "profile_upgrade_clicked",
+                    page: "/profile",
+                    metadata: {
+                      source: "why_pro_card",
+                      currentPlan: subscription?.plan ?? null,
+                      currentStatus: subscription?.status ?? null,
+                      used: usage?.used ?? null,
+                      remaining: usage?.remaining ?? null,
+                    },
+                  });
+
+                  router.push("/upgrade");
+                }}
+                className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                View Pro plan
+              </button>
+            </div>
+          )}
 
           {isAdmin && (
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">

@@ -24,6 +24,11 @@ export type AnalyticsEventName =
   | "billing_success_refresh_clicked"
   | "billing_success_profile_clicked"
   | "billing_success_start_reflection_clicked"
+  | "profile_viewed"
+  | "profile_refresh_plan_clicked"
+  | "profile_billing_clicked"
+  | "profile_upgrade_clicked"
+  | "profile_onboarding_restart_clicked"
   | "billing_portal_opened"
   | "journal_export_opened"
   | "journal_export_printed";
