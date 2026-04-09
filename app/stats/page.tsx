@@ -8,6 +8,7 @@ import MoodChart from "./MoodChart";
 import MoodTimeline from "./MoodTimeline";
 import MoodStreak from "./MoodStreak";
 import LockedFeatureCard from "@/components/ui/LockedFeatureCard";
+import { trackClientEvent } from "@/lib/analytics-client";
 
 type WeeklySummaryResponse = {
   summary: string;
@@ -51,6 +52,7 @@ export default function StatsPage() {
     useState(true);
   const [loadingWeekly, setLoadingWeekly] = useState(false);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [viewTracked, setViewTracked] = useState(false);
 
   useEffect(() => {
     setHeader({
@@ -66,7 +68,19 @@ export default function StatsPage() {
       menuItems: [
         {
           label: "New conversation",
-          onClick: () => router.push("/chat"),
+          onClick: async () => {
+            await trackClientEvent({
+              eventName: "stats_new_reflection_clicked",
+              page: "/stats",
+              metadata: {
+                source: "header_menu",
+                totalEntries: items.length,
+                plan: subscription?.plan ?? null,
+              },
+            });
+
+            router.push("/chat");
+          },
         },
         {
           label: "Profile",
@@ -74,13 +88,25 @@ export default function StatsPage() {
         },
         {
           label: "Upgrade",
-          onClick: () => router.push("/upgrade"),
+          onClick: async () => {
+            await trackClientEvent({
+              eventName: "stats_upgrade_clicked",
+              page: "/stats",
+              metadata: {
+                source: "header_menu",
+                totalEntries: items.length,
+                plan: subscription?.plan ?? null,
+              },
+            });
+
+            router.push("/upgrade");
+          },
         },
       ],
     });
 
     return () => resetHeader();
-  }, [router, setHeader, resetHeader]);
+  }, [router, setHeader, resetHeader, items.length, subscription?.plan]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +152,24 @@ export default function StatsPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (viewTracked) return;
+
+    if (loadingSubscription) return;
+
+    setViewTracked(true);
+
+    trackClientEvent({
+      eventName: "stats_viewed",
+      page: "/stats",
+      metadata: {
+        totalEntries: items.length,
+        plan: subscription?.plan ?? null,
+        isPro: Boolean(subscription?.isPro),
+      },
+    });
+  }, [viewTracked, loadingSubscription, items.length, subscription]);
 
   useEffect(() => {
     if (loadingSubscription || !subscription?.isPro) {
@@ -231,6 +275,22 @@ export default function StatsPage() {
     return new Date(items[0].createdAt).toLocaleDateString();
   }, [items]);
 
+  const entriesThisWeek = useMemo(() => {
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
+    return items.filter((item) => {
+      const created = new Date(item.createdAt).getTime();
+      return now - created <= sevenDays;
+    }).length;
+  }, [items]);
+
+  const recentMomentum = useMemo(() => {
+    if (entriesThisWeek === 0) return "No reflections this week yet";
+    if (entriesThisWeek === 1) return "1 reflection this week";
+    return `${entriesThisWeek} reflections this week`;
+  }, [entriesThisWeek]);
+
   const isPro = subscription?.isPro ?? false;
 
   const milestoneLabel = useMemo(() => {
@@ -240,6 +300,30 @@ export default function StatsPage() {
     if (totalEntries < 15) return "Your reflection history is growing";
     return "You’ve built a meaningful reflection archive";
   }, [totalEntries]);
+
+  const statsValueCopy = useMemo(() => {
+    if (totalEntries === 0) {
+      return "Your stats become useful once you begin saving reflections.";
+    }
+
+    if (totalEntries < 3) {
+      return "You are still in the early stage, but even a few entries begin to create emotional contrast over time.";
+    }
+
+    if (totalEntries < 8) {
+      return "You now have enough history for recurring moods and rhythms to start feeling real.";
+    }
+
+    return "Your journal is now deep enough that reflection stats can help you see patterns instead of isolated moments.";
+  }, [totalEntries]);
+
+  const nextStepCopy = useMemo(() => {
+    if (isPro) {
+      return "Use your stats as a reflection mirror: review patterns, open recent entries, and keep building continuity.";
+    }
+
+    return "Keep saving reflections to strengthen your stats, or upgrade to unlock richer summaries and deeper AI pattern detection.";
+  }, [isPro]);
 
   if (!items.length) {
     return (
@@ -261,7 +345,19 @@ export default function StatsPage() {
 
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <button
-                onClick={() => router.push("/chat")}
+                onClick={async () => {
+                  await trackClientEvent({
+                    eventName: "stats_new_reflection_clicked",
+                    page: "/stats",
+                    metadata: {
+                      source: "empty_state",
+                      totalEntries: 0,
+                      plan: subscription?.plan ?? null,
+                    },
+                  });
+
+                  router.push("/chat");
+                }}
                 className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 Start first reflection
@@ -316,14 +412,36 @@ export default function StatsPage() {
       <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-            Progress
+            Reflection progress
           </div>
+
           <div className="mt-3 text-lg font-medium text-white">
             {milestoneLabel}
           </div>
+
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-            Last entry: {lastEntryDate}
+            {statsValueCopy}
           </p>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Last entry
+              </div>
+              <div className="mt-2 text-base font-medium text-white">
+                {lastEntryDate}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Weekly momentum
+              </div>
+              <div className="mt-2 text-base font-medium text-white">
+                {recentMomentum}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -361,16 +479,48 @@ export default function StatsPage() {
               Generating your weekly reflection...
             </p>
           ) : isPro ? (
-            <p className="mt-4 text-sm leading-relaxed text-neutral-300">
-              {weekly?.summary ||
-                "No weekly reflection available yet."}
-            </p>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <p className="text-sm leading-relaxed text-neutral-200">
+                {weekly?.summary ||
+                  "No weekly reflection available yet."}
+              </p>
+            </div>
           ) : (
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
               <LockedFeatureCard
                 title="Weekly reflection summary"
                 description="Pro unlocks a 7-day reflective summary based on your recent journal activity, emotional patterns, and recurring themes."
               />
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-sm font-medium text-white">
+                  Why this matters
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                  Weekly summaries make your journal feel cumulative,
+                  not fragmented. They help connect separate reflections
+                  into a bigger emotional picture.
+                </p>
+
+                <button
+                  onClick={async () => {
+                    await trackClientEvent({
+                      eventName: "stats_upgrade_clicked",
+                      page: "/stats",
+                      metadata: {
+                        source: "weekly_summary_lock",
+                        totalEntries,
+                        plan: subscription?.plan ?? null,
+                      },
+                    });
+
+                    router.push("/upgrade");
+                  }}
+                  className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                >
+                  Unlock weekly reflection
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -395,24 +545,67 @@ export default function StatsPage() {
               </div>
             ) : isPro ? (
               insights?.insights?.length ? (
-                insights.insights.map((insight, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
-                  >
-                    {insight}
+                <div className="space-y-3">
+                  {insights.insights.map((insight, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
+                    >
+                      {insight}
+                    </div>
+                  ))}
+
+                  <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                    <div className="text-sm font-medium text-white">
+                      Keep building context
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                      The stronger your journal history becomes, the more
+                      meaningful these insights can feel.
+                    </p>
                   </div>
-                ))
+                </div>
               ) : (
                 <p className="text-sm text-neutral-500">
                   No insights available yet.
                 </p>
               )
             ) : (
-              <LockedFeatureCard
-                title="AI emotional pattern insights"
-                description="Pro unlocks deeper emotional signals, recurring themes, and more meaningful reflection guidance generated from your journal history."
-              />
+              <div className="space-y-4">
+                <LockedFeatureCard
+                  title="AI emotional pattern insights"
+                  description="Pro unlocks deeper emotional signals, recurring themes, and more meaningful reflection guidance generated from your journal history."
+                />
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    What Pro adds
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                    Instead of only seeing counts and charts, Pro helps
+                    turn your reflection history into narrative meaning.
+                  </p>
+
+                  <button
+                    onClick={async () => {
+                      await trackClientEvent({
+                        eventName: "stats_upgrade_clicked",
+                        page: "/stats",
+                        metadata: {
+                          source: "insights_lock",
+                          totalEntries,
+                          plan: subscription?.plan ?? null,
+                        },
+                      });
+
+                      router.push("/upgrade");
+                    }}
+                    className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                  >
+                    Unlock pattern insights
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -421,6 +614,10 @@ export default function StatsPage() {
           <div className="text-sm font-medium text-white">
             Recent streak
           </div>
+
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            This shows how steadily you’ve been returning to reflection.
+          </p>
 
           <div className="mt-4">
             <MoodStreak items={items} />
@@ -432,6 +629,11 @@ export default function StatsPage() {
             Mood timeline
           </div>
 
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            A timeline helps you notice movement, not just isolated mood
+            labels.
+          </p>
+
           <div className="mt-4">
             <MoodTimeline items={items} />
           </div>
@@ -442,6 +644,11 @@ export default function StatsPage() {
             Mood distribution
           </div>
 
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            Your top mood doesn’t define you, but it can reveal what has
+            been most present lately.
+          </p>
+
           <div className="mt-4">
             <MoodChart items={items} />
           </div>
@@ -449,17 +656,97 @@ export default function StatsPage() {
 
         {!isPro && !loadingSubscription && (
           <>
-            <LockedFeatureCard
-              title="Deep emotional trends"
-              description="Pro will unlock longer-range pattern detection, stronger summaries, and richer emotional analytics over time."
-            />
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+              <div className="text-sm font-medium text-white">
+                Free plan progress
+              </div>
 
-            <LockedFeatureCard
-              title="Export reflection reports"
-              description="Pro will let users export personal summaries and journal analytics as polished downloadable reports."
-            />
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                Your stats are already useful, but Pro turns them into a
+                deeper reflective layer with summaries, insights, export,
+                and stronger emotional pattern detection.
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    Deep emotional trends
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                    Longer-range pattern detection over time.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    Export reflection reports
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                    Save personal summaries and journal analytics as
+                    polished reports.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  await trackClientEvent({
+                    eventName: "stats_upgrade_clicked",
+                    page: "/stats",
+                    metadata: {
+                      source: "bottom_payoff_block",
+                      totalEntries,
+                      plan: subscription?.plan ?? null,
+                    },
+                  });
+
+                  router.push("/upgrade");
+                }}
+                className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
           </>
         )}
+
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="text-sm font-medium text-white">
+            What to do next
+          </div>
+
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            {nextStepCopy}
+          </p>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={async () => {
+                await trackClientEvent({
+                  eventName: "stats_new_reflection_clicked",
+                  page: "/stats",
+                  metadata: {
+                    source: "bottom_cta",
+                    totalEntries,
+                    plan: subscription?.plan ?? null,
+                  },
+                });
+
+                router.push("/chat");
+              }}
+              className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+            >
+              Start another reflection
+            </button>
+
+            <button
+              onClick={() => router.push("/journal")}
+              className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+            >
+              Open journal
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
