@@ -5,13 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 import { trackClientEvent } from "@/lib/analytics-client";
-
-type SubscriptionResponse = {
-  plan: "free" | "pro";
-  status: string;
-  currentPeriodEnd: string | null;
-  isPro: boolean;
-};
+import {
+  fetchSubscription,
+  type SubscriptionInfo,
+} from "@/lib/account-client";
 
 type SyncState = "checking" | "active" | "pending" | "error";
 
@@ -23,7 +20,7 @@ export default function BillingSuccessPage() {
   const [syncState, setSyncState] =
     useState<SyncState>("checking");
   const [subscription, setSubscription] =
-    useState<SubscriptionResponse | null>(null);
+    useState<SubscriptionInfo | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -61,16 +58,11 @@ export default function BillingSuccessPage() {
     });
   }, [sessionId]);
 
-  async function fetchSubscriptionStatus() {
-    const res = await fetch("/api/account/subscription", {
-      cache: "no-store",
-    });
+  async function fetchSubscriptionStatus(signal?: AbortSignal) {
+    const data = await fetchSubscription(signal);
 
-    if (!res.ok) {
-      throw new Error("Failed to refresh subscription");
-    }
+    if (signal?.aborted) return false;
 
-    const data = (await res.json()) as SubscriptionResponse;
     setSubscription(data);
 
     if (data.isPro) {
@@ -98,7 +90,7 @@ export default function BillingSuccessPage() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     let intervalId: NodeJS.Timeout | null = null;
     let timeoutId: NodeJS.Timeout | null = null;
 
@@ -106,9 +98,11 @@ export default function BillingSuccessPage() {
       setSyncState("checking");
 
       try {
-        const active = await fetchSubscriptionStatus();
+        const active = await fetchSubscriptionStatus(
+          controller.signal
+        );
 
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
 
         if (active) {
           return;
@@ -117,16 +111,20 @@ export default function BillingSuccessPage() {
         intervalId = setInterval(async () => {
           try {
             setAttempts((prev) => prev + 1);
-            const isActive = await fetchSubscriptionStatus();
+            const isActive = await fetchSubscriptionStatus(
+              controller.signal
+            );
 
-            if (cancelled) return;
+            if (controller.signal.aborted) return;
 
             if (isActive && intervalId) {
               clearInterval(intervalId);
               intervalId = null;
             }
           } catch (error) {
-            console.error("Subscription polling failed:", error);
+            if (!controller.signal.aborted) {
+              console.error("Subscription polling failed:", error);
+            }
           }
         }, 2000);
 
@@ -136,16 +134,15 @@ export default function BillingSuccessPage() {
             intervalId = null;
           }
 
-          if (!cancelled) {
+          if (!controller.signal.aborted) {
             setSyncState((prev) =>
               prev === "active" ? prev : "pending"
             );
           }
         }, 16000);
       } catch (error) {
-        console.error("Initial subscription check failed:", error);
-
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
+          console.error("Initial subscription check failed:", error);
           setSyncState("error");
         }
       }
@@ -154,7 +151,7 @@ export default function BillingSuccessPage() {
     startPolling();
 
     return () => {
-      cancelled = true;
+      controller.abort();
 
       if (intervalId) clearInterval(intervalId);
       if (timeoutId) clearTimeout(timeoutId);

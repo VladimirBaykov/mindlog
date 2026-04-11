@@ -5,28 +5,11 @@ import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 import { trackClientEvent } from "@/lib/analytics-client";
-
-type SubscriptionInfo = {
-  plan: "free" | "pro";
-  status: string;
-  currentPeriodEnd: string | null;
-  isPro: boolean;
-} | null;
-
-type UsageInfo = {
-  plan: "free" | "pro";
-  status?: string;
-  used: number;
-  limit: number | null;
-  remaining: number | null;
-  canSave: boolean;
-  currentPeriodEnd?: string | null;
-  ai?: {
-    maxMessagesPerConversation: number;
-    maxCharactersPerMessage: number;
-    maxTotalInputCharacters: number;
-  };
-} | null;
+import {
+  fetchAccountSnapshot,
+  type SubscriptionInfo,
+  type UsageInfo,
+} from "@/lib/account-client";
 
 type BillingInterval = "monthly" | "yearly";
 
@@ -36,13 +19,11 @@ export default function UpgradePage() {
 
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
-  const [loadingSubscription, setLoadingSubscription] =
-    useState(true);
-  const [loadingUsage, setLoadingUsage] = useState(true);
+  const [loadingAccount, setLoadingAccount] = useState(true);
 
   const [subscription, setSubscription] =
-    useState<SubscriptionInfo>(null);
-  const [usage, setUsage] = useState<UsageInfo>(null);
+    useState<SubscriptionInfo | null>(null);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [billingInterval, setBillingInterval] =
     useState<BillingInterval>("monthly");
   const [viewTracked, setViewTracked] = useState(false);
@@ -73,58 +54,37 @@ export default function UpgradePage() {
     return () => resetHeader();
   }, [router, resetHeader, setHeader]);
 
-  async function loadSubscription() {
+  async function loadAccountState(signal?: AbortSignal) {
     try {
-      setLoadingSubscription(true);
+      setLoadingAccount(true);
 
-      const res = await fetch("/api/account/subscription", {
-        cache: "no-store",
-      });
+      const snapshot = await fetchAccountSnapshot(signal);
 
-      if (!res.ok) {
-        throw new Error("Failed to load subscription");
-      }
+      if (signal?.aborted) return;
 
-      const data = await res.json();
-      setSubscription(data);
+      setSubscription(snapshot.subscription);
+      setUsage(snapshot.usage);
     } catch (error) {
-      console.error("Subscription load failed:", error);
+      if (signal?.aborted) return;
+      console.error("Account snapshot load failed:", error);
       setSubscription(null);
-    } finally {
-      setLoadingSubscription(false);
-    }
-  }
-
-  async function loadUsage() {
-    try {
-      setLoadingUsage(true);
-
-      const res = await fetch("/api/account/usage", {
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to load usage");
-      }
-
-      const data = await res.json();
-      setUsage(data);
-    } catch (error) {
-      console.error("Usage load failed:", error);
       setUsage(null);
     } finally {
-      setLoadingUsage(false);
+      if (signal?.aborted) return;
+      setLoadingAccount(false);
     }
   }
 
   useEffect(() => {
-    loadSubscription();
-    loadUsage();
+    const controller = new AbortController();
+    loadAccountState(controller.signal);
+
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     if (viewTracked) return;
-    if (loadingSubscription || loadingUsage) return;
+    if (loadingAccount) return;
 
     setViewTracked(true);
 
@@ -139,13 +99,7 @@ export default function UpgradePage() {
         remaining: usage?.remaining ?? null,
       },
     });
-  }, [
-    viewTracked,
-    loadingSubscription,
-    loadingUsage,
-    subscription,
-    usage,
-  ]);
+  }, [viewTracked, loadingAccount, subscription, usage]);
 
   async function handleCheckout(source = "primary_cta") {
     try {
@@ -353,7 +307,7 @@ export default function UpgradePage() {
                 </div>
 
                 <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300 capitalize">
-                  {loadingSubscription
+                  {loadingAccount
                     ? "loading"
                     : isPro
                     ? "pro active"
@@ -439,16 +393,11 @@ export default function UpgradePage() {
               )}
 
               <button
-                onClick={() => {
-                  loadSubscription();
-                  loadUsage();
-                }}
-                disabled={loadingSubscription || loadingUsage}
+                onClick={() => loadAccountState()}
+                disabled={loadingAccount}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
-                {loadingSubscription || loadingUsage
-                  ? "Refreshing..."
-                  : "Refresh plan status"}
+                {loadingAccount ? "Refreshing..." : "Refresh plan status"}
               </button>
             </div>
 

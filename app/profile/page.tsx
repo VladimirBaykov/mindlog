@@ -6,33 +6,16 @@ import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 import { supabase } from "@/lib/supabase-browser";
 import { trackClientEvent } from "@/lib/analytics-client";
+import {
+  fetchAccountSnapshot,
+  type SubscriptionInfo,
+  type UsageInfo,
+} from "@/lib/account-client";
 
 type UserInfo = {
   email: string | null;
   id: string | null;
 };
-
-type UsageInfo = {
-  plan: "free" | "pro";
-  status?: string;
-  used: number;
-  limit: number | null;
-  remaining: number | null;
-  canSave: boolean;
-  currentPeriodEnd?: string | null;
-  ai?: {
-    maxMessagesPerConversation: number;
-    maxCharactersPerMessage: number;
-    maxTotalInputCharacters: number;
-  };
-} | null;
-
-type SubscriptionInfo = {
-  plan: "free" | "pro";
-  status: string;
-  currentPeriodEnd: string | null;
-  isPro: boolean;
-} | null;
 
 type GoalOption =
   | "process_emotions"
@@ -136,9 +119,11 @@ export default function ProfilePage() {
     id: null,
   });
 
-  const [usage, setUsage] = useState<UsageInfo>(null);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [subscription, setSubscription] =
-    useState<SubscriptionInfo>(null);
+    useState<SubscriptionInfo | null>(null);
+
+  const [loadingAccount, setLoadingAccount] = useState(true);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [refreshingPlan, setRefreshingPlan] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -196,10 +181,12 @@ export default function ProfilePage() {
     return () => resetHeader();
   }, [router, resetHeader, setHeader]);
 
-  async function loadUser() {
+  async function loadUser(signal?: AbortSignal) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (signal?.aborted) return;
 
     setUserInfo({
       email: user?.email ?? null,
@@ -231,66 +218,70 @@ export default function ProfilePage() {
     });
   }
 
-  async function loadUsage() {
+  async function loadAccountState(options?: {
+    signal?: AbortSignal;
+    refresh?: boolean;
+  }) {
+    const signal = options?.signal;
+    const refresh = options?.refresh ?? false;
+
     try {
-      const res = await fetch("/api/account/usage", {
-        cache: "no-store",
-      });
+      if (refresh) {
+        setRefreshingPlan(true);
+      } else {
+        setLoadingAccount(true);
+      }
 
-      if (!res.ok) return;
+      const snapshot = await fetchAccountSnapshot(signal);
 
-      const data = await res.json();
-      setUsage(data);
+      if (signal?.aborted) return;
+
+      setUsage(snapshot.usage);
+      setSubscription(snapshot.subscription);
     } catch (err) {
-      console.error("Usage load failed:", err);
-    }
-  }
+      if (signal?.aborted) return;
+      console.error("Account snapshot load failed:", err);
+    } finally {
+      if (signal?.aborted) return;
 
-  async function loadSubscription() {
-    try {
-      const res = await fetch("/api/account/subscription", {
-        cache: "no-store",
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-      setSubscription(data);
-    } catch (err) {
-      console.error("Subscription load failed:", err);
+      if (refresh) {
+        setRefreshingPlan(false);
+      } else {
+        setLoadingAccount(false);
+      }
     }
   }
 
   async function refreshPlanStatus(source = "manual_refresh") {
-    try {
-      setRefreshingPlan(true);
+    await trackClientEvent({
+      eventName: "profile_refresh_plan_clicked",
+      page: "/profile",
+      metadata: {
+        source,
+        currentPlan: subscription?.plan ?? null,
+        currentStatus: subscription?.status ?? null,
+        used: usage?.used ?? null,
+        remaining: usage?.remaining ?? null,
+      },
+    });
 
-      await trackClientEvent({
-        eventName: "profile_refresh_plan_clicked",
-        page: "/profile",
-        metadata: {
-          source,
-          currentPlan: subscription?.plan ?? null,
-          currentStatus: subscription?.status ?? null,
-          used: usage?.used ?? null,
-          remaining: usage?.remaining ?? null,
-        },
-      });
-
-      await Promise.all([loadUsage(), loadSubscription()]);
-    } finally {
-      setRefreshingPlan(false);
-    }
+    await loadAccountState({ refresh: true });
   }
 
   useEffect(() => {
-    loadUser();
-    Promise.all([loadUsage(), loadSubscription()]);
+    const controller = new AbortController();
+
+    loadUser(controller.signal);
+    loadAccountState({ signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
     if (viewTracked) return;
-    if (!userInfo.email && !subscription && !usage) return;
+    if (loadingAccount) return;
 
     setViewTracked(true);
 
@@ -304,7 +295,7 @@ export default function ProfilePage() {
         remaining: usage?.remaining ?? null,
       },
     });
-  }, [viewTracked, userInfo.email, subscription, usage]);
+  }, [viewTracked, loadingAccount, subscription, usage]);
 
   async function handlePortal(source = "billing_card") {
     try {
@@ -492,7 +483,7 @@ export default function ProfilePage() {
       : "border-white/10 bg-white/[0.03]";
 
   const accountHealthCopy = useMemo(() => {
-    if (!usage && !subscription) {
+    if (loadingAccount) {
       return "Loading account health...";
     }
 
@@ -500,22 +491,33 @@ export default function ProfilePage() {
       return "Your account is in a healthy state. Pro access is active and billing looks good.";
     }
 
-    if (!isPro && typeof usage?.remaining === "number" && usage.remaining <= 0) {
+    if (
+      !isPro &&
+      typeof usage?.remaining === "number" &&
+      usage.remaining <= 0
+    ) {
       return "You’ve reached the free save limit. Upgrading now is the cleanest way to keep your reflection momentum going.";
     }
 
-    if (!isPro && typeof usage?.remaining === "number" && usage.remaining <= 2) {
+    if (
+      !isPro &&
+      typeof usage?.remaining === "number" &&
+      usage.remaining <= 2
+    ) {
       return `You only have ${usage.remaining} free save${
         usage.remaining === 1 ? "" : "s"
       } left.`;
     }
 
-    if (subscription?.status === "past_due" || subscription?.status === "unpaid") {
+    if (
+      subscription?.status === "past_due" ||
+      subscription?.status === "unpaid"
+    ) {
       return "Your account needs billing attention before Pro access can feel stable again.";
     }
 
     return "Your account is ready to keep growing with more reflections.";
-  }, [usage, subscription, isPro]);
+  }, [loadingAccount, usage, subscription, isPro]);
 
   const planValueCopy = useMemo(() => {
     if (isPro) {
@@ -548,9 +550,7 @@ export default function ProfilePage() {
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                <div className="text-xs text-neutral-500">
-                  Plan
-                </div>
+                <div className="text-xs text-neutral-500">Plan</div>
                 <div className="mt-2 text-lg font-semibold capitalize text-white">
                   {subscription?.plan || "free"}
                 </div>
@@ -722,7 +722,8 @@ export default function ProfilePage() {
                 Why Pro may be worth it now
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                {typeof usage?.remaining === "number" && usage.remaining <= 2
+                {typeof usage?.remaining === "number" &&
+                usage.remaining <= 2
                   ? "You are close to the free save limit. Pro keeps your momentum uninterrupted and unlocks the deeper product layer."
                   : "Once your journal starts becoming a habit, unlimited history, summaries, premium insights, and export become much more meaningful."}
               </p>
@@ -733,7 +734,8 @@ export default function ProfilePage() {
                     Unlimited journal growth
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                    Keep building history without worrying about save caps.
+                    Keep building history without worrying about save
+                    caps.
                   </p>
                 </div>
 
@@ -742,7 +744,8 @@ export default function ProfilePage() {
                     Richer reflection layer
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                    Unlock summaries, insights, export, and deeper AI use.
+                    Unlock summaries, insights, export, and deeper AI
+                    use.
                   </p>
                 </div>
               </div>
