@@ -7,6 +7,8 @@ import { Header } from "@/components/header/Header";
 import { JournalProvider } from "@/components/journal/JournalContext";
 import { ToastProvider } from "@/components/ui/ToastContext";
 import { AnimatedLayout } from "@/components/layout/AnimatedLayout";
+import { BottomNav } from "@/components/navigation/BottomNav";
+import { shouldShowBottomNav } from "@/lib/navigation";
 
 export default function RootLayout({
   children,
@@ -14,6 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const showBottomNav = shouldShowBottomNav(pathname);
 
   return (
     <html lang="en">
@@ -23,12 +26,19 @@ export default function RootLayout({
             <JournalProvider>
               <Header />
 
-              {/* Отступ под фиксированный header */}
-              <main className="pt-[72px]">
+              <main
+                className={
+                  showBottomNav
+                    ? "pt-[72px] pb-[88px]"
+                    : "pt-[72px]"
+                }
+              >
                 <AnimatedLayout key={pathname}>
                   {children}
                 </AnimatedLayout>
               </main>
+
+              <BottomNav />
             </JournalProvider>
           </ToastProvider>
         </HeaderProvider>

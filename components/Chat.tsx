@@ -61,7 +61,6 @@ type UserPreferences = {
 
 type CloseIntentSource =
   | "header_close"
-  | "journal_nav"
   | "save_nudge";
 
 export default function Chat() {
@@ -74,8 +73,6 @@ export default function Chat() {
     useState<ChatState>("empty");
   const [isSaved, setIsSaved] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] =
-    useState(false);
-  const [pendingNavigation, setPendingNavigation] =
     useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
@@ -277,11 +274,6 @@ export default function Chat() {
 
   async function openCloseFlow(source: CloseIntentSource) {
     if (messages.length === 0 || isSaved) {
-      if (source === "journal_nav") {
-        window.location.href = "/journal";
-        return;
-      }
-
       setShowCloseConfirm(true);
       return;
     }
@@ -298,7 +290,6 @@ export default function Chat() {
       },
     });
 
-    setPendingNavigation(source === "journal_nav");
     setShowCloseConfirm(true);
   }
 
@@ -310,12 +301,6 @@ export default function Chat() {
           label: "New conversation",
           danger: true,
           onClick: resetChat,
-        },
-        {
-          label: "Journal",
-          onClick: () => {
-            openCloseFlow("journal_nav");
-          },
         },
         {
           label: "Close conversation",
@@ -431,17 +416,9 @@ export default function Chat() {
       )}`;
 
       resetChat();
-
-      if (pendingNavigation) {
-        window.location.href = successUrl;
-        return;
-      }
-
       window.location.href = successUrl;
     } catch (err) {
       console.error(err);
-    } finally {
-      setPendingNavigation(false);
     }
   }
 
@@ -671,7 +648,7 @@ export default function Chat() {
 
       <div
         ref={scrollerRef}
-        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-28 pb-36"
+        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-28 pb-56"
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
@@ -982,9 +959,9 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="pointer-events-none fixed bottom-20 left-0 right-0 z-30 h-20 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent" />
+      <div className="pointer-events-none fixed bottom-[148px] left-0 right-0 z-30 h-20 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent" />
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 px-4 py-3 backdrop-blur-xl">
+      <div className="fixed bottom-[76px] left-0 right-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 px-4 py-3 backdrop-blur-xl">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1036,7 +1013,6 @@ export default function Chat() {
         danger={false}
         onCancel={() => {
           setShowCloseConfirm(false);
-          setPendingNavigation(false);
         }}
         onConfirm={() => {
           setShowCloseConfirm(false);

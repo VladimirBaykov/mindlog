@@ -52,14 +52,6 @@ export default function JournalPage() {
 
       menuItems: [
         {
-          label: "Stats",
-          onClick: () => router.push("/stats"),
-        },
-        {
-          label: "Profile",
-          onClick: () => router.push("/profile"),
-        },
-        {
           label: "Logout",
           danger: true,
           onClick: async () => {
@@ -260,32 +252,33 @@ export default function JournalPage() {
                   </p>
                 </div>
 
-                {usage?.plan === "free" && typeof usage?.remaining === "number" && (
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm text-neutral-200">
-                        Free plan saves remaining
+                {usage?.plan === "free" &&
+                  typeof usage?.remaining === "number" && (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm text-neutral-200">
+                          Free plan saves remaining
+                        </div>
+                        <div className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-neutral-200">
+                          {usage.remaining}
+                        </div>
                       </div>
-                      <div className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-neutral-200">
-                        {usage.remaining}
-                      </div>
+
+                      <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                        Pro unlocks unlimited saved entries, deeper AI reflection,
+                        weekly summaries, insights, and PDF export.
+                      </p>
+
+                      {usage.remaining <= 3 && (
+                        <button
+                          onClick={() => router.push("/upgrade")}
+                          className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                        >
+                          Upgrade to Pro
+                        </button>
+                      )}
                     </div>
-
-                    <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                      Pro unlocks unlimited saved entries, deeper AI reflection,
-                      weekly summaries, insights, and PDF export.
-                    </p>
-
-                    {usage.remaining <= 3 && (
-                      <button
-                        onClick={() => router.push("/upgrade")}
-                        className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                      >
-                        Upgrade to Pro
-                      </button>
-                    )}
-                  </div>
-                )}
+                  )}
 
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   {entryId && (
