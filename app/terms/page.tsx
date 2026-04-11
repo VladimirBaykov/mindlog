@@ -6,10 +6,10 @@ export default function TermsPage() {
       <div className="mx-auto max-w-3xl px-6 py-12">
         <div className="mb-8 flex items-center justify-between">
           <Link
-            href="/"
+            href="/profile"
             className="text-sm text-neutral-400 transition hover:text-white"
           >
-            ← Back
+            ← Back to profile
           </Link>
 
           <div className="text-sm text-neutral-500">
@@ -143,6 +143,27 @@ export default function TermsPage() {
               </p>
             </section>
           </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+          <Link
+            href="/profile"
+            className="transition hover:text-white"
+          >
+            Profile
+          </Link>
+          <Link
+            href="/privacy"
+            className="transition hover:text-white"
+          >
+            Privacy Policy
+          </Link>
+          <Link
+            href="/support"
+            className="transition hover:text-white"
+          >
+            Support
+          </Link>
         </div>
       </div>
     </main>
