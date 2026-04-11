@@ -780,16 +780,23 @@ export default function ProfilePage() {
                 Admin tools
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                Internal visibility for analytics, billing states, and
-                product activity.
+                Internal visibility for analytics, billing states, launch
+                readiness, and product activity.
               </p>
 
-              <div className="mt-4">
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => router.push("/debug")}
                   className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Open debug metrics
+                </button>
+
+                <button
+                  onClick={() => router.push("/launch-checklist")}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                >
+                  Open launch checklist
                 </button>
               </div>
             </div>

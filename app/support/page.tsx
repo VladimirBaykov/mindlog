@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  PUBLIC_BILLING_SUPPORT_EMAIL,
+  PUBLIC_SUPPORT_EMAIL,
+} from "@/lib/public-config";
 
 export default function SupportPage() {
   return (
@@ -12,9 +16,7 @@ export default function SupportPage() {
             ← Back to profile
           </Link>
 
-          <div className="text-sm text-neutral-500">
-            MindLog
-          </div>
+          <div className="text-sm text-neutral-500">MindLog</div>
         </div>
 
         <div className="space-y-6">
@@ -80,43 +82,39 @@ export default function SupportPage() {
             </h2>
 
             <p className="mt-3 text-sm leading-relaxed text-neutral-400">
-              Replace the placeholder contact details below with your real
-              support channel before launch.
+              Set your real public support contacts through env before launch.
             </p>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
               <div>
                 Support email:{" "}
-                <span className="text-white">
-                  support@mindlog.app
-                </span>
+                <a
+                  href={`mailto:${PUBLIC_SUPPORT_EMAIL}`}
+                  className="text-white underline underline-offset-4"
+                >
+                  {PUBLIC_SUPPORT_EMAIL}
+                </a>
               </div>
               <div className="mt-2">
                 Billing support:{" "}
-                <span className="text-white">
-                  billing@mindlog.app
-                </span>
+                <a
+                  href={`mailto:${PUBLIC_BILLING_SUPPORT_EMAIL}`}
+                  className="text-white underline underline-offset-4"
+                >
+                  {PUBLIC_BILLING_SUPPORT_EMAIL}
+                </a>
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
-            <Link
-              href="/profile"
-              className="transition hover:text-white"
-            >
+            <Link href="/profile" className="transition hover:text-white">
               Profile
             </Link>
-            <Link
-              href="/privacy"
-              className="transition hover:text-white"
-            >
+            <Link href="/privacy" className="transition hover:text-white">
               Privacy Policy
             </Link>
-            <Link
-              href="/terms"
-              className="transition hover:text-white"
-            >
+            <Link href="/terms" className="transition hover:text-white">
               Terms of Service
             </Link>
           </div>

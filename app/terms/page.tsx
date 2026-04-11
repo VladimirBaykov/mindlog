@@ -1,4 +1,8 @@
 import Link from "next/link";
+import {
+  PUBLIC_EFFECTIVE_DATE,
+  PUBLIC_SUPPORT_EMAIL,
+} from "@/lib/public-config";
 
 export default function TermsPage() {
   return (
@@ -12,9 +16,7 @@ export default function TermsPage() {
             ← Back to profile
           </Link>
 
-          <div className="text-sm text-neutral-500">
-            MindLog
-          </div>
+          <div className="text-sm text-neutral-500">MindLog</div>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8">
@@ -27,7 +29,7 @@ export default function TermsPage() {
           </h1>
 
           <p className="mt-3 text-sm leading-relaxed text-neutral-400">
-            Effective date: April 11, 2026
+            Effective date: {PUBLIC_EFFECTIVE_DATE}
           </p>
 
           <div className="mt-8 space-y-8 text-sm leading-relaxed text-neutral-300">
@@ -135,7 +137,23 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg font-medium text-white">
-                10. Changes to the terms
+                10. Contact
+              </h2>
+              <p className="mt-2">
+                For terms or service questions, contact{" "}
+                <a
+                  href={`mailto:${PUBLIC_SUPPORT_EMAIL}`}
+                  className="text-white underline underline-offset-4"
+                >
+                  {PUBLIC_SUPPORT_EMAIL}
+                </a>
+                .
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                11. Changes to the terms
               </h2>
               <p className="mt-2">
                 We may update these terms over time. Continued use after
@@ -146,22 +164,13 @@ export default function TermsPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
-          <Link
-            href="/profile"
-            className="transition hover:text-white"
-          >
+          <Link href="/profile" className="transition hover:text-white">
             Profile
           </Link>
-          <Link
-            href="/privacy"
-            className="transition hover:text-white"
-          >
+          <Link href="/privacy" className="transition hover:text-white">
             Privacy Policy
           </Link>
-          <Link
-            href="/support"
-            className="transition hover:text-white"
-          >
+          <Link href="/support" className="transition hover:text-white">
             Support
           </Link>
         </div>
