@@ -1,9 +1,5 @@
 import Link from "next/link";
-import {
-  PUBLIC_BILLING_SUPPORT_EMAIL,
-  PUBLIC_EFFECTIVE_DATE,
-  PUBLIC_SUPPORT_EMAIL,
-} from "@/lib/public-config";
+import { getLaunchConfigStatus } from "@/lib/public-config";
 
 const checklist = [
   {
@@ -53,7 +49,31 @@ const checklist = [
   },
 ];
 
+function StatusBadge({
+  ready,
+  label,
+}: {
+  ready: boolean;
+  label: string;
+}) {
+  return (
+    <div
+      className={`inline-flex rounded-full border px-3 py-1 text-xs ${
+        ready
+          ? "border-emerald-500/20 bg-emerald-500/10 text-neutral-100"
+          : "border-amber-500/20 bg-amber-500/10 text-neutral-100"
+      }`}
+    >
+      {label}
+    </div>
+  );
+}
+
 export default function LaunchChecklistPage() {
+  const config = getLaunchConfigStatus();
+  const publicConfigReady =
+    config.supportEmailReady && config.billingSupportEmailReady;
+
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-3xl px-6 py-12">
@@ -82,7 +102,31 @@ export default function LaunchChecklistPage() {
               A compact checklist for moving MindLog from internal build
               to first real users.
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <StatusBadge
+                ready={publicConfigReady}
+                label={
+                  publicConfigReady
+                    ? "Public config looks ready"
+                    : "Public config still needs work"
+                }
+              />
+            </div>
           </div>
+
+          {!publicConfigReady && (
+            <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 px-6 py-6">
+              <div className="text-sm font-medium text-white">
+                Action needed before launch
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                One or more public support emails are still placeholder
+                values. Update them in <span className="text-white">.env.local</span>
+                before giving the product to real users.
+              </p>
+            </div>
+          )}
 
           {checklist.map((section) => (
             <div
@@ -113,13 +157,57 @@ export default function LaunchChecklistPage() {
 
             <div className="mt-4 space-y-3 text-sm text-neutral-300">
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                Effective date: {PUBLIC_EFFECTIVE_DATE}
+                Effective date: {config.effectiveDate}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div>Support email: {config.supportEmail}</div>
+                <div className="mt-2">
+                  <StatusBadge
+                    ready={config.supportEmailReady}
+                    label={
+                      config.supportEmailReady
+                        ? "Ready"
+                        : "Placeholder detected"
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div>
+                  Billing support email: {config.billingSupportEmail}
+                </div>
+                <div className="mt-2">
+                  <StatusBadge
+                    ready={config.billingSupportEmailReady}
+                    label={
+                      config.billingSupportEmailReady
+                        ? "Ready"
+                        : "Placeholder detected"
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-6">
+            <h2 className="text-lg font-medium text-white">
+              Suggested next steps
+            </h2>
+
+            <div className="mt-4 space-y-3 text-sm text-neutral-300">
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                1. Replace public support emails with real addresses.
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                Support email: {PUBLIC_SUPPORT_EMAIL}
+                2. Re-run a full manual QA pass on auth, journal, stats,
+                upgrade, billing success, and export.
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                Billing support email: {PUBLIC_BILLING_SUPPORT_EMAIL}
+                3. Prepare for first users only after the checklist feels
+                clean end to end.
               </div>
             </div>
           </div>

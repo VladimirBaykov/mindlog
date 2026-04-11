@@ -1,10 +1,15 @@
 import Link from "next/link";
 import {
+  getLaunchConfigStatus,
   PUBLIC_BILLING_SUPPORT_EMAIL,
   PUBLIC_SUPPORT_EMAIL,
 } from "@/lib/public-config";
 
 export default function SupportPage() {
+  const config = getLaunchConfigStatus();
+  const hasPlaceholderEmails =
+    !config.supportEmailReady || !config.billingSupportEmailReady;
+
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-3xl px-6 py-12">
@@ -36,6 +41,28 @@ export default function SupportPage() {
               qualified crisis resource immediately.
             </p>
           </div>
+
+          {hasPlaceholderEmails && (
+            <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 px-6 py-6">
+              <div className="text-sm font-medium text-white">
+                Launch warning
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                Support emails are still using placeholder values. Replace
+                them in <span className="text-white">.env.local</span> before
+                launch:
+              </p>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
+                <div>
+                  NEXT_PUBLIC_SUPPORT_EMAIL=your-real-support@example.com
+                </div>
+                <div className="mt-2">
+                  NEXT_PUBLIC_BILLING_SUPPORT_EMAIL=your-real-billing@example.com
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-6">
             <h2 className="text-lg font-medium text-white">
@@ -82,7 +109,7 @@ export default function SupportPage() {
             </h2>
 
             <p className="mt-3 text-sm leading-relaxed text-neutral-400">
-              Set your real public support contacts through env before launch.
+              Public support contacts currently configured for launch.
             </p>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
