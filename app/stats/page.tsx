@@ -9,6 +9,10 @@ import MoodTimeline from "./MoodTimeline";
 import MoodStreak from "./MoodStreak";
 import LockedFeatureCard from "@/components/ui/LockedFeatureCard";
 import { trackClientEvent } from "@/lib/analytics-client";
+import {
+  fetchSubscription,
+  type SubscriptionInfo,
+} from "@/lib/account-client";
 
 type WeeklySummaryResponse = {
   summary: string;
@@ -28,20 +32,13 @@ type InsightsResponse = {
   upgradeUrl?: string;
 };
 
-type SubscriptionResponse = {
-  plan: "free" | "pro";
-  status: string;
-  currentPeriodEnd: string | null;
-  isPro: boolean;
-};
-
 export default function StatsPage() {
   const router = useRouter();
   const { items } = useJournal();
   const { setHeader, resetHeader } = useHeader();
 
   const [subscription, setSubscription] =
-    useState<SubscriptionResponse | null>(null);
+    useState<SubscriptionInfo | null>(null);
 
   const [weekly, setWeekly] =
     useState<WeeklySummaryResponse | null>(null);
@@ -50,8 +47,10 @@ export default function StatsPage() {
 
   const [loadingSubscription, setLoadingSubscription] =
     useState(true);
-  const [loadingWeekly, setLoadingWeekly] = useState(false);
-  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [loadingPremiumData, setLoadingPremiumData] =
+    useState(false);
+  const [refreshingPremiumData, setRefreshingPremiumData] =
+    useState(false);
   const [viewTracked, setViewTracked] = useState(false);
 
   useEffect(() => {
@@ -108,54 +107,100 @@ export default function StatsPage() {
     return () => resetHeader();
   }, [router, setHeader, resetHeader, items.length, subscription?.plan]);
 
-  useEffect(() => {
-    let cancelled = false;
+  async function loadSubscription(signal?: AbortSignal) {
+    try {
+      setLoadingSubscription(true);
 
-    async function loadSubscription() {
-      try {
-        setLoadingSubscription(true);
+      const data = await fetchSubscription(signal);
 
-        const res = await fetch("/api/account/subscription", {
+      if (signal?.aborted) return;
+
+      setSubscription(data);
+    } catch (error) {
+      if (signal?.aborted) return;
+
+      console.error("Subscription load error:", error);
+
+      setSubscription({
+        plan: "free",
+        status: "inactive",
+        currentPeriodEnd: null,
+        isPro: false,
+      });
+    } finally {
+      if (signal?.aborted) return;
+      setLoadingSubscription(false);
+    }
+  }
+
+  async function loadPremiumStats(options?: {
+    signal?: AbortSignal;
+    refresh?: boolean;
+  }) {
+    const signal = options?.signal;
+    const refresh = options?.refresh ?? false;
+
+    try {
+      if (refresh) {
+        setRefreshingPremiumData(true);
+      } else {
+        setLoadingPremiumData(true);
+      }
+
+      const [weeklyRes, insightsRes] = await Promise.all([
+        fetch("/api/stats/weekly-summary", {
           cache: "no-store",
-        });
+          signal,
+        }),
+        fetch("/api/stats/insights", {
+          cache: "no-store",
+          signal,
+        }),
+      ]);
 
-        if (!res.ok) {
-          throw new Error("Failed to load subscription");
-        }
+      const [weeklyData, insightsData] = await Promise.all([
+        weeklyRes.json().catch(() => null),
+        insightsRes.json().catch(() => null),
+      ]);
 
-        const data = (await res.json()) as SubscriptionResponse;
+      if (signal?.aborted) return;
 
-        if (!cancelled) {
-          setSubscription(data);
-        }
-      } catch (error) {
-        console.error("Subscription load error:", error);
+      if (!weeklyRes.ok && weeklyRes.status !== 403) {
+        throw new Error("Failed to load weekly summary");
+      }
 
-        if (!cancelled) {
-          setSubscription({
-            plan: "free",
-            status: "inactive",
-            currentPeriodEnd: null,
-            isPro: false,
-          });
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingSubscription(false);
-        }
+      if (!insightsRes.ok && insightsRes.status !== 403) {
+        throw new Error("Failed to load insights");
+      }
+
+      setWeekly((weeklyData as WeeklySummaryResponse | null) ?? null);
+      setInsights((insightsData as InsightsResponse | null) ?? null);
+    } catch (err) {
+      if (signal?.aborted) return;
+      console.error("Premium stats load error:", err);
+    } finally {
+      if (signal?.aborted) return;
+
+      if (refresh) {
+        setRefreshingPremiumData(false);
+      } else {
+        setLoadingPremiumData(false);
       }
     }
+  }
 
-    loadSubscription();
+  useEffect(() => {
+    const controller = new AbortController();
+
+    loadSubscription(controller.signal);
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
   useEffect(() => {
     if (viewTracked) return;
-
     if (loadingSubscription) return;
 
     setViewTracked(true);
@@ -172,84 +217,31 @@ export default function StatsPage() {
   }, [viewTracked, loadingSubscription, items.length, subscription]);
 
   useEffect(() => {
-    if (loadingSubscription || !subscription?.isPro) {
+    if (loadingSubscription) {
       return;
     }
 
-    let cancelled = false;
-
-    async function loadWeekly() {
-      try {
-        setLoadingWeekly(true);
-
-        const res = await fetch("/api/stats/weekly-summary", {
-          cache: "no-store",
-        });
-
-        const data = await res.json();
-
-        if (!cancelled) {
-          setWeekly(data);
-        }
-
-        if (!res.ok && res.status !== 403) {
-          throw new Error("Failed to load weekly summary");
-        }
-      } catch (err) {
-        console.error("Stats load error:", err);
-      } finally {
-        if (!cancelled) {
-          setLoadingWeekly(false);
-        }
-      }
-    }
-
-    loadWeekly();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loadingSubscription, subscription?.isPro]);
-
-  useEffect(() => {
-    if (loadingSubscription || !subscription?.isPro) {
+    if (!subscription?.isPro) {
+      setWeekly(null);
+      setInsights(null);
+      setLoadingPremiumData(false);
+      setRefreshingPremiumData(false);
       return;
     }
 
-    let cancelled = false;
-
-    async function loadInsights() {
-      try {
-        setLoadingInsights(true);
-
-        const res = await fetch("/api/stats/insights", {
-          cache: "no-store",
-        });
-
-        const data = await res.json();
-
-        if (!cancelled) {
-          setInsights(data);
-        }
-
-        if (!res.ok && res.status !== 403) {
-          throw new Error("Failed to load insights");
-        }
-      } catch (err) {
-        console.error("Insights load error:", err);
-      } finally {
-        if (!cancelled) {
-          setLoadingInsights(false);
-        }
-      }
-    }
-
-    loadInsights();
+    const controller = new AbortController();
+    loadPremiumStats({ signal: controller.signal });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [loadingSubscription, subscription?.isPro]);
+
+  async function refreshPremiumStats() {
+    if (!subscription?.isPro) return;
+
+    await loadPremiumStats({ refresh: true });
+  }
 
   const totalEntries = items.length;
 
@@ -469,12 +461,25 @@ export default function StatsPage() {
             <div className="text-sm font-medium text-white">
               Weekly reflection
             </div>
-            <div className="text-xs text-neutral-500">
-              Last entry: {lastEntryDate}
+            <div className="flex items-center gap-3">
+              {isPro && (
+                <button
+                  onClick={refreshPremiumStats}
+                  disabled={loadingPremiumData || refreshingPremiumData}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                >
+                  {refreshingPremiumData
+                    ? "Refreshing..."
+                    : "Refresh"}
+                </button>
+              )}
+              <div className="text-xs text-neutral-500">
+                Last entry: {lastEntryDate}
+              </div>
             </div>
           </div>
 
-          {loadingSubscription || loadingWeekly ? (
+          {loadingSubscription || loadingPremiumData ? (
             <p className="mt-4 text-sm leading-relaxed text-neutral-400">
               Generating your weekly reflection...
             </p>
@@ -490,6 +495,8 @@ export default function StatsPage() {
               <LockedFeatureCard
                 title="Weekly reflection summary"
                 description="Pro unlocks a 7-day reflective summary based on your recent journal activity, emotional patterns, and recurring themes."
+                feature="weekly_summary"
+                source="stats_weekly_summary_lock"
               />
 
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
@@ -526,12 +533,25 @@ export default function StatsPage() {
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
-          <div className="text-sm font-medium text-white">
-            Pattern insights
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-sm font-medium text-white">
+              Pattern insights
+            </div>
+            {isPro && (
+              <button
+                onClick={refreshPremiumStats}
+                disabled={loadingPremiumData || refreshingPremiumData}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+              >
+                {refreshingPremiumData
+                  ? "Refreshing..."
+                  : "Refresh"}
+              </button>
+            )}
           </div>
 
           <div className="mt-4 space-y-3">
-            {loadingSubscription || loadingInsights ? (
+            {loadingSubscription || loadingPremiumData ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div
@@ -575,6 +595,8 @@ export default function StatsPage() {
                 <LockedFeatureCard
                   title="AI emotional pattern insights"
                   description="Pro unlocks deeper emotional signals, recurring themes, and more meaningful reflection guidance generated from your journal history."
+                  feature="ai_pattern_insights"
+                  source="stats_insights_lock"
                 />
 
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
@@ -655,59 +677,57 @@ export default function StatsPage() {
         </div>
 
         {!isPro && !loadingSubscription && (
-          <>
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
-              <div className="text-sm font-medium text-white">
-                Free plan progress
-              </div>
-
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                Your stats are already useful, but Pro turns them into a
-                deeper reflective layer with summaries, insights, export,
-                and stronger emotional pattern detection.
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                  <div className="text-sm font-medium text-white">
-                    Deep emotional trends
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                    Longer-range pattern detection over time.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                  <div className="text-sm font-medium text-white">
-                    Export reflection reports
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                    Save personal summaries and journal analytics as
-                    polished reports.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={async () => {
-                  await trackClientEvent({
-                    eventName: "stats_upgrade_clicked",
-                    page: "/stats",
-                    metadata: {
-                      source: "bottom_payoff_block",
-                      totalEntries,
-                      plan: subscription?.plan ?? null,
-                    },
-                  });
-
-                  router.push("/upgrade");
-                }}
-                className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
-              >
-                Upgrade to Pro
-              </button>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="text-sm font-medium text-white">
+              Free plan progress
             </div>
-          </>
+
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              Your stats are already useful, but Pro turns them into a
+              deeper reflective layer with summaries, insights, export,
+              and stronger emotional pattern detection.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-sm font-medium text-white">
+                  Deep emotional trends
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                  Longer-range pattern detection over time.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-sm font-medium text-white">
+                  Export reflection reports
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                  Save personal summaries and journal analytics as
+                  polished reports.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={async () => {
+                await trackClientEvent({
+                  eventName: "stats_upgrade_clicked",
+                  page: "/stats",
+                  metadata: {
+                    source: "bottom_payoff_block",
+                    totalEntries,
+                    plan: subscription?.plan ?? null,
+                  },
+                });
+
+                router.push("/upgrade");
+              }}
+              className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+            >
+              Upgrade to Pro
+            </button>
+          </div>
         )}
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
