@@ -1,0 +1,150 @@
+import Link from "next/link";
+
+export default function TermsPage() {
+  return (
+    <main className="min-h-screen bg-black text-white">
+      <div className="mx-auto max-w-3xl px-6 py-12">
+        <div className="mb-8 flex items-center justify-between">
+          <Link
+            href="/"
+            className="text-sm text-neutral-400 transition hover:text-white"
+          >
+            ← Back
+          </Link>
+
+          <div className="text-sm text-neutral-500">
+            MindLog
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8">
+          <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
+            Terms of Service
+          </div>
+
+          <h1 className="mt-4 text-3xl font-semibold text-white">
+            Terms of Service
+          </h1>
+
+          <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+            Effective date: April 11, 2026
+          </p>
+
+          <div className="mt-8 space-y-8 text-sm leading-relaxed text-neutral-300">
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                1. Acceptance of terms
+              </h2>
+              <p className="mt-2">
+                By accessing or using MindLog, you agree to these Terms of
+                Service. If you do not agree, do not use the product.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                2. Nature of the service
+              </h2>
+              <p className="mt-2">
+                MindLog is an AI journaling and reflection product. It is
+                intended for personal reflection and productivity. It is not
+                medical care, therapy, crisis response, or emergency support.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                3. Accounts
+              </h2>
+              <p className="mt-2">
+                You are responsible for maintaining the security of your
+                account and for the activity that occurs under it.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                4. Acceptable use
+              </h2>
+              <p className="mt-2">
+                You agree not to misuse the service, attempt unauthorized
+                access, interfere with product operation, or use the product
+                in ways that violate laws or the rights of others.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                5. AI-generated content
+              </h2>
+              <p className="mt-2">
+                MindLog may generate AI responses, summaries, titles, and
+                insights. These outputs may be imperfect and should not be
+                relied on as legal, medical, psychological, or financial
+                advice.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                6. Paid plans and billing
+              </h2>
+              <p className="mt-2">
+                Paid subscriptions are handled through Stripe. Subscription
+                access, renewal timing, billing status, and cancellation
+                handling may depend on Stripe and related webhook syncs.
+              </p>
+              <p className="mt-2">
+                If a payment fails, premium access may be limited, paused, or
+                removed depending on billing status.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                7. Availability
+              </h2>
+              <p className="mt-2">
+                We may change, suspend, or discontinue features at any time.
+                We do not guarantee uninterrupted availability.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                8. Termination
+              </h2>
+              <p className="mt-2">
+                We may suspend or terminate access to the service if these
+                terms are violated or if continued access creates security,
+                legal, or operational risk.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                9. Limitation of liability
+              </h2>
+              <p className="mt-2">
+                To the maximum extent allowed by law, MindLog is provided on
+                an “as is” basis without warranties of any kind, and we are
+                not liable for indirect, incidental, special, or consequential
+                damages arising from use of the service.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-medium text-white">
+                10. Changes to the terms
+              </h2>
+              <p className="mt-2">
+                We may update these terms over time. Continued use after
+                updates means you accept the revised terms.
+              </p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}

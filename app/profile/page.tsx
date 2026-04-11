@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
@@ -989,6 +990,43 @@ export default function ProfilePage() {
                 <span>New Conversation</span>
                 <span className="text-neutral-500">→</span>
               </button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="text-sm font-medium text-white">
+              Legal and support
+            </div>
+
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              Important launch basics for users, billing questions, and
+              policy access.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <Link
+                href="/privacy"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+              >
+                <span>Privacy Policy</span>
+                <span className="text-neutral-500">→</span>
+              </Link>
+
+              <Link
+                href="/terms"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+              >
+                <span>Terms of Service</span>
+                <span className="text-neutral-500">→</span>
+              </Link>
+
+              <Link
+                href="/support"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+              >
+                <span>Support</span>
+                <span className="text-neutral-500">→</span>
+              </Link>
             </div>
           </div>
 

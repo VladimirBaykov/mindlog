@@ -62,32 +62,55 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid gap-3 pb-2 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-            <div className="text-sm font-medium text-white">
-              Reflective chat
+        <div className="space-y-4 pb-2">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Reflective chat
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                Talk naturally and let the app help you process what matters.
+              </p>
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-              Talk naturally and let the app help you process what matters.
-            </p>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Mood patterns
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                Track emotional themes over time with simple, private analytics.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Weekly insight
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+                Get gentle summaries and signals from your recent reflections.
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-            <div className="text-sm font-medium text-white">
-              Mood patterns
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-              Track emotional themes over time with simple, private analytics.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
-            <div className="text-sm font-medium text-white">
-              Weekly insight
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-              Get gentle summaries and signals from your recent reflections.
-            </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/10 pt-4 text-xs text-neutral-500">
+            <Link
+              href="/privacy"
+              className="transition hover:text-white"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="transition hover:text-white"
+            >
+              Terms of Service
+            </Link>
+            <Link
+              href="/support"
+              className="transition hover:text-white"
+            >
+              Support
+            </Link>
           </div>
         </div>
       </div>
