@@ -143,45 +143,6 @@ export default function ProfilePage() {
   const [restartingOnboarding, setRestartingOnboarding] =
     useState(false);
 
-  useEffect(() => {
-    setHeader({
-      title: "Profile",
-      leftSlot: (
-        <button
-          onClick={() => router.push("/journal")}
-          className="text-sm text-neutral-400 hover:text-white transition"
-        >
-          ← Journal
-        </button>
-      ),
-      menuItems: [
-        {
-          label: "Stats",
-          onClick: () => router.push("/stats"),
-        },
-        {
-          label: "Upgrade",
-          onClick: () => router.push("/upgrade"),
-        },
-        {
-          label: "New conversation",
-          onClick: () => router.push("/chat"),
-        },
-        {
-          label: "Logout",
-          danger: true,
-          onClick: async () => {
-            await supabase.auth.signOut();
-            router.refresh();
-            router.push("/sign-in");
-          },
-        },
-      ],
-    });
-
-    return () => resetHeader();
-  }, [router, resetHeader, setHeader]);
-
   async function loadUser(signal?: AbortSignal) {
     const {
       data: { user },
@@ -269,35 +230,6 @@ export default function ProfilePage() {
     await loadAccountState({ refresh: true });
   }
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    loadUser(controller.signal);
-    loadAccountState({ signal: controller.signal });
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (viewTracked) return;
-    if (loadingAccount) return;
-
-    setViewTracked(true);
-
-    trackClientEvent({
-      eventName: "profile_viewed",
-      page: "/profile",
-      metadata: {
-        currentPlan: subscription?.plan ?? null,
-        currentStatus: subscription?.status ?? null,
-        used: usage?.used ?? null,
-        remaining: usage?.remaining ?? null,
-      },
-    });
-  }, [viewTracked, loadingAccount, subscription, usage]);
-
   async function handlePortal(source = "billing_card") {
     try {
       setLoadingPortal(true);
@@ -332,6 +264,86 @@ export default function ProfilePage() {
       setLoadingPortal(false);
     }
   }
+
+  useEffect(() => {
+    setHeader({
+      title: "Profile",
+      leftSlot: (
+        <button
+          onClick={() => router.push("/journal")}
+          className="text-sm text-neutral-400 hover:text-white transition"
+        >
+          ← Journal
+        </button>
+      ),
+      menuItems: [
+        {
+          label: refreshingPlan ? "Refreshing..." : "Refresh plan status",
+          highlight: true,
+          onClick: () => refreshPlanStatus("header_menu"),
+        },
+        ...(isPro
+          ? [
+              {
+                label: loadingPortal ? "Opening..." : "Manage billing",
+                onClick: () => handlePortal("header_menu"),
+              },
+            ]
+          : []),
+        {
+          label: "Logout",
+          danger: true,
+          onClick: async () => {
+            await supabase.auth.signOut();
+            router.refresh();
+            router.push("/sign-in");
+          },
+        },
+      ],
+    });
+
+    return () => resetHeader();
+  }, [
+    router,
+    resetHeader,
+    setHeader,
+    refreshingPlan,
+    loadingPortal,
+    isPro,
+    subscription?.plan,
+    subscription?.status,
+    usage?.used,
+    usage?.remaining,
+  ]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    loadUser(controller.signal);
+    loadAccountState({ signal: controller.signal });
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (viewTracked) return;
+    if (loadingAccount) return;
+
+    setViewTracked(true);
+
+    trackClientEvent({
+      eventName: "profile_viewed",
+      page: "/profile",
+      metadata: {
+        currentPlan: subscription?.plan ?? null,
+        currentStatus: subscription?.status ?? null,
+        used: usage?.used ?? null,
+        remaining: usage?.remaining ?? null,
+      },
+    });
+  }, [viewTracked, loadingAccount, subscription, usage]);
 
   async function savePreferences() {
     if (savingPreferences) return;
@@ -531,7 +543,7 @@ export default function ProfilePage() {
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Signed in as

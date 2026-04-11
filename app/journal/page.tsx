@@ -218,7 +218,7 @@ export default function JournalPage() {
     <AuthGate>
       <div className="h-screen overflow-hidden bg-black text-white">
         <div className="h-full overflow-y-auto overscroll-contain">
-          <div className="mx-auto max-w-xl px-4 pt-20 pb-24">
+          <div className="mx-auto max-w-xl px-4 pt-8 pb-24">
             {showCelebrate && (
               <div className="mb-5 rounded-[28px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
                 <div className="flex items-start justify-between gap-4">

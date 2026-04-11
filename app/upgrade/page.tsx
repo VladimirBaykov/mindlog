@@ -28,32 +28,6 @@ export default function UpgradePage() {
     useState<BillingInterval>("monthly");
   const [viewTracked, setViewTracked] = useState(false);
 
-  useEffect(() => {
-    setHeader({
-      title: "Upgrade to Pro",
-      leftSlot: (
-        <button
-          onClick={() => router.push("/profile")}
-          className="text-sm text-neutral-400 hover:text-white transition"
-        >
-          ← Profile
-        </button>
-      ),
-      menuItems: [
-        {
-          label: "Journal",
-          onClick: () => router.push("/journal"),
-        },
-        {
-          label: "Stats",
-          onClick: () => router.push("/stats"),
-        },
-      ],
-    });
-
-    return () => resetHeader();
-  }, [router, resetHeader, setHeader]);
-
   async function loadAccountState(signal?: AbortSignal) {
     try {
       setLoadingAccount(true);
@@ -74,6 +48,79 @@ export default function UpgradePage() {
       setLoadingAccount(false);
     }
   }
+
+  async function handlePortal() {
+    try {
+      setLoadingPortal(true);
+
+      await trackClientEvent({
+        eventName: "billing_portal_opened",
+        page: "/upgrade",
+        metadata: {
+          from: "upgrade_page",
+          currentPlan: subscription?.isPro ? "pro" : "free",
+          currentStatus: subscription?.status || "inactive",
+        },
+      });
+
+      const res = await fetch("/api/billing/portal", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Portal failed");
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Portal failed");
+    } finally {
+      setLoadingPortal(false);
+    }
+  }
+
+  useEffect(() => {
+    setHeader({
+      title: "Upgrade to Pro",
+      leftSlot: (
+        <button
+          onClick={() => router.push("/profile")}
+          className="text-sm text-neutral-400 hover:text-white transition"
+        >
+          ← Profile
+        </button>
+      ),
+      menuItems: [
+        {
+          label: loadingAccount ? "Refreshing..." : "Refresh plan status",
+          highlight: true,
+          onClick: () => loadAccountState(),
+        },
+        ...(subscription?.isPro
+          ? [
+              {
+                label: loadingPortal ? "Opening..." : "Manage billing",
+                onClick: () => handlePortal(),
+              },
+            ]
+          : []),
+      ],
+    });
+
+    return () => resetHeader();
+  }, [
+    router,
+    resetHeader,
+    setHeader,
+    loadingAccount,
+    loadingPortal,
+    subscription?.isPro,
+  ]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -142,41 +189,6 @@ export default function UpgradePage() {
       alert(err.message || "Checkout failed");
     } finally {
       setLoadingCheckout(false);
-    }
-  }
-
-  async function handlePortal() {
-    try {
-      setLoadingPortal(true);
-
-      await trackClientEvent({
-        eventName: "billing_portal_opened",
-        page: "/upgrade",
-        metadata: {
-          from: "upgrade_page",
-          currentPlan: subscription?.isPro ? "pro" : "free",
-          currentStatus: subscription?.status || "inactive",
-        },
-      });
-
-      const res = await fetch("/api/billing/portal", {
-        method: "POST",
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Portal failed");
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Portal failed");
-    } finally {
-      setLoadingPortal(false);
     }
   }
 
@@ -251,7 +263,7 @@ export default function UpgradePage() {
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-6">
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-white/[0.03] px-5 py-6">
             <div className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
               MindLog Pro

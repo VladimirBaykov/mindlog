@@ -137,7 +137,7 @@ export function Header() {
                     }}
                     className="absolute right-0 top-10 origin-top-right overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
                   >
-                    <div className="min-w-[180px] py-1.5">
+                    <div className="min-w-[190px] py-1.5">
                       {menuItems.map((item, i) => (
                         <button
                           key={i}
@@ -147,9 +147,9 @@ export function Header() {
                           }}
                           className={`w-full px-4 py-2.5 text-left text-sm transition ${
                             item.danger
-                              ? "text-red-400 hover:bg-red-500/10"
+                              ? "text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
                               : item.highlight
-                              ? "text-blue-400 hover:bg-blue-500/10"
+                              ? "text-white hover:bg-white/[0.08]"
                               : "text-neutral-200 hover:bg-neutral-800/90"
                           }`}
                         >
