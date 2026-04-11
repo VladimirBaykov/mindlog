@@ -29,6 +29,8 @@ export type AnalyticsEventName =
   | "profile_billing_clicked"
   | "profile_upgrade_clicked"
   | "profile_onboarding_restart_clicked"
+  | "premium_lock_viewed"
+  | "premium_upgrade_clicked"
   | "billing_portal_opened"
   | "journal_export_opened"
   | "journal_export_printed";

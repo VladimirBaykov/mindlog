@@ -38,6 +38,7 @@ export default function JournalExportPage() {
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [lockTracked, setLockTracked] = useState(false);
 
   const id = params.id;
 
@@ -74,7 +75,19 @@ export default function JournalExportPage() {
         },
         {
           label: "Upgrade",
-          onClick: () => router.push("/upgrade"),
+          onClick: async () => {
+            await trackClientEvent({
+              eventName: "premium_upgrade_clicked",
+              page: `/journal/${id}/export`,
+              metadata: {
+                feature: "pdf_export",
+                source: "export_header_menu",
+                entryId: id,
+              },
+            });
+
+            router.push("/upgrade");
+          },
         },
       ],
     });
@@ -147,6 +160,22 @@ export default function JournalExportPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!locked || lockTracked) return;
+
+    setLockTracked(true);
+
+    trackClientEvent({
+      eventName: "premium_lock_viewed",
+      page: `/journal/${id}/export`,
+      metadata: {
+        feature: "pdf_export",
+        source: "export_page_lock",
+        entryId: id,
+      },
+    });
+  }, [locked, lockTracked, id]);
+
   const mood = useMemo(() => {
     if (!entry?.mood) return moodConfig.calm;
 
@@ -182,27 +211,51 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-xl px-4 pt-24 pb-24">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
+          <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+            <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.03] px-6 py-8 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
                 ⌁
               </div>
 
               <h1 className="mt-4 text-2xl font-semibold text-white">
-                PDF export is a Pro feature
+                PDF export is part of Pro
               </h1>
 
               <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
-                Upgrade to Pro to export this reflection as a clean,
-                printable report and save it as a PDF.
+                Export turns important reflections into clean, printable
+                reports you can keep, review later, or save outside the app.
               </p>
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-left">
+                <div className="text-sm font-medium text-white">
+                  What Pro adds here
+                </div>
+                <div className="mt-3 space-y-2 text-sm text-neutral-400">
+                  <div>• Clean print-ready reflection report</div>
+                  <div>• Save as PDF directly from your browser</div>
+                  <div>• Keep meaningful entries outside the app</div>
+                  <div>• Use export as part of a deeper journaling workflow</div>
+                </div>
+              </div>
 
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <button
-                  onClick={() => router.push("/upgrade")}
+                  onClick={async () => {
+                    await trackClientEvent({
+                      eventName: "premium_upgrade_clicked",
+                      page: `/journal/${id}/export`,
+                      metadata: {
+                        feature: "pdf_export",
+                        source: "export_page_lock_primary_cta",
+                        entryId: id,
+                      },
+                    });
+
+                    router.push("/upgrade");
+                  }}
                   className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
-                  Upgrade to Pro
+                  Unlock PDF export
                 </button>
 
                 <button
@@ -212,6 +265,17 @@ export default function JournalExportPage() {
                   Back to entry
                 </button>
               </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+              <div className="text-sm font-medium text-white">
+                Why this matters
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                MindLog Pro is designed to make your journal feel cumulative:
+                not just chats, but lasting reflections with summaries,
+                insights, export, and more depth across the whole product.
+              </p>
             </div>
           </div>
         </div>
