@@ -36,6 +36,7 @@ const checklist = [
       "Terms of Service is reachable",
       "Support page is reachable",
       "Real support emails are set in env",
+      "Feedback channel is prepared",
     ],
   },
   {
@@ -112,6 +113,13 @@ export default function LaunchChecklistPage() {
                     : "Public config still needs work"
                 }
               />
+
+              <Link
+                href="/feedback"
+                className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-200 transition hover:bg-white/[0.06]"
+              >
+                Open feedback prep
+              </Link>
             </div>
           </div>
 
@@ -122,7 +130,7 @@ export default function LaunchChecklistPage() {
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-300">
                 One or more public support emails are still placeholder
-                values. Update them in <span className="text-white">.env.local</span>
+                values. Update them in <span className="text-white">.env.local</span>{" "}
                 before giving the product to real users.
               </p>
             </div>
@@ -202,12 +210,15 @@ export default function LaunchChecklistPage() {
                 1. Replace public support emails with real addresses.
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                2. Re-run a full manual QA pass on auth, journal, stats,
+                2. Prepare your real feedback form or channel.
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                3. Re-run a full manual QA pass on auth, journal, stats,
                 upgrade, billing success, and export.
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                3. Prepare for first users only after the checklist feels
-                clean end to end.
+                4. Move to first users only when this checklist feels clean
+                end to end.
               </div>
             </div>
           </div>

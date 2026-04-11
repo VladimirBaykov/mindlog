@@ -781,7 +781,7 @@ export default function ProfilePage() {
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-400">
                 Internal visibility for analytics, billing states, launch
-                readiness, and product activity.
+                readiness, feedback prep, and product activity.
               </p>
 
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -797,6 +797,13 @@ export default function ProfilePage() {
                   className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                 >
                   Open launch checklist
+                </button>
+
+                <button
+                  onClick={() => router.push("/feedback")}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                >
+                  Open feedback prep
                 </button>
               </div>
             </div>
@@ -1006,8 +1013,8 @@ export default function ProfilePage() {
             </div>
 
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              Important launch basics for users, billing questions, and
-              policy access.
+              Important launch basics for users, billing questions, policy
+              access, and early support readiness.
             </p>
 
             <div className="mt-4 space-y-3">
@@ -1032,6 +1039,14 @@ export default function ProfilePage() {
                 className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Support</span>
+                <span className="text-neutral-500">→</span>
+              </Link>
+
+              <Link
+                href="/feedback"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+              >
+                <span>Feedback prep</span>
                 <span className="text-neutral-500">→</span>
               </Link>
             </div>
