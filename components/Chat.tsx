@@ -293,6 +293,18 @@ export default function Chat() {
     setShowCloseConfirm(true);
   }
 
+  function resetChat() {
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+    setChatState("empty");
+    setIsSaved(false);
+    setLimitError(null);
+    setChatError(null);
+    setSaveNudgeDismissed(false);
+    setSavePromptTracked(false);
+  }
+
   useEffect(() => {
     setHeader({
       title: "New conversation",
@@ -322,18 +334,6 @@ export default function Chat() {
     usage?.plan,
     preferences.goal,
   ]);
-
-  function resetChat() {
-    setMessages([]);
-    setInput("");
-    setLoading(false);
-    setChatState("empty");
-    setIsSaved(false);
-    setLimitError(null);
-    setChatError(null);
-    setSaveNudgeDismissed(false);
-    setSavePromptTracked(false);
-  }
 
   function applySuggestedPrompt(prompt: string) {
     setInput(prompt);
@@ -644,11 +644,11 @@ export default function Chat() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-black text-white">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-28 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
+      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-20 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
 
       <div
         ref={scrollerRef}
-        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-28 pb-56"
+        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-8 pb-56"
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
@@ -656,7 +656,7 @@ export default function Chat() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.28 }}
-              className="px-1 pt-8 pb-10"
+              className="px-1 pt-2 pb-10"
             >
               <div className="max-w-md">
                 <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">

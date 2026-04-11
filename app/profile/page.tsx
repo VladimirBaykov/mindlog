@@ -214,6 +214,8 @@ export default function ProfilePage() {
     }
   }
 
+  const isPro = subscription?.isPro ?? false;
+
   async function refreshPlanStatus(source = "manual_refresh") {
     await trackClientEvent({
       eventName: "profile_refresh_plan_clicked",
@@ -409,8 +411,6 @@ export default function ProfilePage() {
       setRestartingOnboarding(false);
     }
   }
-
-  const isPro = subscription?.isPro ?? false;
 
   const starterPreview = useMemo(() => {
     switch (preferences.goal) {

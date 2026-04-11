@@ -164,6 +164,7 @@ export default function JournalEntryPage() {
           label: subscription?.isPro
             ? "Export to PDF"
             : "Export to PDF (Pro)",
+          highlight: true,
           onClick: async () => {
             await trackClientEvent({
               eventName: "journal_entry_export_cta_clicked",
@@ -206,21 +207,6 @@ export default function JournalEntryPage() {
             router.push("/journal");
           },
         },
-        {
-          label: "New conversation",
-          onClick: async () => {
-            await trackClientEvent({
-              eventName: "journal_entry_new_reflection_clicked",
-              page: `/journal/${id}`,
-              metadata: {
-                entryId: item.id,
-                plan: usage?.plan ?? subscription?.plan ?? null,
-              },
-            });
-
-            router.push("/chat");
-          },
-        },
       ],
     });
 
@@ -235,13 +221,12 @@ export default function JournalEntryPage() {
     deleteItem,
     subscription?.isPro,
     subscription?.plan,
-    usage?.plan,
   ]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-3">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
@@ -260,7 +245,7 @@ export default function JournalEntryPage() {
   if (!item) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-24 pb-24">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-24">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
               ⊘
@@ -338,13 +323,13 @@ export default function JournalEntryPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-30 h-24 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
+      <div className="pointer-events-none fixed top-0 left-0 right-0 z-30 h-20 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
 
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="mx-auto max-w-xl px-4 pt-24 pb-24"
+        className="mx-auto max-w-xl px-4 pt-8 pb-24"
       >
         <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="flex items-start justify-between gap-4">
