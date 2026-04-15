@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   getActiveBottomNavTab,
@@ -131,51 +131,114 @@ function NavIcon({
   return <ProfileIcon active={active} />;
 }
 
+function NavHandle({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+      className="mx-auto flex h-8 w-16 items-center justify-center rounded-t-[18px] border border-white/10 border-b-0 bg-[#0a0a0a]/94 backdrop-blur-xl transition hover:bg-[#111111]/95"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className={`h-4 w-4 text-neutral-300 transition-transform ${
+          expanded ? "rotate-180" : "rotate-0"
+        }`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="m6 14 6-6 6 6" />
+      </svg>
+    </button>
+  );
+}
+
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [chatNavExpanded, setChatNavExpanded] = useState(false);
 
   const isVisible = shouldShowBottomNav(pathname);
+  const isChat = pathname.startsWith("/chat");
 
   const activeTab = useMemo(
     () => getActiveBottomNavTab(pathname),
     [pathname]
   );
 
+  useEffect(() => {
+    if (isChat) {
+      setChatNavExpanded(false);
+      return;
+    }
+
+    setChatNavExpanded(true);
+  }, [isChat, pathname]);
+
   if (!isVisible) {
     return null;
   }
 
+  const showCollapsedHandleOnly = isChat && !chatNavExpanded;
+
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
-      <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/68 to-transparent" />
-
-      <div className="border-t border-white/10 bg-[#0a0a0a]/94 backdrop-blur-xl">
-        <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+4px)] pt-1">
-          <div className="grid grid-cols-4 gap-1">
-            {items.map((item) => {
-              const active = activeTab === item.key;
-
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => router.push(item.href)}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2.5 py-1.5 transition ${
-                    active
-                      ? "bg-white/[0.08] text-white"
-                      : "text-neutral-400 hover:bg-white/[0.04] hover:text-white"
-                  }`}
-                >
-                  <NavIcon tab={item.key} active={active} />
-                  <span className="text-[10px] font-medium tracking-[0.01em]">
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {showCollapsedHandleOnly ? (
+        <div className="pb-[calc(env(safe-area-inset-bottom)+2px)]">
+          <NavHandle
+            expanded={false}
+            onToggle={() => setChatNavExpanded(true)}
+          />
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/68 to-transparent" />
+
+          {isChat && (
+            <div className="pb-0">
+              <NavHandle
+                expanded
+                onToggle={() => setChatNavExpanded(false)}
+              />
+            </div>
+          )}
+
+          <div className="border-t border-white/10 bg-[#0a0a0a]/94 backdrop-blur-xl">
+            <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+4px)] pt-1">
+              <div className="grid grid-cols-4 gap-1">
+                {items.map((item) => {
+                  const active = activeTab === item.key;
+
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => router.push(item.href)}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2.5 py-1.5 transition ${
+                        active
+                          ? "bg-white/[0.08] text-white"
+                          : "text-neutral-400 hover:bg-white/[0.04] hover:text-white"
+                      }`}
+                    >
+                      <NavIcon tab={item.key} active={active} />
+                      <span className="text-[10px] font-medium tracking-[0.01em]">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

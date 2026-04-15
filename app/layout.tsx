@@ -10,7 +10,17 @@ import { AnimatedLayout } from "@/components/layout/AnimatedLayout";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { shouldShowBottomNav } from "@/lib/navigation";
 
+const HEADERLESS_EXACT_PATHS = new Set([
+  "/privacy",
+  "/terms",
+  "/support",
+]);
+
 function getMainClassName(pathname: string, showBottomNav: boolean) {
+  if (HEADERLESS_EXACT_PATHS.has(pathname)) {
+    return "";
+  }
+
   if (pathname.startsWith("/chat")) {
     return "pt-[64px]";
   }

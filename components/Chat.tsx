@@ -648,7 +648,7 @@ export default function Chat() {
 
       <div
         ref={scrollerRef}
-        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[128px]"
+        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[94px]"
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
@@ -959,17 +959,17 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="pointer-events-none fixed bottom-[108px] left-0 right-0 z-30 h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/70 to-transparent" />
+      <div className="pointer-events-none fixed bottom-[72px] left-0 right-0 z-30 h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/68 to-transparent" />
 
-      <div className="fixed bottom-[52px] left-0 right-0 z-40 border-t border-white/10 bg-[#0a0a0a]/96 px-4 py-2 backdrop-blur-xl">
+      <div className="fixed bottom-[10px] left-0 right-0 z-40 px-4">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             sendMessage();
           }}
-          className="mx-auto flex max-w-xl items-end gap-2"
+          className="mx-auto flex max-w-xl items-end gap-2 rounded-[26px] border border-white/10 bg-[#0a0a0a]/96 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl"
         >
-          <div className="flex-1 rounded-[22px] border border-white/10 bg-neutral-900/90 px-3 py-1.5 shadow-[0_0_0_1px_rgba(255,255,255,0.015)]">
+          <div className="flex-1 rounded-[20px] border border-white/10 bg-neutral-900/90 px-3 py-1.5 shadow-[0_0_0_1px_rgba(255,255,255,0.015)]">
             <textarea
               ref={textareaRef}
               rows={1}

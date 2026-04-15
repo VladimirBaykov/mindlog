@@ -188,7 +188,7 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-3xl px-4 pt-24 pb-24">
+          <div className="mx-auto max-w-3xl px-4 pt-8 pb-14">
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8">
               <div className="h-5 w-40 animate-pulse rounded-full bg-white/[0.08]" />
               <div className="mt-4 h-8 w-2/3 animate-pulse rounded-full bg-white/[0.06]" />
@@ -211,7 +211,7 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+          <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
             <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.03] px-6 py-8 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
                 ⌁
@@ -287,7 +287,7 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-xl px-4 pt-24 pb-24">
+          <div className="mx-auto max-w-xl px-4 pt-8 pb-14">
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
                 ⊘
@@ -331,7 +331,7 @@ export default function JournalExportPage() {
         `}</style>
 
         <div className="min-h-screen bg-black text-white">
-          <div className="print-hide mx-auto max-w-3xl px-4 pt-24">
+          <div className="print-hide mx-auto max-w-3xl px-4 pt-8">
             <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -375,7 +375,7 @@ export default function JournalExportPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-3xl px-4 pb-24 print:pb-0">
+          <div className="mx-auto max-w-3xl px-4 pb-14 print:pb-0">
             <article className="rounded-[32px] border border-white/10 bg-white text-black shadow-2xl print:rounded-none print:border-0 print:shadow-none">
               <div className="border-b border-black/10 px-8 py-8">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">

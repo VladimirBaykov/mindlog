@@ -12,8 +12,8 @@ export default function SupportPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-3xl px-6 py-12">
-        <div className="mb-8 flex items-center justify-between">
+      <div className="mx-auto max-w-3xl px-6 pt-8 pb-14">
+        <div className="mb-6 flex items-center justify-between">
           <Link
             href="/profile"
             className="text-sm text-neutral-400 transition hover:text-white"
