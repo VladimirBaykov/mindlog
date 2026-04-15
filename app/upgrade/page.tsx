@@ -263,7 +263,7 @@ export default function UpgradePage() {
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-6">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.08] to-white/[0.03] px-5 py-6">
             <div className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
               MindLog Pro

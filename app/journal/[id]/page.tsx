@@ -226,7 +226,7 @@ export default function JournalEntryPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-3">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
@@ -245,7 +245,7 @@ export default function JournalEntryPage() {
   if (!item) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-24">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-14">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
               ⊘
@@ -329,7 +329,7 @@ export default function JournalEntryPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="mx-auto max-w-xl px-4 pt-8 pb-24"
+        className="mx-auto max-w-xl px-4 pt-8 pb-14"
       >
         <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="flex items-start justify-between gap-4">

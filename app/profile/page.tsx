@@ -543,7 +543,7 @@ export default function ProfilePage() {
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-6">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Signed in as

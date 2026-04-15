@@ -10,6 +10,18 @@ import { AnimatedLayout } from "@/components/layout/AnimatedLayout";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { shouldShowBottomNav } from "@/lib/navigation";
 
+function getMainClassName(pathname: string, showBottomNav: boolean) {
+  if (pathname.startsWith("/chat")) {
+    return "pt-[64px]";
+  }
+
+  if (showBottomNav) {
+    return "pt-[64px] pb-[56px]";
+  }
+
+  return "pt-[64px]";
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -17,6 +29,7 @@ export default function RootLayout({
 }) {
   const pathname = usePathname();
   const showBottomNav = shouldShowBottomNav(pathname);
+  const mainClassName = getMainClassName(pathname, showBottomNav);
 
   return (
     <html lang="en">
@@ -26,13 +39,7 @@ export default function RootLayout({
             <JournalProvider>
               <Header />
 
-              <main
-                className={
-                  showBottomNav
-                    ? "pt-[64px] pb-[74px]"
-                    : "pt-[64px]"
-                }
-              >
+              <main className={mainClassName}>
                 <AnimatedLayout key={pathname}>
                   {children}
                 </AnimatedLayout>

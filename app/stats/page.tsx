@@ -321,7 +321,7 @@ export default function StatsPage() {
   if (!items.length) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-6">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
               ◌
@@ -402,7 +402,7 @@ export default function StatsPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-xl px-4 pt-8 pb-24 space-y-6">
+      <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
             Reflection progress

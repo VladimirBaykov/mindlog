@@ -148,10 +148,10 @@ export function BottomNav() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
-      <div className="pointer-events-none absolute inset-x-0 bottom-full h-12 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/68 to-transparent" />
 
       <div className="border-t border-white/10 bg-[#0a0a0a]/94 backdrop-blur-xl">
-        <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+6px)] pt-1.5">
+        <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+4px)] pt-1">
           <div className="grid grid-cols-4 gap-1">
             {items.map((item) => {
               const active = activeTab === item.key;
@@ -160,7 +160,7 @@ export function BottomNav() {
                 <button
                   key={item.key}
                   onClick={() => router.push(item.href)}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2.5 py-2 transition ${
+                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2.5 py-1.5 transition ${
                     active
                       ? "bg-white/[0.08] text-white"
                       : "text-neutral-400 hover:bg-white/[0.04] hover:text-white"
