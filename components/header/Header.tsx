@@ -24,11 +24,11 @@ export function Header() {
 
   const { scrollY } = useScroll();
 
-  const height = useTransform(scrollY, [0, 96], [74, 60]);
+  const height = useTransform(scrollY, [0, 96], [64, 54]);
   const backdrop = useTransform(
     scrollY,
     [0, 96],
-    ["blur(8px)", "blur(18px)"]
+    ["blur(8px)", "blur(16px)"]
   );
   const bgColor = useTransform(
     scrollY,
@@ -40,11 +40,11 @@ export function Header() {
     [0, 96],
     [0.04, 0.1]
   );
-  const scale = useTransform(scrollY, [0, 96], [1, 0.965]);
+  const scale = useTransform(scrollY, [0, 96], [1, 0.975]);
   const titleOpacity = useTransform(
     scrollY,
     [0, 48],
-    [0.84, 1]
+    [0.86, 1]
   );
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export function Header() {
       }}
       className="fixed top-0 left-0 right-0 z-50"
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.045] via-white/[0.015] to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] via-white/[0.012] to-transparent" />
 
       <motion.div
         style={{
@@ -91,7 +91,7 @@ export function Header() {
       />
 
       <div className="relative mx-auto flex h-full max-w-xl items-center justify-between px-4">
-        <div className="flex min-w-[72px] items-center gap-2">
+        <div className="flex min-w-[64px] items-center gap-2">
           {leftSlot}
         </div>
 
@@ -105,20 +105,20 @@ export function Header() {
             </span>
           )}
           {subtitle && (
-            <span className="truncate text-xs capitalize text-neutral-400">
+            <span className="truncate text-[11px] capitalize text-neutral-400">
               {subtitle}
             </span>
           )}
         </motion.div>
 
-        <div className="relative flex min-w-[72px] items-center justify-end gap-2">
+        <div className="relative flex min-w-[64px] items-center justify-end gap-2">
           {rightSlot}
 
           {menuItems && menuItems.length > 0 && (
             <>
               <button
                 onClick={() => setOpen((v) => !v)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-300 transition-all duration-200 hover:bg-neutral-800/80 hover:text-white active:scale-95"
+                className="flex h-7.5 w-7.5 items-center justify-center rounded-full text-neutral-300 transition-all duration-200 hover:bg-neutral-800/80 hover:text-white active:scale-95"
               >
                 ⋯
               </button>
@@ -135,7 +135,7 @@ export function Header() {
                       stiffness: 420,
                       damping: 30,
                     }}
-                    className="absolute right-0 top-10 origin-top-right overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
+                    className="absolute right-0 top-9 origin-top-right overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
                   >
                     <div className="min-w-[190px] py-1.5">
                       {menuItems.map((item, i) => (
@@ -147,9 +147,9 @@ export function Header() {
                           }}
                           className={`w-full px-4 py-2.5 text-left text-sm transition ${
                             item.danger
-                              ? "text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
+                              ? "text-red-400 hover:bg-red-500/12 hover:text-red-300"
                               : item.highlight
-                              ? "text-white hover:bg-white/[0.08]"
+                              ? "text-white hover:bg-white/[0.10]"
                               : "text-neutral-200 hover:bg-neutral-800/90"
                           }`}
                         >

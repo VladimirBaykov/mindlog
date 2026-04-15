@@ -41,7 +41,9 @@ function JournalIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-5 w-5 ${active ? "opacity-100" : "opacity-80"}`}
+      className={`h-[18px] w-[18px] ${
+        active ? "opacity-100" : "opacity-80"
+      }`}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -60,7 +62,9 @@ function ChatIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-5 w-5 ${active ? "opacity-100" : "opacity-80"}`}
+      className={`h-[18px] w-[18px] ${
+        active ? "opacity-100" : "opacity-80"
+      }`}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -78,7 +82,9 @@ function StatsIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-5 w-5 ${active ? "opacity-100" : "opacity-80"}`}
+      className={`h-[18px] w-[18px] ${
+        active ? "opacity-100" : "opacity-80"
+      }`}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -97,7 +103,9 @@ function ProfileIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-5 w-5 ${active ? "opacity-100" : "opacity-80"}`}
+      className={`h-[18px] w-[18px] ${
+        active ? "opacity-100" : "opacity-80"
+      }`}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -140,10 +148,10 @@ export function BottomNav() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
-      <div className="pointer-events-none absolute inset-x-0 bottom-full h-20 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-full h-12 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/70 to-transparent" />
 
-      <div className="border-t border-white/10 bg-[#0a0a0a]/92 backdrop-blur-xl">
-        <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-2">
+      <div className="border-t border-white/10 bg-[#0a0a0a]/94 backdrop-blur-xl">
+        <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+6px)] pt-1.5">
           <div className="grid grid-cols-4 gap-1">
             {items.map((item) => {
               const active = activeTab === item.key;
@@ -152,14 +160,14 @@ export function BottomNav() {
                 <button
                   key={item.key}
                   onClick={() => router.push(item.href)}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2.5 transition ${
+                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2.5 py-2 transition ${
                     active
                       ? "bg-white/[0.08] text-white"
                       : "text-neutral-400 hover:bg-white/[0.04] hover:text-white"
                   }`}
                 >
                   <NavIcon tab={item.key} active={active} />
-                  <span className="text-[11px] font-medium tracking-[0.01em]">
+                  <span className="text-[10px] font-medium tracking-[0.01em]">
                     {item.label}
                   </span>
                 </button>

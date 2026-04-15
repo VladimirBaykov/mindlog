@@ -29,8 +29,8 @@ export default function RootLayout({
               <main
                 className={
                   showBottomNav
-                    ? "pt-[72px] pb-[88px]"
-                    : "pt-[72px]"
+                    ? "pt-[64px] pb-[74px]"
+                    : "pt-[64px]"
                 }
               >
                 <AnimatedLayout key={pathname}>

@@ -116,7 +116,7 @@ export default function Chat() {
 
     el.style.height = "0px";
     const scrollHeight = el.scrollHeight;
-    el.style.height = Math.min(scrollHeight, 160) + "px";
+    el.style.height = Math.min(scrollHeight, 144) + "px";
   }, [input]);
 
   useEffect(() => {
@@ -644,11 +644,11 @@ export default function Chat() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-black text-white">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-20 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
+      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-12 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/78 to-transparent" />
 
       <div
         ref={scrollerRef}
-        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-8 pb-56"
+        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 pb-44"
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
@@ -656,26 +656,26 @@ export default function Chat() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.28 }}
-              className="px-1 pt-2 pb-10"
+              className="px-1 pt-0 pb-8"
             >
               <div className="max-w-md">
                 <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
                   {guidanceLabel}
                 </div>
 
-                <h1 className="mt-5 text-3xl font-semibold leading-tight text-white">
+                <h1 className="mt-4 text-[28px] font-semibold leading-tight text-white">
                   A quiet space
                   <br />
                   to reflect clearly.
                 </h1>
 
-                <p className="mt-4 max-w-sm text-sm leading-relaxed text-neutral-400">
+                <p className="mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
                   Start with whatever feels present. When you’re ready,
                   close the conversation and save it to your journal.
                 </p>
 
                 {starter && (
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
                     <div className="text-sm font-medium text-white">
                       Your first starter is ready
                     </div>
@@ -686,7 +686,7 @@ export default function Chat() {
                   </div>
                 )}
 
-                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                       Plan
@@ -715,7 +715,7 @@ export default function Chat() {
                   )}
 
                   {usage?.ai && (
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
                       <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                         AI depth
                       </div>
@@ -729,7 +729,7 @@ export default function Chat() {
                   )}
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-4">
                   <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                     Suggested starters
                   </div>
@@ -739,7 +739,7 @@ export default function Chat() {
                       <button
                         key={prompt}
                         onClick={() => applySuggestedPrompt(prompt)}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-left text-xs leading-relaxed text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+                        className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-left text-xs leading-relaxed text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
                       >
                         {prompt}
                       </button>
@@ -959,9 +959,9 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="pointer-events-none fixed bottom-[148px] left-0 right-0 z-30 h-20 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent" />
+      <div className="pointer-events-none fixed bottom-[122px] left-0 right-0 z-30 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/72 to-transparent" />
 
-      <div className="fixed bottom-[76px] left-0 right-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 px-4 py-3 backdrop-blur-xl">
+      <div className="fixed bottom-[58px] left-0 right-0 z-40 border-t border-white/10 bg-[#0a0a0a]/96 px-4 py-2.5 backdrop-blur-xl">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -969,7 +969,7 @@ export default function Chat() {
           }}
           className="mx-auto flex max-w-xl items-end gap-2"
         >
-          <div className="flex-1 rounded-[24px] border border-white/10 bg-neutral-900/90 px-3 py-2 shadow-[0_0_0_1px_rgba(255,255,255,0.015)]">
+          <div className="flex-1 rounded-[22px] border border-white/10 bg-neutral-900/90 px-3 py-2 shadow-[0_0_0_1px_rgba(255,255,255,0.015)]">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -985,14 +985,14 @@ export default function Chat() {
                 }
               }}
               placeholder="Write what’s on your mind…"
-              className="max-h-40 w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-[14.5px] leading-[1.5] text-white outline-none placeholder-neutral-500"
+              className="max-h-36 w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-[14.5px] leading-[1.5] text-white outline-none placeholder-neutral-500"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="rounded-[20px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-200 hover:opacity-90 disabled:opacity-40"
+            className="rounded-[18px] bg-white px-4 py-2.5 text-sm font-medium text-black transition duration-200 hover:opacity-90 disabled:opacity-40"
           >
             Send
           </button>
