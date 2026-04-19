@@ -7,8 +7,8 @@ import {
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-3xl px-6 pt-8 pb-14">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="mx-auto max-w-3xl px-5 pt-7 pb-12">
+        <div className="mb-5 flex items-center justify-between">
           <Link
             href="/profile"
             className="text-sm text-neutral-400 transition hover:text-white"
@@ -19,12 +19,12 @@ export default function PrivacyPage() {
           <div className="text-sm text-neutral-500">MindLog</div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8">
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-7">
           <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
             Privacy Policy
           </div>
 
-          <h1 className="mt-4 text-3xl font-semibold text-white">
+          <h1 className="mt-4 text-[30px] font-semibold leading-tight text-white">
             Privacy Policy
           </h1>
 
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
             Effective date: {PUBLIC_EFFECTIVE_DATE}
           </p>
 
-          <div className="mt-8 space-y-8 text-sm leading-relaxed text-neutral-300">
+          <div className="mt-7 space-y-7 text-[14.5px] leading-[1.72] text-neutral-300">
             <section>
               <h2 className="text-lg font-medium text-white">
                 1. What MindLog does
@@ -164,7 +164,7 @@ export default function PrivacyPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
           <Link href="/profile" className="transition hover:text-white">
             Profile
           </Link>

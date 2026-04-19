@@ -1,8 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  --app-shell-max-width: 48rem;
+  --app-page-x: 1.25rem;
+  --app-page-top: 1.75rem;
+  --app-page-bottom: 3rem;
+
+  --app-radius-card: 28px;
+  --app-radius-bubble: 24px;
+  --app-radius-control: 22px;
+
+  --app-surface: rgba(255, 255, 255, 0.03);
+  --app-surface-strong: rgba(255, 255, 255, 0.05);
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-border-soft: rgba(255, 255, 255, 0.06);
+
+  --app-ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  --app-shadow-soft: 0 20px 50px rgba(0, 0, 0, 0.32);
+  --app-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 @theme inline {
@@ -12,18 +30,41 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      1200px 600px at 50% -10%,
+      rgba(255, 255, 255, 0.045),
+      transparent 55%
+    ),
+    radial-gradient(
+      900px 480px at 100% 0%,
+      rgba(120, 119, 198, 0.055),
+      transparent 45%
+    ),
+    var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
 @keyframes shimmer {
   0% {
     background-position: -400px 0;
@@ -42,4 +83,32 @@ body {
   );
   background-size: 800px 100%;
   animation: shimmer 1.6s infinite linear;
+}
+
+@supports (scrollbar-color: auto) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
 }

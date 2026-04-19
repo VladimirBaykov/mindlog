@@ -93,6 +93,11 @@ export default function Chat() {
       moodPreference: null,
       notifications: null,
     });
+  const [scrollTop, setScrollTop] = useState(0);
+  const [isComposerFocused, setIsComposerFocused] =
+    useState(false);
+  const [isChatNavExpanded, setIsChatNavExpanded] =
+    useState(false);
 
   const { setHeader, resetHeader } = useHeader();
   const { addItem } = useJournal();
@@ -116,7 +121,7 @@ export default function Chat() {
 
     el.style.height = "0px";
     const scrollHeight = el.scrollHeight;
-    el.style.height = Math.min(scrollHeight, 144) + "px";
+    el.style.height = Math.min(scrollHeight, 164) + "px";
   }, [input]);
 
   useEffect(() => {
@@ -157,6 +162,33 @@ export default function Chat() {
     }
 
     loadPreferences();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncExpanded = (expanded: boolean) => {
+      setIsChatNavExpanded(expanded);
+    };
+
+    syncExpanded(document.body.dataset.chatNavExpanded === "true");
+
+    const handleNavChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ expanded?: boolean }>;
+      syncExpanded(Boolean(customEvent.detail?.expanded));
+    };
+
+    window.addEventListener(
+      "mindlog-chat-nav-change",
+      handleNavChange as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "mindlog-chat-nav-change",
+        handleNavChange as EventListener
+      );
+    };
   }, []);
 
   const suggestedPrompts = useMemo(() => {
@@ -219,6 +251,25 @@ export default function Chat() {
     !isSaved &&
     !saveNudgeDismissed &&
     !limitError;
+
+  const hasScrolled = scrollTop > 8;
+  const topFadeClass = hasScrolled
+    ? "from-[#0a0a0a] via-[#0a0a0a]/92"
+    : "from-[#0a0a0a]/92 via-[#0a0a0a]/72";
+
+  const composerBottomClass = isChatNavExpanded
+    ? "bottom-[92px]"
+    : "bottom-[10px]";
+
+  const footerFadeBottomClass = isChatNavExpanded
+    ? "bottom-[154px]"
+    : "bottom-[72px]";
+
+  const scrollerBottomPaddingClass = isChatNavExpanded
+    ? "pb-[182px]"
+    : "pb-[118px]";
+
+  const canSend = !!input.trim() && !loading;
 
   useEffect(() => {
     if (!shouldShowSaveNudge || savePromptTracked) {
@@ -303,6 +354,7 @@ export default function Chat() {
     setChatError(null);
     setSaveNudgeDismissed(false);
     setSavePromptTracked(false);
+    setScrollTop(0);
   }
 
   useEffect(() => {
@@ -643,39 +695,49 @@ export default function Chat() {
   const showEmptyState = messages.length === 0 && !loading;
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-64px)] flex-col bg-black text-white">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-40 h-12 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/78 to-transparent" />
+    <div className="relative flex min-h-[calc(100dvh-64px)] flex-col overflow-hidden bg-black text-white">
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-30 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.065),transparent_58%)]" />
+      <div
+        className={`pointer-events-none fixed left-0 right-0 top-0 z-40 h-16 bg-gradient-to-b ${topFadeClass} to-transparent transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]`}
+      />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[34vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_60%)]" />
 
       <div
         ref={scrollerRef}
-        className="flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[94px]"
+        onScroll={(e) => {
+          setScrollTop(e.currentTarget.scrollTop);
+        }}
+        className={`relative z-10 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-5 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.28 }}
-              className="px-1 pt-0 pb-6"
+              transition={{
+                duration: 0.34,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="px-1 pb-7"
             >
               <div className="max-w-md">
                 <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
                   {guidanceLabel}
                 </div>
 
-                <h1 className="mt-4 text-[28px] font-semibold leading-tight text-white">
+                <h1 className="mt-5 text-[30px] font-semibold leading-[1.04] text-white">
                   A quiet space
                   <br />
                   to reflect clearly.
                 </h1>
 
-                <p className="mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
+                <p className="mt-3 max-w-sm text-[14.5px] leading-[1.65] text-neutral-400">
                   Start with whatever feels present. When you’re ready,
                   close the conversation and save it to your journal.
                 </p>
 
                 {starter && (
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <div className="mt-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                     <div className="text-sm font-medium text-white">
                       Your first starter is ready
                     </div>
@@ -686,9 +748,9 @@ export default function Chat() {
                   </div>
                 )}
 
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+                <div className="mt-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
                       Plan
                     </span>
                     <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300 capitalize">
@@ -707,7 +769,7 @@ export default function Chat() {
                   </p>
 
                   {typeof usage?.remaining === "number" && (
-                    <p className="mt-2 text-xs text-neutral-500">
+                    <p className="mt-2 text-xs leading-relaxed text-neutral-500">
                       {usage.remaining > 0
                         ? `${usage.remaining} saves remaining on your current plan.`
                         : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
@@ -715,8 +777,8 @@ export default function Chat() {
                   )}
 
                   {usage?.ai && (
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-                      <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                    <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
                         AI depth
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-neutral-300">
@@ -729,17 +791,17 @@ export default function Chat() {
                   )}
                 </div>
 
-                <div className="mt-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                <div className="mt-5">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
                     Suggested starters
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2.5">
                     {suggestedPrompts.map((prompt) => (
                       <button
                         key={prompt}
                         onClick={() => applySuggestedPrompt(prompt)}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-left text-xs leading-relaxed text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+                        className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-left text-xs leading-relaxed text-neutral-300 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.06] hover:text-white"
                       >
                         {prompt}
                       </button>
@@ -748,7 +810,7 @@ export default function Chat() {
                 </div>
 
                 {limitError && (
-                  <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
+                  <div className="mt-5 rounded-[28px] border border-amber-500/20 bg-amber-500/10 px-5 py-5">
                     <div className="text-sm font-medium text-white">
                       Save limit reached
                     </div>
@@ -760,7 +822,7 @@ export default function Chat() {
                       onClick={() => {
                         window.location.href = "/upgrade";
                       }}
-                      className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                      className="mt-4 rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
                     >
                       Upgrade to Pro
                     </button>
@@ -768,7 +830,7 @@ export default function Chat() {
                 )}
 
                 {chatError && (
-                  <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
+                  <div className="mt-5 rounded-[28px] border border-red-500/20 bg-red-500/10 px-5 py-5">
                     <div className="text-sm font-medium text-white">
                       Conversation limit reached
                     </div>
@@ -781,7 +843,7 @@ export default function Chat() {
                         onClick={() => {
                           window.location.href = "/upgrade";
                         }}
-                        className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                        className="mt-4 rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
                       >
                         Upgrade to Pro
                       </button>
@@ -795,7 +857,7 @@ export default function Chat() {
           {!showEmptyState && (
             <div className="mb-4 space-y-3">
               {shouldShowSaveNudge && (
-                <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
+                <div className="rounded-[28px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-sm font-medium text-white">
@@ -811,7 +873,7 @@ export default function Chat() {
 
                     <button
                       onClick={() => setSaveNudgeDismissed(true)}
-                      className="text-sm text-neutral-400 transition hover:text-white"
+                      className="text-sm text-neutral-400 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-white"
                     >
                       Dismiss
                     </button>
@@ -822,14 +884,14 @@ export default function Chat() {
                       onClick={() => {
                         openCloseFlow("save_nudge");
                       }}
-                      className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                      className="rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
                     >
                       Close & save now
                     </button>
 
                     <button
                       onClick={() => setSaveNudgeDismissed(true)}
-                      className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                      className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.05]"
                     >
                       Keep reflecting
                     </button>
@@ -840,7 +902,7 @@ export default function Chat() {
               {(limitError || chatError) && (
                 <div className="space-y-3">
                   {limitError && (
-                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
+                    <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 px-5 py-5">
                       <div className="text-sm font-medium text-white">
                         Save limit reached
                       </div>
@@ -852,7 +914,7 @@ export default function Chat() {
                         onClick={() => {
                           window.location.href = "/upgrade";
                         }}
-                        className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                        className="mt-4 rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
                       >
                         Upgrade to Pro
                       </button>
@@ -860,7 +922,7 @@ export default function Chat() {
                   )}
 
                   {chatError && (
-                    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
+                    <div className="rounded-[28px] border border-red-500/20 bg-red-500/10 px-5 py-5">
                       <div className="text-sm font-medium text-white">
                         AI conversation limit
                       </div>
@@ -874,7 +936,7 @@ export default function Chat() {
                             onClick={() => {
                               window.location.href = "/upgrade";
                             }}
-                            className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                            className="rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
                           >
                             Upgrade to Pro
                           </button>
@@ -882,7 +944,7 @@ export default function Chat() {
 
                         <button
                           onClick={resetChat}
-                          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                          className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.05]"
                         >
                           Start new conversation
                         </button>
@@ -908,7 +970,7 @@ export default function Chat() {
                     initial={{ opacity: 0, y: 10, scale: 0.985 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{
-                      duration: 0.22,
+                      duration: 0.24,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                     className={`flex ${
@@ -916,7 +978,7 @@ export default function Chat() {
                     } ${groupedWithPrevious ? "pt-1" : "pt-3"}`}
                   >
                     <div
-                      className={`max-w-[78%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.55] shadow-[0_0_0_1px_rgba(255,255,255,0.01)] ${
+                      className={`max-w-[79%] rounded-[24px] border px-4 py-3.5 text-[14.5px] leading-[1.62] shadow-[0_0_0_1px_rgba(255,255,255,0.01)] ${
                         isUser
                           ? "border-white/[0.08] bg-white/[0.07] text-white"
                           : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
@@ -936,12 +998,12 @@ export default function Chat() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4 }}
                   transition={{
-                    duration: 0.2,
+                    duration: 0.22,
                     ease: [0.22, 1, 0.36, 1],
                   }}
                   className="flex justify-start pt-3"
                 >
-                  <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
+                  <div className="flex items-center gap-2 rounded-[24px] border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
                     <span>MindLog is thinking</span>
 
                     <div className="flex gap-1">
@@ -959,43 +1021,101 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="pointer-events-none fixed bottom-[72px] left-0 right-0 z-30 h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/68 to-transparent" />
+      <div
+        className={`pointer-events-none fixed left-0 right-0 z-30 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/72 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
+      />
 
-      <div className="fixed bottom-[10px] left-0 right-0 z-40 px-4">
+      <div
+        className={`fixed left-0 right-0 z-40 px-4 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${composerBottomClass}`}
+      >
         <form
           onSubmit={(e) => {
             e.preventDefault();
             sendMessage();
           }}
-          className="mx-auto flex max-w-xl items-end gap-2 rounded-[26px] border border-white/10 bg-[#0a0a0a]/96 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+          className={`mx-auto max-w-xl rounded-[28px] border px-3 py-3 backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isComposerFocused
+              ? "border-white/14 bg-[#0a0a0a]/96 shadow-[0_24px_70px_rgba(0,0,0,0.48)]"
+              : "border-white/10 bg-[#0a0a0a]/94 shadow-[0_18px_50px_rgba(0,0,0,0.36)]"
+          }`}
         >
-          <div className="flex-1 rounded-[20px] border border-white/10 bg-neutral-900/90 px-3 py-1.5 shadow-[0_0_0_1px_rgba(255,255,255,0.015)]">
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                if (chatError) setChatError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder="Write what’s on your mind…"
-              className="max-h-36 w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-[14.5px] leading-[1.5] text-white outline-none placeholder-neutral-500"
-            />
+          <div className="flex items-end gap-3">
+            <div className="min-w-0 flex-1 rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
+                  Reflection
+                </div>
+
+                <div className="text-[11px] text-neutral-500">
+                  Enter to send
+                </div>
+              </div>
+
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={input}
+                onFocus={() => setIsComposerFocused(true)}
+                onBlur={() => setIsComposerFocused(false)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  if (chatError) setChatError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="Write what’s on your mind..."
+                className="mt-2 max-h-40 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[15px] leading-[1.6] text-white outline-none placeholder:text-neutral-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canSend}
+              aria-label="Send message"
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                canSend
+                  ? "border-white bg-white text-black shadow-[0_12px_28px_rgba(255,255,255,0.16)] hover:opacity-92"
+                  : "border-white/10 bg-white/[0.05] text-neutral-500"
+              }`}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-[18px] w-[18px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h11" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </button>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="rounded-[18px] bg-white px-4 py-2.5 text-sm font-medium text-black transition duration-200 hover:opacity-90 disabled:opacity-40"
-          >
-            Send
-          </button>
+          <div className="mt-2 flex items-center justify-between gap-3 px-1">
+            <div className="text-[11px] leading-relaxed text-neutral-500">
+              Shift + Enter for a new line
+            </div>
+
+            {usage?.ai?.maxCharactersPerMessage ? (
+              <div className="text-[11px] text-neutral-500">
+                {Math.max(
+                  usage.ai.maxCharactersPerMessage - input.length,
+                  0
+                )}{" "}
+                left
+              </div>
+            ) : (
+              <div className="text-[11px] text-neutral-500">
+                Reflect clearly
+              </div>
+            )}
+          </div>
         </form>
       </div>
 

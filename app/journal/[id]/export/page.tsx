@@ -48,7 +48,7 @@ export default function JournalExportPage() {
       leftSlot: (
         <button
           onClick={() => router.push(`/journal/${id}`)}
-          className="text-sm text-neutral-400 hover:text-white transition"
+          className="text-sm text-neutral-400 transition hover:text-white"
         >
           ← Entry
         </button>
@@ -188,15 +188,15 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-3xl px-4 pt-8 pb-14">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8">
+          <div className="mx-auto max-w-3xl px-5 pt-7 pb-12">
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-7">
               <div className="h-5 w-40 animate-pulse rounded-full bg-white/[0.08]" />
               <div className="mt-4 h-8 w-2/3 animate-pulse rounded-full bg-white/[0.06]" />
-              <div className="mt-8 space-y-4">
+              <div className="mt-7 space-y-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div
                     key={i}
-                    className="h-16 animate-pulse rounded-2xl bg-white/[0.04]"
+                    className="h-16 animate-pulse rounded-[24px] bg-white/[0.04]"
                   />
                 ))}
               </div>
@@ -211,13 +211,13 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.03] px-6 py-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
+          <div className="mx-auto max-w-xl space-y-5 px-5 pt-7 pb-12">
+            <div className="rounded-[28px] border border-white/10 bg-gradient-to-b from-white/[0.05] to-white/[0.03] px-6 py-7 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[22px] border border-white/10 bg-white/[0.04] text-lg">
                 ⌁
               </div>
 
-              <h1 className="mt-4 text-2xl font-semibold text-white">
+              <h1 className="mt-4 text-[28px] font-semibold leading-tight text-white">
                 PDF export is part of Pro
               </h1>
 
@@ -226,7 +226,7 @@ export default function JournalExportPage() {
                 reports you can keep, review later, or save outside the app.
               </p>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-left">
+              <div className="mt-5 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-left">
                 <div className="text-sm font-medium text-white">
                   What Pro adds here
                 </div>
@@ -253,21 +253,21 @@ export default function JournalExportPage() {
 
                     router.push("/upgrade");
                   }}
-                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                  className="rounded-[22px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Unlock PDF export
                 </button>
 
                 <button
                   onClick={() => router.push(`/journal/${id}`)}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                  className="rounded-[22px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                 >
                   Back to entry
                 </button>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5">
               <div className="text-sm font-medium text-white">
                 Why this matters
               </div>
@@ -287,13 +287,13 @@ export default function JournalExportPage() {
     return (
       <AuthGate>
         <div className="min-h-screen bg-black text-white">
-          <div className="mx-auto max-w-xl px-4 pt-8 pb-14">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
+          <div className="mx-auto max-w-xl px-5 pt-7 pb-12">
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-7 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[22px] border border-white/10 bg-white/[0.04] text-lg">
                 ⊘
               </div>
 
-              <h1 className="mt-4 text-2xl font-semibold text-white">
+              <h1 className="mt-4 text-[28px] font-semibold leading-tight text-white">
                 Export unavailable
               </h1>
 
@@ -304,7 +304,7 @@ export default function JournalExportPage() {
 
               <button
                 onClick={() => router.push("/journal")}
-                className="mt-6 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                className="mt-6 rounded-[22px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 Back to journal
               </button>
@@ -331,8 +331,8 @@ export default function JournalExportPage() {
         `}</style>
 
         <div className="min-h-screen bg-black text-white">
-          <div className="print-hide mx-auto max-w-3xl px-4 pt-8">
-            <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="print-hide mx-auto max-w-3xl px-5 pt-7">
+            <div className="mb-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-medium text-white">
@@ -359,14 +359,14 @@ export default function JournalExportPage() {
 
                       window.print();
                     }}
-                    className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                    className="rounded-[22px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                   >
                     Print / Save PDF
                   </button>
 
                   <button
                     onClick={() => router.push(`/journal/${id}`)}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                    className="rounded-[22px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                   >
                     Back
                   </button>
@@ -375,8 +375,8 @@ export default function JournalExportPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-3xl px-4 pb-14 print:pb-0">
-            <article className="rounded-[32px] border border-white/10 bg-white text-black shadow-2xl print:rounded-none print:border-0 print:shadow-none">
+          <div className="mx-auto max-w-3xl px-5 pb-12 print:pb-0">
+            <article className="rounded-[28px] border border-white/10 bg-white text-black shadow-2xl print:rounded-none print:border-0 print:shadow-none">
               <div className="border-b border-black/10 px-8 py-8">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
                   MindLog Reflection Report
@@ -418,7 +418,7 @@ export default function JournalExportPage() {
 
                   <div className="mt-6 space-y-4">
                     {entry.messages.length === 0 ? (
-                      <div className="rounded-2xl border border-black/10 bg-black/[0.02] px-5 py-5 text-sm text-neutral-600">
+                      <div className="rounded-[24px] border border-black/10 bg-black/[0.02] px-5 py-5 text-sm text-neutral-600">
                         No messages found in this reflection.
                       </div>
                     ) : (
@@ -428,7 +428,7 @@ export default function JournalExportPage() {
                         return (
                           <div
                             key={`${message.role}-${index}`}
-                            className={`rounded-3xl border px-5 py-4 ${
+                            className={`rounded-[24px] border px-5 py-4 ${
                               isUser
                                 ? "border-black/10 bg-black/[0.03]"
                                 : "border-black/10 bg-white"
