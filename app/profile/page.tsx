@@ -543,8 +543,8 @@ export default function ProfilePage() {
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="mx-auto max-w-xl space-y-5 px-4 pt-6 pb-8">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Signed in as
             </div>
@@ -553,7 +553,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-sm font-medium text-white">
               Account health
             </div>
@@ -562,14 +562,14 @@ export default function ProfilePage() {
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-xs text-neutral-500">Plan</div>
                 <div className="mt-2 text-lg font-semibold capitalize text-white">
                   {subscription?.plan || "free"}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-xs text-neutral-500">
                   Billing status
                 </div>
@@ -578,7 +578,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-xs text-neutral-500">
                   Saved entries
                 </div>
@@ -589,7 +589,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-medium text-white">
@@ -632,7 +632,7 @@ export default function ProfilePage() {
             )}
 
             {usage?.ai && (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                   AI depth
                 </div>
@@ -663,7 +663,7 @@ export default function ProfilePage() {
 
                     router.push("/upgrade");
                   }}
-                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Upgrade to Pro
                 </button>
@@ -671,7 +671,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => handlePortal("plan_card")}
                   disabled={loadingPortal}
-                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
                 >
                   {loadingPortal ? "Opening..." : "Manage billing"}
                 </button>
@@ -680,7 +680,7 @@ export default function ProfilePage() {
               <button
                 onClick={() => refreshPlanStatus("plan_card")}
                 disabled={refreshingPlan}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
                 {refreshingPlan
                   ? "Refreshing..."
@@ -696,7 +696,7 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <div className={`rounded-3xl border px-5 py-5 ${billingToneClasses}`}>
+          <div className={`rounded-[24px] border px-5 py-5 ${billingToneClasses}`}>
             <div className="text-sm font-medium text-white">
               {billingSummary.title}
             </div>
@@ -708,7 +708,7 @@ export default function ProfilePage() {
               <button
                 onClick={() => refreshPlanStatus("billing_state_card")}
                 disabled={refreshingPlan}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
                 {refreshingPlan
                   ? "Refreshing..."
@@ -721,7 +721,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => handlePortal("billing_state_card")}
                   disabled={loadingPortal}
-                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
                 >
                   {loadingPortal ? "Opening..." : "Open billing"}
                 </button>
@@ -730,7 +730,7 @@ export default function ProfilePage() {
           </div>
 
           {!isPro && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
               <div className="text-sm font-medium text-white">
                 Why Pro may be worth it now
               </div>
@@ -742,7 +742,7 @@ export default function ProfilePage() {
               </p>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                   <div className="text-sm font-medium text-white">
                     Unlimited journal growth
                   </div>
@@ -752,7 +752,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                   <div className="text-sm font-medium text-white">
                     Richer reflection layer
                   </div>
@@ -779,7 +779,7 @@ export default function ProfilePage() {
 
                   router.push("/upgrade");
                 }}
-                className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 View Pro plan
               </button>
@@ -787,7 +787,7 @@ export default function ProfilePage() {
           )}
 
           {isAdmin && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
               <div className="text-sm font-medium text-white">
                 Admin tools
               </div>
@@ -799,21 +799,21 @@ export default function ProfilePage() {
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => router.push("/debug")}
-                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Open debug metrics
                 </button>
 
                 <button
                   onClick={() => router.push("/launch-checklist")}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                  className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                 >
                   Open launch checklist
                 </button>
 
                 <button
                   onClick={() => router.push("/feedback")}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                  className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                 >
                   Open feedback prep
                 </button>
@@ -821,7 +821,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-medium text-white">
@@ -860,7 +860,7 @@ export default function ProfilePage() {
                             goal: option.value,
                           }))
                         }
-                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                        className={`w-full rounded-[18px] border px-4 py-4 text-left transition ${
                           selected
                             ? "border-white/20 bg-white/[0.08]"
                             : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
@@ -898,7 +898,7 @@ export default function ProfilePage() {
                             moodPreference: option.value,
                           }))
                         }
-                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                        className={`w-full rounded-[18px] border px-4 py-4 text-left transition ${
                           selected
                             ? "border-white/20 bg-white/[0.08]"
                             : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
@@ -936,7 +936,7 @@ export default function ProfilePage() {
                             notifications: option.value,
                           }))
                         }
-                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                        className={`w-full rounded-[18px] border px-4 py-4 text-left transition ${
                           selected
                             ? "border-white/20 bg-white/[0.08]"
                             : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
@@ -954,7 +954,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-white/[0.02] px-4 py-4">
                 <div className="text-sm font-medium text-white">
                   Current starter preview
                 </div>
@@ -967,7 +967,7 @@ export default function ProfilePage() {
                 <button
                   onClick={savePreferences}
                   disabled={savingPreferences}
-                  className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
                 >
                   {savingPreferences
                     ? "Saving..."
@@ -977,7 +977,7 @@ export default function ProfilePage() {
                 <button
                   onClick={restartOnboarding}
                   disabled={restartingOnboarding}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                  className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
                 >
                   {restartingOnboarding
                     ? "Opening..."
@@ -987,7 +987,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-sm font-medium text-white">
               Account
             </div>
@@ -995,7 +995,7 @@ export default function ProfilePage() {
             <div className="mt-4 space-y-3">
               <button
                 onClick={() => router.push("/journal")}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Open Journal</span>
                 <span className="text-neutral-500">→</span>
@@ -1003,7 +1003,7 @@ export default function ProfilePage() {
 
               <button
                 onClick={() => router.push("/stats")}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Reflection Stats</span>
                 <span className="text-neutral-500">→</span>
@@ -1011,7 +1011,7 @@ export default function ProfilePage() {
 
               <button
                 onClick={() => router.push("/chat")}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>New Conversation</span>
                 <span className="text-neutral-500">→</span>
@@ -1019,7 +1019,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-sm font-medium text-white">
               Legal and support
             </div>
@@ -1032,7 +1032,7 @@ export default function ProfilePage() {
             <div className="mt-4 space-y-3">
               <Link
                 href="/privacy"
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Privacy Policy</span>
                 <span className="text-neutral-500">→</span>
@@ -1040,7 +1040,7 @@ export default function ProfilePage() {
 
               <Link
                 href="/terms"
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Terms of Service</span>
                 <span className="text-neutral-500">→</span>
@@ -1048,7 +1048,7 @@ export default function ProfilePage() {
 
               <Link
                 href="/support"
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Support</span>
                 <span className="text-neutral-500">→</span>
@@ -1056,7 +1056,7 @@ export default function ProfilePage() {
 
               <Link
                 href="/feedback"
-                className="flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
+                className="flex w-full items-center justify-between rounded-[18px] border border-white/8 bg-white/[0.02] px-4 py-3.5 text-left text-sm text-neutral-200 transition hover:bg-white/[0.04]"
               >
                 <span>Feedback prep</span>
                 <span className="text-neutral-500">→</span>
@@ -1064,7 +1064,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-sm font-medium text-white">
               Session
             </div>
@@ -1076,7 +1076,7 @@ export default function ProfilePage() {
                   router.refresh();
                   router.push("/sign-in");
                 }}
-                className="w-full rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                className="w-full rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 Logout
               </button>
@@ -1084,7 +1084,7 @@ export default function ProfilePage() {
           </div>
 
           {userInfo.id && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
               <div className="text-xs text-neutral-500">
                 User ID
               </div>

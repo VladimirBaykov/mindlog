@@ -7,7 +7,7 @@ import {
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-3xl px-5 pt-7 pb-12">
+      <div className="mx-auto max-w-3xl px-5 pt-6 pb-8">
         <div className="mb-5 flex items-center justify-between">
           <Link
             href="/profile"
@@ -19,7 +19,7 @@ export default function TermsPage() {
           <div className="text-sm text-neutral-500">MindLog</div>
         </div>
 
-        <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-7">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-6 py-7">
           <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
             Terms of Service
           </div>

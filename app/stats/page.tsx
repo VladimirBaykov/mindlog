@@ -321,9 +321,9 @@ export default function StatsPage() {
   if (!items.length) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
+        <div className="mx-auto max-w-xl space-y-5 px-4 pt-6 pb-8">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-6 py-7 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.04] text-lg">
               ◌
             </div>
 
@@ -351,14 +351,14 @@ export default function StatsPage() {
 
                   router.push("/chat");
                 }}
-                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 Start first reflection
               </button>
 
               <button
                 onClick={() => router.push("/journal")}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
               >
                 Go to journal
               </button>
@@ -366,7 +366,7 @@ export default function StatsPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
               <div className="text-sm font-medium text-white">
                 Mood distribution
               </div>
@@ -375,7 +375,7 @@ export default function StatsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
               <div className="text-sm font-medium text-white">
                 Reflection streaks
               </div>
@@ -385,7 +385,7 @@ export default function StatsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
               <div className="text-sm font-medium text-white">
                 AI insight layer
               </div>
@@ -402,8 +402,8 @@ export default function StatsPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-xl px-4 pt-8 pb-14 space-y-6">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+      <div className="mx-auto max-w-xl space-y-5 px-4 pt-6 pb-8">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
             Reflection progress
           </div>
@@ -417,7 +417,7 @@ export default function StatsPage() {
           </p>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+            <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                 Last entry
               </div>
@@ -426,7 +426,7 @@ export default function StatsPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+            <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                 Weekly momentum
               </div>
@@ -438,7 +438,7 @@ export default function StatsPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Total entries
             </div>
@@ -447,7 +447,7 @@ export default function StatsPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Top mood
             </div>
@@ -457,7 +457,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-medium text-white">
               Weekly reflection
@@ -467,7 +467,7 @@ export default function StatsPage() {
                 <button
                   onClick={refreshPremiumStats}
                   disabled={loadingPremiumData || refreshingPremiumData}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                  className="rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
                 >
                   {refreshingPremiumData
                     ? "Refreshing..."
@@ -485,7 +485,7 @@ export default function StatsPage() {
               Generating your weekly reflection...
             </p>
           ) : isPro ? (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+            <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
               <p className="text-sm leading-relaxed text-neutral-200">
                 {weekly?.summary ||
                   "No weekly reflection available yet."}
@@ -500,7 +500,7 @@ export default function StatsPage() {
                 source="stats_weekly_summary_lock"
               />
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-sm font-medium text-white">
                   Why this matters
                 </div>
@@ -524,7 +524,7 @@ export default function StatsPage() {
 
                     router.push("/upgrade");
                   }}
-                  className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                  className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Unlock weekly reflection
                 </button>
@@ -533,7 +533,7 @@ export default function StatsPage() {
           )}
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm font-medium text-white">
               Pattern insights
@@ -542,7 +542,7 @@ export default function StatsPage() {
               <button
                 onClick={refreshPremiumStats}
                 disabled={loadingPremiumData || refreshingPremiumData}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
+                className="rounded-[18px] border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-50"
               >
                 {refreshingPremiumData
                   ? "Refreshing..."
@@ -557,7 +557,7 @@ export default function StatsPage() {
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div
                     key={i}
-                    className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4"
+                    className="rounded-[20px] border border-white/8 bg-white/[0.02] px-4 py-4"
                   >
                     <div className="h-3 w-full animate-pulse rounded-full bg-white/[0.05]" />
                     <div className="mt-2 h-3 w-4/5 animate-pulse rounded-full bg-white/[0.05]" />
@@ -570,13 +570,13 @@ export default function StatsPage() {
                   {insights.insights.map((insight, idx) => (
                     <div
                       key={idx}
-                      className="rounded-2xl border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
+                      className="rounded-[20px] border border-white/8 bg-white/[0.02] px-4 py-4 text-sm leading-relaxed text-neutral-300"
                     >
                       {insight}
                     </div>
                   ))}
 
-                  <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                  <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                     <div className="text-sm font-medium text-white">
                       Keep building context
                     </div>
@@ -600,7 +600,7 @@ export default function StatsPage() {
                   source="stats_insights_lock"
                 />
 
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                   <div className="text-sm font-medium text-white">
                     What Pro adds
                   </div>
@@ -623,7 +623,7 @@ export default function StatsPage() {
 
                       router.push("/upgrade");
                     }}
-                    className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                    className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                   >
                     Unlock pattern insights
                   </button>
@@ -633,7 +633,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Recent streak
           </div>
@@ -647,7 +647,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Mood timeline
           </div>
@@ -662,7 +662,7 @@ export default function StatsPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             Mood distribution
           </div>
@@ -678,7 +678,7 @@ export default function StatsPage() {
         </div>
 
         {!isPro && !loadingSubscription && (
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-sm font-medium text-white">
               Free plan progress
             </div>
@@ -690,7 +690,7 @@ export default function StatsPage() {
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-sm font-medium text-white">
                   Deep emotional trends
                 </div>
@@ -699,7 +699,7 @@ export default function StatsPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+              <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-sm font-medium text-white">
                   Export reflection reports
                 </div>
@@ -724,14 +724,14 @@ export default function StatsPage() {
 
                 router.push("/upgrade");
               }}
-              className="mt-5 rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
             >
               Upgrade to Pro
             </button>
           </div>
         )}
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
           <div className="text-sm font-medium text-white">
             What to do next
           </div>
@@ -755,14 +755,14 @@ export default function StatsPage() {
 
                 router.push("/chat");
               }}
-              className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
             >
               Start another reflection
             </button>
 
             <button
               onClick={() => router.push("/journal")}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+              className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
             >
               Open journal
             </button>

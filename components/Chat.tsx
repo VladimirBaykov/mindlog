@@ -94,8 +94,7 @@ export default function Chat() {
       notifications: null,
     });
   const [scrollTop, setScrollTop] = useState(0);
-  const [isComposerFocused, setIsComposerFocused] =
-    useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [isChatNavExpanded, setIsChatNavExpanded] =
     useState(false);
 
@@ -104,7 +103,6 @@ export default function Chat() {
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   const starter = searchParams.get("starter");
 
@@ -121,7 +119,7 @@ export default function Chat() {
 
     el.style.height = "0px";
     const scrollHeight = el.scrollHeight;
-    el.style.height = Math.min(scrollHeight, 164) + "px";
+    el.style.height = Math.min(scrollHeight, 96) + "px";
   }, [input]);
 
   useEffect(() => {
@@ -252,25 +250,6 @@ export default function Chat() {
     !saveNudgeDismissed &&
     !limitError;
 
-  const hasScrolled = scrollTop > 8;
-  const topFadeClass = hasScrolled
-    ? "from-[#0a0a0a] via-[#0a0a0a]/92"
-    : "from-[#0a0a0a]/92 via-[#0a0a0a]/72";
-
-  const composerBottomClass = isChatNavExpanded
-    ? "bottom-[92px]"
-    : "bottom-[10px]";
-
-  const footerFadeBottomClass = isChatNavExpanded
-    ? "bottom-[154px]"
-    : "bottom-[72px]";
-
-  const scrollerBottomPaddingClass = isChatNavExpanded
-    ? "pb-[182px]"
-    : "pb-[118px]";
-
-  const canSend = !!input.trim() && !loading;
-
   useEffect(() => {
     if (!shouldShowSaveNudge || savePromptTracked) {
       return;
@@ -354,7 +333,6 @@ export default function Chat() {
     setChatError(null);
     setSaveNudgeDismissed(false);
     setSavePromptTracked(false);
-    setScrollTop(0);
   }
 
   useEffect(() => {
@@ -693,21 +671,38 @@ export default function Chat() {
   }
 
   const showEmptyState = messages.length === 0 && !loading;
+  const hasScrolled = scrollTop > 8;
+
+  const composerBottomClass = isChatNavExpanded
+    ? "bottom-[72px]"
+    : "bottom-[8px]";
+
+  const footerFadeBottomClass = isChatNavExpanded
+    ? "bottom-[128px]"
+    : "bottom-[62px]";
+
+  const scrollerBottomPaddingClass = isChatNavExpanded
+    ? "pb-[162px]"
+    : "pb-[112px]";
+
+  const canSend = !!input.trim() && !loading;
 
   return (
     <div className="relative flex min-h-[calc(100dvh-64px)] flex-col overflow-hidden bg-black text-white">
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-30 h-28 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.065),transparent_58%)]" />
-      <div
-        className={`pointer-events-none fixed left-0 right-0 top-0 z-40 h-16 bg-gradient-to-b ${topFadeClass} to-transparent transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]`}
-      />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[34vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.04),transparent_60%)]" />
+      <div className="pointer-events-none fixed left-0 right-0 top-0 z-30 h-12 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[28vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.035),transparent_60%)]" />
 
       <div
-        ref={scrollerRef}
-        onScroll={(e) => {
-          setScrollTop(e.currentTarget.scrollTop);
-        }}
-        className={`relative z-10 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-5 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
+        className={`pointer-events-none fixed inset-x-0 top-0 z-20 h-16 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          hasScrolled
+            ? "from-[#0a0a0a] via-[#0a0a0a]/92 to-transparent"
+            : "from-[#0a0a0a]/88 via-[#0a0a0a]/68 to-transparent"
+        }`}
+      />
+
+      <div
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        className={`flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
@@ -715,29 +710,29 @@ export default function Chat() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: 0.34,
+                duration: 0.28,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              className="px-1 pb-7"
+              className="px-1 pb-5"
             >
               <div className="max-w-md">
                 <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
                   {guidanceLabel}
                 </div>
 
-                <h1 className="mt-5 text-[30px] font-semibold leading-[1.04] text-white">
+                <h1 className="mt-4 text-[28px] font-semibold leading-tight text-white">
                   A quiet space
                   <br />
                   to reflect clearly.
                 </h1>
 
-                <p className="mt-3 max-w-sm text-[14.5px] leading-[1.65] text-neutral-400">
+                <p className="mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
                   Start with whatever feels present. When you’re ready,
                   close the conversation and save it to your journal.
                 </p>
 
                 {starter && (
-                  <div className="mt-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                  <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-4">
                     <div className="text-sm font-medium text-white">
                       Your first starter is ready
                     </div>
@@ -748,9 +743,9 @@ export default function Chat() {
                   </div>
                 )}
 
-                <div className="mt-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-4">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                    <span className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                       Plan
                     </span>
                     <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300 capitalize">
@@ -769,7 +764,7 @@ export default function Chat() {
                   </p>
 
                   {typeof usage?.remaining === "number" && (
-                    <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                    <p className="mt-2 text-xs text-neutral-500">
                       {usage.remaining > 0
                         ? `${usage.remaining} saves remaining on your current plan.`
                         : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
@@ -777,8 +772,8 @@ export default function Chat() {
                   )}
 
                   {usage?.ai && (
-                    <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                    <div className="mt-3 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
+                      <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                         AI depth
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-neutral-300">
@@ -791,17 +786,17 @@ export default function Chat() {
                   )}
                 </div>
 
-                <div className="mt-5">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                <div className="mt-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                     Suggested starters
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2.5">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {suggestedPrompts.map((prompt) => (
                       <button
                         key={prompt}
                         onClick={() => applySuggestedPrompt(prompt)}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-left text-xs leading-relaxed text-neutral-300 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.06] hover:text-white"
+                        className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-left text-xs leading-relaxed text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
                       >
                         {prompt}
                       </button>
@@ -810,7 +805,7 @@ export default function Chat() {
                 </div>
 
                 {limitError && (
-                  <div className="mt-5 rounded-[28px] border border-amber-500/20 bg-amber-500/10 px-5 py-5">
+                  <div className="mt-4 rounded-[24px] border border-amber-500/20 bg-amber-500/10 px-4 py-4">
                     <div className="text-sm font-medium text-white">
                       Save limit reached
                     </div>
@@ -822,7 +817,7 @@ export default function Chat() {
                       onClick={() => {
                         window.location.href = "/upgrade";
                       }}
-                      className="mt-4 rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
+                      className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                     >
                       Upgrade to Pro
                     </button>
@@ -830,7 +825,7 @@ export default function Chat() {
                 )}
 
                 {chatError && (
-                  <div className="mt-5 rounded-[28px] border border-red-500/20 bg-red-500/10 px-5 py-5">
+                  <div className="mt-4 rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
                     <div className="text-sm font-medium text-white">
                       Conversation limit reached
                     </div>
@@ -843,7 +838,7 @@ export default function Chat() {
                         onClick={() => {
                           window.location.href = "/upgrade";
                         }}
-                        className="mt-4 rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
+                        className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                       >
                         Upgrade to Pro
                       </button>
@@ -857,7 +852,7 @@ export default function Chat() {
           {!showEmptyState && (
             <div className="mb-4 space-y-3">
               {shouldShowSaveNudge && (
-                <div className="rounded-[28px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
+                <div className="rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-sm font-medium text-white">
@@ -873,7 +868,7 @@ export default function Chat() {
 
                     <button
                       onClick={() => setSaveNudgeDismissed(true)}
-                      className="text-sm text-neutral-400 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-white"
+                      className="text-sm text-neutral-400 transition hover:text-white"
                     >
                       Dismiss
                     </button>
@@ -884,14 +879,14 @@ export default function Chat() {
                       onClick={() => {
                         openCloseFlow("save_nudge");
                       }}
-                      className="rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
+                      className="rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                     >
                       Close & save now
                     </button>
 
                     <button
                       onClick={() => setSaveNudgeDismissed(true)}
-                      className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.05]"
+                      className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                     >
                       Keep reflecting
                     </button>
@@ -902,7 +897,7 @@ export default function Chat() {
               {(limitError || chatError) && (
                 <div className="space-y-3">
                   {limitError && (
-                    <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 px-5 py-5">
+                    <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/10 px-4 py-4">
                       <div className="text-sm font-medium text-white">
                         Save limit reached
                       </div>
@@ -914,7 +909,7 @@ export default function Chat() {
                         onClick={() => {
                           window.location.href = "/upgrade";
                         }}
-                        className="mt-4 rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
+                        className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                       >
                         Upgrade to Pro
                       </button>
@@ -922,7 +917,7 @@ export default function Chat() {
                   )}
 
                   {chatError && (
-                    <div className="rounded-[28px] border border-red-500/20 bg-red-500/10 px-5 py-5">
+                    <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
                       <div className="text-sm font-medium text-white">
                         AI conversation limit
                       </div>
@@ -936,7 +931,7 @@ export default function Chat() {
                             onClick={() => {
                               window.location.href = "/upgrade";
                             }}
-                            className="rounded-[22px] bg-white px-4 py-3 text-sm font-medium text-black transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90"
+                            className="rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                           >
                             Upgrade to Pro
                           </button>
@@ -944,7 +939,7 @@ export default function Chat() {
 
                         <button
                           onClick={resetChat}
-                          className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-white/[0.05]"
+                          className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                         >
                           Start new conversation
                         </button>
@@ -970,7 +965,7 @@ export default function Chat() {
                     initial={{ opacity: 0, y: 10, scale: 0.985 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{
-                      duration: 0.24,
+                      duration: 0.22,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                     className={`flex ${
@@ -978,7 +973,7 @@ export default function Chat() {
                     } ${groupedWithPrevious ? "pt-1" : "pt-3"}`}
                   >
                     <div
-                      className={`max-w-[79%] rounded-[24px] border px-4 py-3.5 text-[14.5px] leading-[1.62] shadow-[0_0_0_1px_rgba(255,255,255,0.01)] ${
+                      className={`max-w-[79%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.58] shadow-[0_0_0_1px_rgba(255,255,255,0.01)] ${
                         isUser
                           ? "border-white/[0.08] bg-white/[0.07] text-white"
                           : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
@@ -998,12 +993,12 @@ export default function Chat() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4 }}
                   transition={{
-                    duration: 0.22,
+                    duration: 0.2,
                     ease: [0.22, 1, 0.36, 1],
                   }}
                   className="flex justify-start pt-3"
                 >
-                  <div className="flex items-center gap-2 rounded-[24px] border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
+                  <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
                     <span>MindLog is thinking</span>
 
                     <div className="flex gap-1">
@@ -1022,41 +1017,31 @@ export default function Chat() {
       </div>
 
       <div
-        className={`pointer-events-none fixed left-0 right-0 z-30 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/72 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
+        className={`pointer-events-none fixed left-0 right-0 z-30 h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/66 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
       />
 
       <div
-        className={`fixed left-0 right-0 z-40 px-4 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${composerBottomClass}`}
+        className={`fixed left-0 right-0 z-40 px-3 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${composerBottomClass}`}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
             sendMessage();
           }}
-          className={`mx-auto max-w-xl rounded-[28px] border px-3 py-3 backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            isComposerFocused
-              ? "border-white/14 bg-[#0a0a0a]/96 shadow-[0_24px_70px_rgba(0,0,0,0.48)]"
-              : "border-white/10 bg-[#0a0a0a]/94 shadow-[0_18px_50px_rgba(0,0,0,0.36)]"
+          className={`mx-auto max-w-xl rounded-[24px] border px-3 py-2.5 backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isFocused
+              ? "border-white/14 bg-[#0b0b0b]/96 shadow-[0_18px_40px_rgba(0,0,0,0.36)]"
+              : "border-white/10 bg-[#0b0b0b]/92 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
           }`}
         >
-          <div className="flex items-end gap-3">
-            <div className="min-w-0 flex-1 rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-neutral-500">
-                  Reflection
-                </div>
-
-                <div className="text-[11px] text-neutral-500">
-                  Enter to send
-                </div>
-              </div>
-
+          <div className="flex items-end gap-2.5">
+            <div className="min-w-0 flex-1">
               <textarea
                 ref={textareaRef}
                 rows={1}
                 value={input}
-                onFocus={() => setIsComposerFocused(true)}
-                onBlur={() => setIsComposerFocused(false)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 onChange={(e) => {
                   setInput(e.target.value);
                   if (chatError) setChatError(null);
@@ -1067,8 +1052,8 @@ export default function Chat() {
                     sendMessage();
                   }
                 }}
-                placeholder="Write what’s on your mind..."
-                className="mt-2 max-h-40 min-h-[28px] w-full resize-none overflow-y-auto bg-transparent text-[15px] leading-[1.6] text-white outline-none placeholder:text-neutral-500"
+                placeholder="Message"
+                className="max-h-24 w-full resize-none overflow-y-auto bg-transparent px-1 py-2 text-[15px] leading-[1.45] text-white outline-none placeholder-neutral-500"
               />
             </div>
 
@@ -1076,15 +1061,15 @@ export default function Chat() {
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 canSend
-                  ? "border-white bg-white text-black shadow-[0_12px_28px_rgba(255,255,255,0.16)] hover:opacity-92"
-                  : "border-white/10 bg-white/[0.05] text-neutral-500"
+                  ? "bg-white text-black"
+                  : "bg-white/[0.07] text-neutral-500"
               }`}
             >
               <svg
                 viewBox="0 0 24 24"
-                className="h-[18px] w-[18px]"
+                className="h-[17px] w-[17px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
@@ -1097,23 +1082,18 @@ export default function Chat() {
             </button>
           </div>
 
-          <div className="mt-2 flex items-center justify-between gap-3 px-1">
-            <div className="text-[11px] leading-relaxed text-neutral-500">
-              Shift + Enter for a new line
-            </div>
-
+          <div className="mt-1 flex items-center justify-between px-1 text-[11px] text-neutral-500">
+            <span>Shift + Enter for a new line</span>
             {usage?.ai?.maxCharactersPerMessage ? (
-              <div className="text-[11px] text-neutral-500">
+              <span>
                 {Math.max(
                   usage.ai.maxCharactersPerMessage - input.length,
                   0
                 )}{" "}
                 left
-              </div>
+              </span>
             ) : (
-              <div className="text-[11px] text-neutral-500">
-                Reflect clearly
-              </div>
+              <span>Reflect clearly</span>
             )}
           </div>
         </form>

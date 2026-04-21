@@ -26,7 +26,7 @@ function getMainClassName(pathname: string, showBottomNav: boolean) {
   }
 
   if (showBottomNav) {
-    return "pt-[64px] pb-[56px]";
+    return "pt-[64px] pb-[50px]";
   }
 
   return "pt-[64px]";

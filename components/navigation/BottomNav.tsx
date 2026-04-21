@@ -41,7 +41,7 @@ function JournalIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-[18px] w-[18px] transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+      className={`h-[18px] w-[18px] ${
         active ? "opacity-100" : "opacity-80"
       }`}
       fill="none"
@@ -62,7 +62,7 @@ function ChatIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-[18px] w-[18px] transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+      className={`h-[18px] w-[18px] ${
         active ? "opacity-100" : "opacity-80"
       }`}
       fill="none"
@@ -82,7 +82,7 @@ function StatsIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-[18px] w-[18px] transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+      className={`h-[18px] w-[18px] ${
         active ? "opacity-100" : "opacity-80"
       }`}
       fill="none"
@@ -103,7 +103,7 @@ function ProfileIcon({ active }: { active: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`h-[18px] w-[18px] transition-opacity duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+      className={`h-[18px] w-[18px] ${
         active ? "opacity-100" : "opacity-80"
       }`}
       fill="none"
@@ -142,25 +142,13 @@ function NavHandle({
     <button
       onClick={onToggle}
       aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
-      className="mx-auto flex h-8 w-[68px] items-center justify-center rounded-t-[18px] border border-white/10 border-b-0 bg-[#0a0a0a]/94 shadow-[0_-8px_30px_rgba(0,0,0,0.28)] backdrop-blur-xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#121212]/96"
+      className="mx-auto flex h-6 w-12 items-center justify-center rounded-full border border-white/10 bg-[#0b0b0b]/92 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#111111]/96"
     >
-      <span className="sr-only">
-        {expanded ? "Collapse navigation" : "Expand navigation"}
-      </span>
-
-      <svg
-        viewBox="0 0 24 24"
-        className={`h-4 w-4 text-neutral-300 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          expanded ? "rotate-180" : "rotate-0"
+      <span
+        className={`block h-[3px] w-5 rounded-full bg-white/55 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          expanded ? "scale-x-[0.8] opacity-80" : "scale-x-100 opacity-100"
         }`}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m6 14 6-6 6 6" />
-      </svg>
+      />
     </button>
   );
 }
@@ -210,7 +198,7 @@ export function BottomNav() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
       {showCollapsedHandleOnly ? (
-        <div className="pb-[calc(env(safe-area-inset-bottom)+2px)]">
+        <div className="pb-[calc(env(safe-area-inset-bottom)+4px)]">
           <NavHandle
             expanded={false}
             onToggle={() => setChatNavExpanded(true)}
@@ -218,10 +206,10 @@ export function BottomNav() {
         </div>
       ) : (
         <>
-          <div className="pointer-events-none absolute inset-x-0 bottom-full h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/72 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/64 to-transparent" />
 
           {isChat && (
-            <div className="pb-0">
+            <div className="pb-1">
               <NavHandle
                 expanded
                 onToggle={() => setChatNavExpanded(false)}
@@ -229,9 +217,9 @@ export function BottomNav() {
             </div>
           )}
 
-          <div className="border-t border-white/10 bg-[#0a0a0a]/94 shadow-[0_-16px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-            <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+5px)] pt-1.5">
-              <div className="grid grid-cols-4 gap-1.5">
+          <div className="border-t border-white/10 bg-[#0a0a0a]/92 backdrop-blur-xl">
+            <div className="mx-auto max-w-xl px-3 pb-[calc(env(safe-area-inset-bottom)+3px)] pt-1">
+              <div className="grid grid-cols-4 gap-1">
                 {items.map((item) => {
                   const active = activeTab === item.key;
 
@@ -239,9 +227,9 @@ export function BottomNav() {
                     <button
                       key={item.key}
                       onClick={() => router.push(item.href)}
-                      className={`flex flex-col items-center justify-center gap-1 rounded-[20px] px-2.5 py-2 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                      className={`flex flex-col items-center justify-center gap-1 rounded-[18px] px-2.5 py-1.5 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                         active
-                          ? "bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                          ? "bg-white/[0.08] text-white"
                           : "text-neutral-400 hover:bg-white/[0.04] hover:text-white"
                       }`}
                     >

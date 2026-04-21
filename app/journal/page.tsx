@@ -216,9 +216,9 @@ export default function JournalPage() {
     <AuthGate>
       <div className="h-screen overflow-hidden bg-black text-white">
         <div className="h-full overflow-y-auto overscroll-contain">
-          <div className="mx-auto max-w-xl px-4 pt-8 pb-14">
+          <div className="mx-auto max-w-xl px-4 pt-6 pb-8">
             {showCelebrate && (
-              <div className="mb-5 rounded-[28px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
+              <div className="mb-5 rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="inline-flex rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200">
@@ -238,7 +238,7 @@ export default function JournalPage() {
                   </button>
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                   <div className="text-xs uppercase tracking-[0.18em] text-neutral-400">
                     Journal progress
                   </div>
@@ -252,7 +252,7 @@ export default function JournalPage() {
 
                 {usage?.plan === "free" &&
                   typeof usage?.remaining === "number" && (
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+                    <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-sm text-neutral-200">
                           Free plan saves remaining
@@ -270,7 +270,7 @@ export default function JournalPage() {
                       {usage.remaining <= 3 && (
                         <button
                           onClick={() => router.push("/upgrade")}
-                          className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                          className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
                         >
                           Upgrade to Pro
                         </button>
@@ -282,7 +282,7 @@ export default function JournalPage() {
                   {entryId && (
                     <button
                       onClick={openSavedEntry}
-                      className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                      className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                     >
                       Open saved entry
                     </button>
@@ -290,7 +290,7 @@ export default function JournalPage() {
 
                   <button
                     onClick={startNewReflection}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                    className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                   >
                     Start another reflection
                   </button>

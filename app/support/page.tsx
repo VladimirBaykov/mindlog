@@ -12,7 +12,7 @@ export default function SupportPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-3xl px-5 pt-7 pb-12">
+      <div className="mx-auto max-w-3xl px-5 pt-6 pb-8">
         <div className="mb-5 flex items-center justify-between">
           <Link
             href="/profile"
@@ -25,7 +25,7 @@ export default function SupportPage() {
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-7">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-6 py-7">
             <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300">
               Support
             </div>
@@ -43,7 +43,7 @@ export default function SupportPage() {
           </div>
 
           {hasPlaceholderEmails && (
-            <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 px-6 py-6">
+            <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/10 px-6 py-6">
               <div className="text-sm font-medium text-white">
                 Launch warning
               </div>
@@ -53,7 +53,7 @@ export default function SupportPage() {
                 launch:
               </p>
 
-              <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
+              <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
                 <div>
                   NEXT_PUBLIC_SUPPORT_EMAIL=your-real-support@example.com
                 </div>
@@ -64,7 +64,7 @@ export default function SupportPage() {
             </div>
           )}
 
-          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-6">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-6 py-6">
             <h2 className="text-lg font-medium text-white">
               Common support topics
             </h2>
@@ -103,7 +103,7 @@ export default function SupportPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-6 py-6">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-6 py-6">
             <h2 className="text-lg font-medium text-white">
               Need help?
             </h2>
@@ -112,7 +112,7 @@ export default function SupportPage() {
               Public support contacts currently configured for launch.
             </p>
 
-            <div className="mt-5 rounded-[24px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
+            <div className="mt-5 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4 text-sm text-neutral-300">
               <div>
                 Support email:{" "}
                 <a
