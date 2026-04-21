@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "@/types/chat";
 import type { ChatState } from "@/types/chatState";
@@ -42,16 +42,8 @@ type GoalOption =
   | "understand_patterns"
   | null;
 
-type MoodOption =
-  | "gentle"
-  | "balanced"
-  | "direct"
-  | null;
-
-type NotificationOption =
-  | "yes"
-  | "not_now"
-  | null;
+type MoodOption = "gentle" | "balanced" | "direct" | null;
+type NotificationOption = "yes" | "not_now" | null;
 
 type UserPreferences = {
   goal: GoalOption;
@@ -59,57 +51,54 @@ type UserPreferences = {
   notifications: NotificationOption;
 };
 
-type CloseIntentSource =
-  | "header_close"
-  | "save_nudge";
+type CloseIntentSource = "header_close" | "save_nudge";
 
 export default function Chat() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [chatState, setChatState] =
-    useState<ChatState>("empty");
+  const [chatState, setChatState] = useState<ChatState>("empty");
   const [isSaved, setIsSaved] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] =
-    useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [pendingLeaveHref, setPendingLeaveHref] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
-  const [limitError, setLimitError] = useState<string | null>(
-    null
-  );
-  const [chatError, setChatError] = useState<string | null>(
-    null
-  );
+  const [limitError, setLimitError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [starterApplied, setStarterApplied] = useState(false);
-  const [saveNudgeDismissed, setSaveNudgeDismissed] =
-    useState(false);
-  const [savePromptTracked, setSavePromptTracked] =
-    useState(false);
-  const [preferences, setPreferences] =
-    useState<UserPreferences>({
-      goal: null,
-      moodPreference: null,
-      notifications: null,
-    });
+  const [saveNudgeDismissed, setSaveNudgeDismissed] = useState(false);
+  const [savePromptTracked, setSavePromptTracked] = useState(false);
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    goal: null,
+    moodPreference: null,
+    notifications: null,
+  });
   const [scrollTop, setScrollTop] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
-  const [isChatNavExpanded, setIsChatNavExpanded] =
-    useState(false);
+  const [isChatNavExpanded, setIsChatNavExpanded] = useState(false);
 
   const { setHeader, resetHeader } = useHeader();
   const { addItem } = useJournal();
 
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const starter = searchParams.get("starter");
+  const hasDraftConversation = messages.length > 0 && !isSaved;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    requestAnimationFrame(() => {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: messages.length > 1 ? "smooth" : "auto",
+      });
     });
   }, [messages, loading]);
 
@@ -118,8 +107,7 @@ export default function Chat() {
     if (!el) return;
 
     el.style.height = "0px";
-    const scrollHeight = el.scrollHeight;
-    el.style.height = Math.min(scrollHeight, 96) + "px";
+    el.style.height = `${Math.min(el.scrollHeight, 88)}px`;
   }, [input]);
 
   useEffect(() => {
@@ -143,15 +131,12 @@ export default function Chat() {
         } = await supabase.auth.getUser();
 
         setPreferences({
-          goal:
-            (user?.user_metadata?.onboarding_goal as GoalOption) ??
-            null,
+          goal: (user?.user_metadata?.onboarding_goal as GoalOption) ?? null,
           moodPreference:
-            (user?.user_metadata
-              ?.onboarding_mood_preference as MoodOption) ?? null,
+            (user?.user_metadata?.onboarding_mood_preference as MoodOption) ??
+            null,
           notifications:
-            (user?.user_metadata
-              ?.onboarding_notifications as NotificationOption) ??
+            (user?.user_metadata?.onboarding_notifications as NotificationOption) ??
             null,
         });
       } catch (error) {
@@ -188,6 +173,48 @@ export default function Chat() {
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    document.body.dataset.chatHasDraft = hasDraftConversation ? "true" : "false";
+
+    window.dispatchEvent(
+      new CustomEvent("mindlog-chat-draft-change", {
+        detail: { hasDraft: hasDraftConversation },
+      })
+    );
+  }, [hasDraftConversation]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleBeforeLeave = (event: Event) => {
+      const customEvent = event as CustomEvent<{ href?: string }>;
+      const href = customEvent.detail?.href;
+
+      if (!href) return;
+      if (!hasDraftConversation) {
+        router.push(href);
+        return;
+      }
+
+      setPendingLeaveHref(href);
+      setShowLeaveConfirm(true);
+    };
+
+    window.addEventListener(
+      "mindlog-chat-before-leave",
+      handleBeforeLeave as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "mindlog-chat-before-leave",
+        handleBeforeLeave as EventListener
+      );
+    };
+  }, [hasDraftConversation, router]);
 
   const suggestedPrompts = useMemo(() => {
     if (preferences.goal === "process_emotions") {
@@ -333,6 +360,7 @@ export default function Chat() {
     setChatError(null);
     setSaveNudgeDismissed(false);
     setSavePromptTracked(false);
+    setPendingLeaveHref(null);
   }
 
   useEffect(() => {
@@ -382,7 +410,7 @@ export default function Chat() {
     });
   }
 
-  async function closeConversation() {
+  async function closeConversation(nextHref?: string) {
     if (messages.length === 0 || isSaved) return;
 
     setLimitError(null);
@@ -446,7 +474,7 @@ export default function Chat() {
       )}`;
 
       resetChat();
-      window.location.href = successUrl;
+      window.location.href = nextHref || successUrl;
     } catch (err) {
       console.error(err);
     }
@@ -456,27 +484,15 @@ export default function Chat() {
     if (!input.trim() || loading) return;
 
     setChatError(null);
-
     const currentInput = input.trim();
 
     if (
       usage?.ai?.maxCharactersPerMessage &&
       currentInput.length > usage.ai.maxCharactersPerMessage
     ) {
-      const message = `This message is too long for your current plan. Maximum length: ${usage.ai.maxCharactersPerMessage} characters.`;
-      setChatError(message);
-
-      await trackClientEvent({
-        eventName: "chat_limit_hit",
-        page: "/chat",
-        metadata: {
-          type: "message_too_long",
-          plan: usage?.plan || "free",
-          attemptedLength: currentInput.length,
-          limit: usage.ai.maxCharactersPerMessage,
-        },
-      });
-
+      setChatError(
+        `This message is too long for your current plan. Maximum length: ${usage.ai.maxCharactersPerMessage} characters.`
+      );
       return;
     }
 
@@ -492,24 +508,11 @@ export default function Chat() {
       usage?.ai?.maxMessagesPerConversation &&
       nextMessages.length > usage.ai.maxMessagesPerConversation
     ) {
-      const message =
+      setChatError(
         usage.plan === "free"
           ? `You’ve reached the free plan conversation depth limit (${usage.ai.maxMessagesPerConversation} messages). Upgrade to Pro for deeper conversations.`
-          : `This conversation has reached its current depth limit (${usage.ai.maxMessagesPerConversation} messages).`;
-
-      setChatError(message);
-
-      await trackClientEvent({
-        eventName: "chat_limit_hit",
-        page: "/chat",
-        metadata: {
-          type: "conversation_depth",
-          plan: usage.plan,
-          attemptedMessages: nextMessages.length,
-          limit: usage.ai.maxMessagesPerConversation,
-        },
-      });
-
+          : `This conversation has reached its current depth limit (${usage.ai.maxMessagesPerConversation} messages).`
+      );
       return;
     }
 
@@ -522,24 +525,11 @@ export default function Chat() {
       usage?.ai?.maxTotalInputCharacters &&
       totalInputCharacters > usage.ai.maxTotalInputCharacters
     ) {
-      const message =
+      setChatError(
         usage.plan === "free"
           ? "You’ve reached the free plan context limit for this conversation. Upgrade to Pro or start a new reflection."
-          : "This conversation has become too large. Start a new reflection to continue clearly.";
-
-      setChatError(message);
-
-      await trackClientEvent({
-        eventName: "chat_limit_hit",
-        page: "/chat",
-        metadata: {
-          type: "total_context",
-          plan: usage.plan,
-          attemptedCharacters: totalInputCharacters,
-          limit: usage.ai.maxTotalInputCharacters,
-        },
-      });
-
+          : "This conversation has become too large. Start a new reflection to continue clearly."
+      );
       return;
     }
 
@@ -581,17 +571,6 @@ export default function Chat() {
               : "This conversation has reached its depth limit."
           );
           setMessages(messages);
-
-          await trackClientEvent({
-            eventName: "chat_limit_hit",
-            page: "/chat",
-            metadata: {
-              type: "chat_depth_limit_api",
-              plan: apiError.plan,
-              limit: apiError.limit,
-            },
-          });
-
           return;
         }
 
@@ -602,17 +581,6 @@ export default function Chat() {
               : "This message is too long."
           );
           setMessages(messages);
-
-          await trackClientEvent({
-            eventName: "chat_limit_hit",
-            page: "/chat",
-            metadata: {
-              type: "message_too_long_api",
-              plan: apiError.plan || usage?.plan || "free",
-              limit: apiError.limit,
-            },
-          });
-
           return;
         }
 
@@ -623,24 +591,10 @@ export default function Chat() {
               : "This conversation is too large to continue in one thread. Start a new reflection."
           );
           setMessages(messages);
-
-          await trackClientEvent({
-            eventName: "chat_limit_hit",
-            page: "/chat",
-            metadata: {
-              type: "total_context_limit_api",
-              plan: apiError.plan,
-              limit: apiError.limit,
-            },
-          });
-
           return;
         }
 
-        const text =
-          apiError?.error || "Something went wrong while sending.";
-        console.error("API error:", text);
-        setChatError(text);
+        setChatError(apiError?.error || "Something went wrong while sending.");
         setMessages(messages);
         return;
       }
@@ -650,9 +604,7 @@ export default function Chat() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content:
-            (data as { reply?: string })?.reply ||
-            "I’m here with you.",
+          content: (data as { reply?: string })?.reply || "I’m here with you.",
         },
       ]);
 
@@ -661,9 +613,7 @@ export default function Chat() {
       }
     } catch (err) {
       console.error(err);
-      setChatError(
-        "Something went quiet for a moment. Want to try again?"
-      );
+      setChatError("Something went quiet for a moment. Want to try again?");
       setMessages(messages);
     } finally {
       setLoading(false);
@@ -674,45 +624,43 @@ export default function Chat() {
   const hasScrolled = scrollTop > 8;
 
   const composerBottomClass = isChatNavExpanded
-    ? "bottom-[72px]"
-    : "bottom-[8px]";
+    ? "bottom-[calc(env(safe-area-inset-bottom)+78px)]"
+    : "bottom-[calc(env(safe-area-inset-bottom)+34px)]";
 
   const footerFadeBottomClass = isChatNavExpanded
-    ? "bottom-[128px]"
-    : "bottom-[62px]";
+    ? "bottom-[150px]"
+    : "bottom-[108px]";
 
   const scrollerBottomPaddingClass = isChatNavExpanded
-    ? "pb-[162px]"
-    : "pb-[112px]";
+    ? "pb-[206px]"
+    : "pb-[156px]";
 
   const canSend = !!input.trim() && !loading;
 
   return (
     <div className="relative flex min-h-[calc(100dvh-64px)] flex-col overflow-hidden bg-black text-white">
-      <div className="pointer-events-none fixed left-0 right-0 top-0 z-30 h-12 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[28vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.035),transparent_60%)]" />
+      <div className="pointer-events-none fixed inset-x-0 top-[64px] z-10 h-8 bg-gradient-to-b from-black/30 to-transparent" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[24vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.03),transparent_60%)]" />
 
       <div
-        className={`pointer-events-none fixed inset-x-0 top-0 z-20 h-16 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`pointer-events-none fixed inset-x-0 top-[64px] z-10 h-10 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           hasScrolled
-            ? "from-[#0a0a0a] via-[#0a0a0a]/92 to-transparent"
-            : "from-[#0a0a0a]/88 via-[#0a0a0a]/68 to-transparent"
+            ? "from-black/38 to-transparent"
+            : "from-black/20 to-transparent"
         }`}
       />
 
       <div
+        ref={scrollContainerRef}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-        className={`flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
+        className={`flex-1 overflow-y-auto overscroll-y-contain px-4 pt-5 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.28,
-                ease: [0.22, 1, 0.36, 1],
-              }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               className="px-1 pb-5"
             >
               <div className="max-w-md">
@@ -727,8 +675,8 @@ export default function Chat() {
                 </h1>
 
                 <p className="mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
-                  Start with whatever feels present. When you’re ready,
-                  close the conversation and save it to your journal.
+                  Start with whatever feels present. When you’re ready, close the
+                  conversation and save it to your journal.
                 </p>
 
                 {starter && (
@@ -737,8 +685,8 @@ export default function Chat() {
                       Your first starter is ready
                     </div>
                     <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                      We pre-filled a reflection prompt from onboarding.
-                      You can send it as-is or edit it first.
+                      We pre-filled a reflection prompt from onboarding. You can
+                      send it as-is or edit it first.
                     </p>
                   </div>
                 )}
@@ -749,9 +697,7 @@ export default function Chat() {
                       Plan
                     </span>
                     <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-neutral-300 capitalize">
-                      {usageLoading
-                        ? "loading"
-                        : usage?.plan || "free"}
+                      {usageLoading ? "loading" : usage?.plan || "free"}
                     </span>
                   </div>
 
@@ -769,20 +715,6 @@ export default function Chat() {
                         ? `${usage.remaining} saves remaining on your current plan.`
                         : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
                     </p>
-                  )}
-
-                  {usage?.ai && (
-                    <div className="mt-3 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
-                      <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                        AI depth
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                        {usage.ai.maxMessagesPerConversation} messages
-                        per conversation · up to{" "}
-                        {usage.ai.maxCharactersPerMessage} characters
-                        per message
-                      </p>
-                    </div>
                   )}
                 </div>
 
@@ -823,28 +755,6 @@ export default function Chat() {
                     </button>
                   </div>
                 )}
-
-                {chatError && (
-                  <div className="mt-4 rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
-                    <div className="text-sm font-medium text-white">
-                      Conversation limit reached
-                    </div>
-                    <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                      {chatError}
-                    </p>
-
-                    {usage?.plan === "free" && (
-                      <button
-                        onClick={() => {
-                          window.location.href = "/upgrade";
-                        }}
-                        className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                      >
-                        Upgrade to Pro
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             </motion.div>
           )}
@@ -860,9 +770,7 @@ export default function Chat() {
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-neutral-300">
                         You already have enough context here to turn this
-                        conversation into a journal entry. Saving it now
-                        helps build your reflection history instead of
-                        losing the session.
+                        conversation into a journal entry.
                       </p>
                     </div>
 
@@ -894,58 +802,14 @@ export default function Chat() {
                 </div>
               )}
 
-              {(limitError || chatError) && (
-                <div className="space-y-3">
-                  {limitError && (
-                    <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/10 px-4 py-4">
-                      <div className="text-sm font-medium text-white">
-                        Save limit reached
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                        {limitError}
-                      </p>
-
-                      <button
-                        onClick={() => {
-                          window.location.href = "/upgrade";
-                        }}
-                        className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                      >
-                        Upgrade to Pro
-                      </button>
-                    </div>
-                  )}
-
-                  {chatError && (
-                    <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
-                      <div className="text-sm font-medium text-white">
-                        AI conversation limit
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                        {chatError}
-                      </p>
-
-                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                        {usage?.plan === "free" && (
-                          <button
-                            onClick={() => {
-                              window.location.href = "/upgrade";
-                            }}
-                            className="rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                          >
-                            Upgrade to Pro
-                          </button>
-                        )}
-
-                        <button
-                          onClick={resetChat}
-                          className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
-                        >
-                          Start new conversation
-                        </button>
-                      </div>
-                    </div>
-                  )}
+              {chatError && (
+                <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
+                  <div className="text-sm font-medium text-white">
+                    AI conversation limit
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                    {chatError}
+                  </p>
                 </div>
               )}
             </div>
@@ -964,16 +828,13 @@ export default function Chat() {
                     key={msg.id}
                     initial={{ opacity: 0, y: 10, scale: 0.985 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{
-                      duration: 0.22,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                    className={`flex ${
-                      isUser ? "justify-end" : "justify-start"
-                    } ${groupedWithPrevious ? "pt-1" : "pt-3"}`}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className={`flex ${isUser ? "justify-end" : "justify-start"} ${
+                      groupedWithPrevious ? "pt-1" : "pt-3"
+                    }`}
                   >
                     <div
-                      className={`max-w-[79%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.58] shadow-[0_0_0_1px_rgba(255,255,255,0.01)] ${
+                      className={`max-w-[79%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.58] ${
                         isUser
                           ? "border-white/[0.08] bg-white/[0.07] text-white"
                           : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
@@ -992,10 +853,7 @@ export default function Chat() {
                   initial={{ opacity: 0, y: 8, scale: 0.985 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4 }}
-                  transition={{
-                    duration: 0.2,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                   className="flex justify-start pt-3"
                 >
                   <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm text-neutral-400">
@@ -1011,30 +869,28 @@ export default function Chat() {
               )}
             </AnimatePresence>
           </div>
-
-          <div ref={bottomRef} />
         </div>
       </div>
 
       <div
-        className={`pointer-events-none fixed left-0 right-0 z-30 h-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/66 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
+        className={`pointer-events-none fixed inset-x-0 z-20 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/62 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
       />
 
       <div
-        className={`fixed left-0 right-0 z-40 px-3 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${composerBottomClass}`}
+        className={`fixed inset-x-0 z-30 px-3 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${composerBottomClass}`}
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
             sendMessage();
           }}
-          className={`mx-auto max-w-xl rounded-[24px] border px-3 py-2.5 backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`mx-auto max-w-xl rounded-[22px] border px-3 py-2 backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
             isFocused
               ? "border-white/14 bg-[#0b0b0b]/96 shadow-[0_18px_40px_rgba(0,0,0,0.36)]"
               : "border-white/10 bg-[#0b0b0b]/92 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
           }`}
         >
-          <div className="flex items-end gap-2.5">
+          <div className="flex items-end gap-2">
             <div className="min-w-0 flex-1">
               <textarea
                 ref={textareaRef}
@@ -1053,7 +909,7 @@ export default function Chat() {
                   }
                 }}
                 placeholder="Message"
-                className="max-h-24 w-full resize-none overflow-y-auto bg-transparent px-1 py-2 text-[15px] leading-[1.45] text-white outline-none placeholder-neutral-500"
+                className="max-h-[88px] w-full resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500"
               />
             </div>
 
@@ -1061,7 +917,7 @@ export default function Chat() {
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              className={`mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 canSend
                   ? "bg-white text-black"
                   : "bg-white/[0.07] text-neutral-500"
@@ -1069,7 +925,7 @@ export default function Chat() {
             >
               <svg
                 viewBox="0 0 24 24"
-                className="h-[17px] w-[17px]"
+                className="h-[16px] w-[16px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
@@ -1080,21 +936,6 @@ export default function Chat() {
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </button>
-          </div>
-
-          <div className="mt-1 flex items-center justify-between px-1 text-[11px] text-neutral-500">
-            <span>Shift + Enter for a new line</span>
-            {usage?.ai?.maxCharactersPerMessage ? (
-              <span>
-                {Math.max(
-                  usage.ai.maxCharactersPerMessage - input.length,
-                  0
-                )}{" "}
-                left
-              </span>
-            ) : (
-              <span>Reflect clearly</span>
-            )}
           </div>
         </form>
       </div>
@@ -1110,6 +951,7 @@ export default function Chat() {
         confirmLabel={
           usage?.canSave === false ? "Upgrade to Pro" : "Close & save"
         }
+        cancelLabel="Stay here"
         danger={false}
         onCancel={() => {
           setShowCloseConfirm(false);
@@ -1123,6 +965,32 @@ export default function Chat() {
           }
 
           closeConversation();
+        }}
+      />
+
+      <ConfirmModal
+        open={showLeaveConfirm}
+        title="Save this conversation before leaving?"
+        description="You already started this chat. Save it first if you want it to appear in your journal."
+        confirmLabel="Save & leave"
+        secondaryLabel="Leave without saving"
+        cancelLabel="Stay here"
+        onCancel={() => {
+          setShowLeaveConfirm(false);
+          setPendingLeaveHref(null);
+        }}
+        onSecondary={() => {
+          const nextHref = pendingLeaveHref;
+          setShowLeaveConfirm(false);
+          resetChat();
+          if (nextHref) {
+            router.push(nextHref);
+          }
+        }}
+        onConfirm={() => {
+          const nextHref = pendingLeaveHref || undefined;
+          setShowLeaveConfirm(false);
+          closeConversation(nextHref);
         }}
       />
     </div>

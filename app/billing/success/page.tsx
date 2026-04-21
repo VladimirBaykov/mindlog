@@ -17,12 +17,11 @@ export default function BillingSuccessPage() {
   const searchParams = useSearchParams();
   const { setHeader, resetHeader } = useHeader();
 
-  const [syncState, setSyncState] =
-    useState<SyncState>("checking");
-  const [subscription, setSubscription] =
-    useState<SubscriptionInfo | null>(null);
+  const [syncState, setSyncState] = useState<SyncState>("checking");
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
 
   const sessionId = searchParams.get("session_id");
 
@@ -52,9 +51,7 @@ export default function BillingSuccessPage() {
     trackClientEvent({
       eventName: "billing_success_viewed",
       page: "/billing/success",
-      metadata: {
-        sessionId,
-      },
+      metadata: { sessionId },
     });
   }, [sessionId]);
 
@@ -98,22 +95,15 @@ export default function BillingSuccessPage() {
       setSyncState("checking");
 
       try {
-        const active = await fetchSubscriptionStatus(
-          controller.signal
-        );
+        const active = await fetchSubscriptionStatus(controller.signal);
 
         if (controller.signal.aborted) return;
-
-        if (active) {
-          return;
-        }
+        if (active) return;
 
         intervalId = setInterval(async () => {
           try {
             setAttempts((prev) => prev + 1);
-            const isActive = await fetchSubscriptionStatus(
-              controller.signal
-            );
+            const isActive = await fetchSubscriptionStatus(controller.signal);
 
             if (controller.signal.aborted) return;
 
@@ -135,9 +125,7 @@ export default function BillingSuccessPage() {
           }
 
           if (!controller.signal.aborted) {
-            setSyncState((prev) =>
-              prev === "active" ? prev : "pending"
-            );
+            setSyncState((prev) => (prev === "active" ? prev : "pending"));
           }
         }, 16000);
       } catch (error) {
@@ -152,11 +140,29 @@ export default function BillingSuccessPage() {
 
     return () => {
       controller.abort();
-
       if (intervalId) clearInterval(intervalId);
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
+
+  useEffect(() => {
+    if (syncState !== "active") return;
+
+    setRedirectCountdown(3);
+
+    const intervalId = setInterval(() => {
+      setRedirectCountdown((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+
+    const timeoutId = setTimeout(() => {
+      router.replace("/profile?upgraded=1");
+    }, 2400);
+
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  }, [syncState, router]);
 
   async function handleManualRefresh() {
     try {
@@ -189,9 +195,9 @@ export default function BillingSuccessPage() {
   const statusBlock = useMemo(() => {
     if (syncState === "active") {
       return {
-        title: "Pro is active",
+        title: "You’re officially Pro",
         description:
-          "Your payment was completed and your subscription has been synced successfully. Pro features are now unlocked on your account.",
+          "Your payment completed and MindLog confirmed your subscription successfully.",
         icon: "✓",
         tone: "ok",
       };
@@ -201,7 +207,7 @@ export default function BillingSuccessPage() {
       return {
         title: "Payment completed, sync still pending",
         description:
-          "Stripe checkout completed successfully, but your Pro status has not appeared yet. This usually means the webhook is still syncing your subscription.",
+          "Stripe checkout finished, but Pro has not appeared yet. This usually means the webhook is still syncing your subscription.",
         icon: "…",
         tone: "warn",
       };
@@ -211,7 +217,7 @@ export default function BillingSuccessPage() {
       return {
         title: "Couldn’t confirm subscription yet",
         description:
-          "The payment flow completed, but we couldn’t verify your latest subscription status right now. Try refreshing your plan status in a moment.",
+          "The payment flow completed, but this page couldn’t verify your latest subscription status right now.",
         icon: "!",
         tone: "neutral",
       };
@@ -220,7 +226,7 @@ export default function BillingSuccessPage() {
     return {
       title: "Checking your subscription",
       description:
-        "Stripe checkout completed. We’re now checking whether the webhook has already activated your Pro plan.",
+        "Stripe checkout completed. MindLog is now checking whether your Pro plan is already active.",
       icon: "…",
       tone: "neutral",
     };
@@ -233,26 +239,10 @@ export default function BillingSuccessPage() {
       ? "border-amber-500/20 bg-amber-500/10"
       : "border-white/10 bg-white/[0.03]";
 
-  const reassuranceCopy = useMemo(() => {
-    if (syncState === "active") {
-      return "You can start using Pro right away: weekly summaries, premium AI insights, deeper reflection depth, and export are now available.";
-    }
-
-    if (syncState === "pending") {
-      return "Nothing looks broken here. In most cases, this resolves automatically within a short time after Stripe finishes sending the webhook.";
-    }
-
-    if (syncState === "error") {
-      return "Your checkout session likely completed, but this page couldn’t verify the latest state. A manual refresh usually resolves it once sync catches up.";
-    }
-
-    return "We are verifying your account state so MindLog can unlock Pro safely and consistently.";
-  }, [syncState]);
-
   return (
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-xl px-4 pt-24 pb-24 space-y-6">
+        <div className="mx-auto max-w-xl space-y-6 px-4 pb-24 pt-24">
           <div className={`rounded-3xl border px-6 py-8 text-center ${toneClasses}`}>
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-lg">
               {statusBlock.icon}
@@ -266,9 +256,11 @@ export default function BillingSuccessPage() {
               {statusBlock.description}
             </p>
 
-            <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-neutral-500">
-              {reassuranceCopy}
-            </p>
+            {syncState === "active" && (
+              <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-neutral-400">
+                Redirecting to your profile in about {redirectCountdown}s…
+              </p>
+            )}
 
             {sessionId && (
               <p className="mt-3 break-all text-xs text-neutral-500">
@@ -294,9 +286,7 @@ export default function BillingSuccessPage() {
             {subscription?.currentPeriodEnd && (
               <p className="mt-2 text-xs text-neutral-500">
                 Current period ends{" "}
-                {new Date(
-                  subscription.currentPeriodEnd
-                ).toLocaleDateString()}
+                {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
               </p>
             )}
 
@@ -353,48 +343,24 @@ export default function BillingSuccessPage() {
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-sm font-medium text-white">
-              Best next step
+              Next step
             </div>
             <p className="mt-2 text-sm leading-relaxed text-neutral-400">
               {syncState === "active"
-                ? "The strongest way to feel the value of Pro is to start another reflection, then revisit stats and exports once you save it."
-                : "You can refresh plan status, open your profile to check billing state, or wait briefly while Stripe sync completes."}
+                ? "You can start using Pro right away, or just let this page send you back to profile automatically."
+                : "You can refresh plan status, open profile, or wait briefly while Stripe sync completes."}
             </p>
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={async () => {
-                  await trackClientEvent({
-                    eventName: "billing_success_start_reflection_clicked",
-                    page: "/billing/success",
-                    metadata: {
-                      sessionId,
-                      syncState,
-                      plan: subscription?.plan ?? null,
-                    },
-                  });
-
-                  router.push("/chat");
-                }}
+                onClick={() => router.push("/chat")}
                 className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
               >
                 Start a Pro reflection
               </button>
 
               <button
-                onClick={async () => {
-                  await trackClientEvent({
-                    eventName: "billing_success_profile_clicked",
-                    page: "/billing/success",
-                    metadata: {
-                      sessionId,
-                      syncState,
-                      plan: subscription?.plan ?? null,
-                    },
-                  });
-
-                  router.push("/profile");
-                }}
+                onClick={() => router.push("/profile?upgraded=1")}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
               >
                 Go to profile
