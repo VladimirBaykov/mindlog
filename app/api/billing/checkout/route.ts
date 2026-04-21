@@ -92,7 +92,7 @@ export async function POST(req: Request) {
         },
       ],
       allow_promotion_codes: true,
-      success_url: `${getAppUrl()}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${getAppUrl()}/profile?upgraded=1&checkout=1`,
       cancel_url: `${getAppUrl()}/billing/cancel`,
       metadata: {
         supabase_user_id: user.id,

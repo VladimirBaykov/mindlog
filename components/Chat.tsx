@@ -105,7 +105,7 @@ export default function Chat() {
     if (!el) return;
 
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 84)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 88)}px`;
   }, [input]);
 
   useEffect(() => {
@@ -577,12 +577,12 @@ export default function Chat() {
 
   return (
     <div className="relative flex h-[calc(100dvh-64px)] flex-col overflow-hidden overscroll-none bg-black text-white">
-      <div className="pointer-events-none fixed inset-x-0 top-[64px] z-10 h-7 bg-gradient-to-b from-black/22 to-transparent" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[22vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.028),transparent_60%)]" />
+      <div className="pointer-events-none fixed inset-x-0 top-[64px] z-10 h-7 bg-gradient-to-b from-black/18 to-transparent" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[22vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.02),transparent_60%)]" />
 
       <div
         className={`pointer-events-none fixed inset-x-0 top-[64px] z-10 h-8 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          hasScrolled ? "from-black/24 to-transparent" : "from-black/10 to-transparent"
+          hasScrolled ? "from-black/18 to-transparent" : "from-black/8 to-transparent"
         }`}
       />
 
@@ -764,7 +764,7 @@ export default function Chat() {
       </div>
 
       <div
-        className={`pointer-events-none fixed inset-x-0 z-20 h-12 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
+        className={`pointer-events-none fixed inset-x-0 z-20 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/52 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
       />
 
       <div
@@ -775,73 +775,59 @@ export default function Chat() {
             e.preventDefault();
             sendMessage();
           }}
-          className={`mx-auto max-w-xl rounded-[26px] border px-3 py-2.5 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            isFocused
-              ? "border-white/16 bg-[linear-gradient(180deg,rgba(24,24,24,0.98),rgba(10,10,10,0.96))] shadow-[0_20px_50px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)]"
-              : "border-white/10 bg-[linear-gradient(180deg,rgba(20,20,20,0.95),rgba(10,10,10,0.93))] shadow-[0_18px_42px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]"
-          } backdrop-blur-2xl`}
+          className="mx-auto flex max-w-xl items-end gap-2 rounded-[28px] border border-white/10 bg-[#151515]/92 px-2.5 py-2 shadow-[0_18px_44px_rgba(0,0,0,0.34)] backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         >
-          <div className="mb-2 flex items-center justify-between px-1">
-            <span className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
-              Reflection
-            </span>
-
-            {usage?.ai?.maxCharactersPerMessage ? (
-              <span className="text-[11px] text-neutral-500">
-                {Math.max(usage.ai.maxCharactersPerMessage - input.length, 0)} left
-              </span>
-            ) : (
-              <span className="text-[11px] text-neutral-500">Present moment</span>
-            )}
+          <div
+            className={`min-w-0 flex-1 rounded-[22px] border px-3 transition duration-300 ${
+              isFocused
+                ? "border-white/14 bg-white/[0.06]"
+                : "border-transparent bg-transparent"
+            }`}
+          >
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={input}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (chatError) setChatError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Message"
+              className="max-h-[88px] w-full resize-none overflow-y-auto bg-transparent px-0 py-2.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500"
+            />
           </div>
 
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1 rounded-[18px] border border-white/[0.05] bg-black/20 px-3">
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                value={input}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  if (chatError) setChatError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                placeholder="Message"
-                className="max-h-[84px] w-full resize-none overflow-y-auto bg-transparent px-0 py-2.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={!canSend}
-              aria-label="Send message"
-              className={`mb-[1px] flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                canSend
-                  ? "border-white bg-white text-black shadow-[0_8px_20px_rgba(255,255,255,0.14)]"
-                  : "border-white/8 bg-white/[0.05] text-neutral-500"
-              }`}
+          <button
+            type="submit"
+            disabled={!canSend}
+            aria-label="Send message"
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              canSend
+                ? "bg-white text-black shadow-[0_8px_20px_rgba(255,255,255,0.12)]"
+                : "bg-white/[0.08] text-neutral-500"
+            }`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-[16px] w-[16px]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-[16px] w-[16px]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h11" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </button>
-          </div>
+              <path d="M5 12h11" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+          </button>
         </form>
       </div>
 

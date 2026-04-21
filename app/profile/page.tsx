@@ -24,8 +24,16 @@ type GoalOption =
   | "understand_patterns"
   | null;
 
-type MoodOption = "gentle" | "balanced" | "direct" | null;
-type NotificationOption = "yes" | "not_now" | null;
+type MoodOption =
+  | "gentle"
+  | "balanced"
+  | "direct"
+  | null;
+
+type NotificationOption =
+  | "yes"
+  | "not_now"
+  | null;
 
 type PreferencesState = {
   onboardingCompleted: boolean;
@@ -137,6 +145,7 @@ export default function ProfilePage() {
     useState(false);
 
   const upgraded = searchParams.get("upgraded") === "1";
+  const checkout = searchParams.get("checkout") === "1";
 
   async function loadUser(signal?: AbortSignal) {
     const {
@@ -221,6 +230,8 @@ export default function ProfilePage() {
         currentStatus: subscription?.status ?? null,
         used: usage?.used ?? null,
         remaining: usage?.remaining ?? null,
+        upgraded,
+        checkout,
       },
     });
 
@@ -339,9 +350,10 @@ export default function ProfilePage() {
         used: usage?.used ?? null,
         remaining: usage?.remaining ?? null,
         upgraded,
+        checkout,
       },
     });
-  }, [viewTracked, loadingAccount, subscription, usage, upgraded]);
+  }, [viewTracked, loadingAccount, subscription, usage, upgraded, checkout]);
 
   async function savePreferences() {
     if (savingPreferences) return;
@@ -579,6 +591,51 @@ export default function ProfilePage() {
                   className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
                 >
                   Open reflection stats
+                </button>
+              </div>
+            </div>
+          )}
+
+          {checkout && !isPro && (
+            <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/10 px-5 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200">
+                    Finalizing subscription
+                  </div>
+
+                  <div className="mt-4 text-lg font-medium text-white">
+                    Payment completed
+                  </div>
+
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-200">
+                    Your checkout finished, but Pro is still syncing. This usually
+                    means the Stripe webhook is catching up.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => router.replace("/profile")}
+                  className="text-sm text-neutral-300 transition hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={() => refreshPlanStatus("checkout_pending_block")}
+                  disabled={refreshingPlan}
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {refreshingPlan ? "Refreshing..." : "Refresh plan status"}
+                </button>
+
+                <button
+                  onClick={() => router.replace("/profile")}
+                  className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                >
+                  Stay on profile
                 </button>
               </div>
             </div>

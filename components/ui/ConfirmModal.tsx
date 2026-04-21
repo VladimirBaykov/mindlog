@@ -28,13 +28,11 @@ export default function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 p-3 backdrop-blur-md sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/72 p-4 backdrop-blur-md">
       <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#111111]/96 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-[17px] font-medium text-white">
-              {title}
-            </h2>
+            <h2 className="text-[17px] font-medium text-white">{title}</h2>
 
             {description && (
               <p className="mt-2 text-sm leading-relaxed text-neutral-400">
