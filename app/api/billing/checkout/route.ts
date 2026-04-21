@@ -8,8 +8,8 @@ import {
 } from "@/lib/billing";
 import {
   getStripe,
-  getAppUrl,
   assertStripePriceId,
+  resolveRequestOrigin,
 } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     const supabase = await createSupabaseServerClient();
     const adminSupabase = createSupabaseAdminClient();
     const stripe = getStripe();
+    const appUrl = resolveRequestOrigin(req);
 
     const {
       data: { user },
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
     if (subscription.isPro && subscription.stripeCustomerId) {
       const portal = await stripe.billingPortal.sessions.create({
         customer: subscription.stripeCustomerId,
-        return_url: `${getAppUrl()}/profile`,
+        return_url: `${appUrl}/profile`,
       });
 
       return NextResponse.json({ url: portal.url });
@@ -92,8 +93,8 @@ export async function POST(req: Request) {
         },
       ],
       allow_promotion_codes: true,
-      success_url: `${getAppUrl()}/profile?upgraded=1&checkout=1`,
-      cancel_url: `${getAppUrl()}/billing/cancel`,
+      success_url: `${appUrl}/profile?upgraded=1&checkout=1`,
+      cancel_url: `${appUrl}/billing/cancel`,
       metadata: {
         supabase_user_id: user.id,
       },

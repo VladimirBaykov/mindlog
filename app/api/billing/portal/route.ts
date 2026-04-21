@@ -4,22 +4,24 @@ import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   ensureSubscriptionRow,
   resolveUserSubscription,
+  setStripeCustomerId,
 } from "@/lib/billing";
-import { getStripe, getAppUrl } from "@/lib/stripe";
+import { getStripe, resolveRequestOrigin } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const supabase = await createSupabaseServerClient();
     const adminSupabase = createSupabaseAdminClient();
     const stripe = getStripe();
+    const appUrl = resolveRequestOrigin(req);
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!user || !user.email) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -33,23 +35,31 @@ export async function POST() {
       user.id
     );
 
-    if (!subscription.stripeCustomerId) {
-      return NextResponse.json(
-        {
-          error: "No Stripe customer found for this account yet",
+    let stripeCustomerId = subscription.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          supabase_user_id: user.id,
         },
-        { status: 400 }
+      });
+
+      stripeCustomerId = customer.id;
+
+      await setStripeCustomerId(
+        adminSupabase,
+        user.id,
+        customer.id
       );
     }
 
     const portal = await stripe.billingPortal.sessions.create({
-      customer: subscription.stripeCustomerId,
-      return_url: `${getAppUrl()}/profile`,
+      customer: stripeCustomerId,
+      return_url: `${appUrl}/profile`,
     });
 
-    return NextResponse.json({
-      url: portal.url,
-    });
+    return NextResponse.json({ url: portal.url });
   } catch (e: any) {
     console.error("BILLING PORTAL ERROR:", e);
 

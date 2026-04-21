@@ -15,7 +15,23 @@ export function getStripe() {
 }
 
 export function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const raw =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    "http://localhost:3000";
+
+  return raw.replace(/\/+$/, "");
+}
+
+export function resolveRequestOrigin(req: Request) {
+  const fromEnv = getAppUrl();
+
+  try {
+    const url = new URL(req.url);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return fromEnv;
+  }
 }
 
 export function assertStripePriceId(
@@ -33,9 +49,7 @@ export function assertStripePriceId(
   }
 
   if (!value.startsWith("price_")) {
-    throw new Error(
-      `${envName} must start with price_...`
-    );
+    throw new Error(`${envName} must start with price_...`);
   }
 
   return value;

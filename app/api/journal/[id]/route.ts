@@ -14,6 +14,25 @@ async function getAuthedUserId() {
   };
 }
 
+async function ensureOwnedJournal(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  id: string,
+  userId: string
+) {
+  const { data, error } = await supabase
+    .from("journals")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 // ================= GET =================
 export async function GET(
   req: Request,
@@ -72,7 +91,16 @@ export async function PATCH(
       );
     }
 
-    const patch = await req.json();
+    const owned = await ensureOwnedJournal(supabase, id, userId);
+
+    if (!owned) {
+      return NextResponse.json(
+        { error: "Journal not found" },
+        { status: 404 }
+      );
+    }
+
+    const patch = await req.json().catch(() => ({}));
 
     const payload = patch.restore
       ? {
@@ -88,17 +116,17 @@ export async function PATCH(
     delete payload.user_id;
     delete payload.created_at;
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("journals")
       .update(payload)
       .eq("id", id)
-      .eq("user_id", userId)
-      .select("id")
-      .single();
+      .eq("user_id", userId);
 
-    if (error || !data) {
+    if (error) {
+      console.error("PATCH JOURNAL UPDATE ERROR:", error);
+
       return NextResponse.json(
-        { error: "Failed to update journal" },
+        { error: error.message || "Failed to update journal" },
         { status: 500 }
       );
     }
@@ -130,20 +158,31 @@ export async function DELETE(
       );
     }
 
-    const { data, error } = await supabase
+    const owned = await ensureOwnedJournal(supabase, id, userId);
+
+    if (!owned) {
+      return NextResponse.json(
+        { error: "Journal not found" },
+        { status: 404 }
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
       .from("journals")
       .update({
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        deleted_at: now,
+        updated_at: now,
       })
       .eq("id", id)
-      .eq("user_id", userId)
-      .select("id")
-      .single();
+      .eq("user_id", userId);
 
-    if (error || !data) {
+    if (error) {
+      console.error("DELETE JOURNAL UPDATE ERROR:", error);
+
       return NextResponse.json(
-        { error: "Failed to delete journal" },
+        { error: error.message || "Failed to delete journal" },
         { status: 500 }
       );
     }
