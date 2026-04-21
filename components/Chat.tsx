@@ -51,7 +51,7 @@ type UserPreferences = {
   notifications: NotificationOption;
 };
 
-type CloseIntentSource = "header_close" | "save_nudge";
+type CloseIntentSource = "header_close";
 
 export default function Chat() {
   const router = useRouter();
@@ -70,8 +70,6 @@ export default function Chat() {
   const [limitError, setLimitError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [starterApplied, setStarterApplied] = useState(false);
-  const [saveNudgeDismissed, setSaveNudgeDismissed] = useState(false);
-  const [savePromptTracked, setSavePromptTracked] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({
     goal: null,
     moodPreference: null,
@@ -107,7 +105,7 @@ export default function Chat() {
     if (!el) return;
 
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 88)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 84)}px`;
   }, [input]);
 
   useEffect(() => {
@@ -194,6 +192,7 @@ export default function Chat() {
       const href = customEvent.detail?.href;
 
       if (!href) return;
+
       if (!hasDraftConversation) {
         router.push(href);
         return;
@@ -264,45 +263,6 @@ export default function Chat() {
     return "Your reflection space";
   }, [preferences.moodPreference]);
 
-  const assistantMessageCount = useMemo(
-    () => messages.filter((msg) => msg.role === "assistant").length,
-    [messages]
-  );
-
-  const shouldShowSaveNudge =
-    messages.length >= 4 &&
-    assistantMessageCount >= 1 &&
-    !loading &&
-    !isSaved &&
-    !saveNudgeDismissed &&
-    !limitError;
-
-  useEffect(() => {
-    if (!shouldShowSaveNudge || savePromptTracked) {
-      return;
-    }
-
-    setSavePromptTracked(true);
-
-    trackClientEvent({
-      eventName: "save_prompt_shown",
-      page: "/chat",
-      metadata: {
-        messageCount: messages.length,
-        assistantMessageCount,
-        goal: preferences.goal,
-        plan: usage?.plan || "free",
-      },
-    });
-  }, [
-    shouldShowSaveNudge,
-    savePromptTracked,
-    messages.length,
-    assistantMessageCount,
-    preferences.goal,
-    usage?.plan,
-  ]);
-
   async function loadUsage() {
     try {
       setUsageLoading(true);
@@ -341,7 +301,6 @@ export default function Chat() {
       metadata: {
         source,
         messageCount: messages.length,
-        assistantMessageCount,
         plan: usage?.plan || "free",
         goal: preferences.goal,
       },
@@ -358,8 +317,6 @@ export default function Chat() {
     setIsSaved(false);
     setLimitError(null);
     setChatError(null);
-    setSaveNudgeDismissed(false);
-    setSavePromptTracked(false);
     setPendingLeaveHref(null);
   }
 
@@ -383,15 +340,7 @@ export default function Chat() {
     });
 
     return () => resetHeader();
-  }, [
-    messages,
-    isSaved,
-    setHeader,
-    resetHeader,
-    assistantMessageCount,
-    usage?.plan,
-    preferences.goal,
-  ]);
+  }, [messages, isSaved, setHeader, resetHeader, usage?.plan, preferences.goal]);
 
   function applySuggestedPrompt(prompt: string) {
     setInput(prompt);
@@ -433,17 +382,6 @@ export default function Chat() {
           );
 
           await loadUsage();
-
-          await trackClientEvent({
-            eventName: "chat_limit_hit",
-            page: "/chat",
-            metadata: {
-              type: "save_limit",
-              plan: usage?.plan || "free",
-              limit: data.limit,
-            },
-          });
-
           return;
         }
       }
@@ -624,36 +562,34 @@ export default function Chat() {
   const hasScrolled = scrollTop > 8;
 
   const composerBottomClass = isChatNavExpanded
-    ? "bottom-[calc(env(safe-area-inset-bottom)+78px)]"
-    : "bottom-[calc(env(safe-area-inset-bottom)+34px)]";
+    ? "bottom-[calc(env(safe-area-inset-bottom)+76px)]"
+    : "bottom-[calc(env(safe-area-inset-bottom)+30px)]";
 
   const footerFadeBottomClass = isChatNavExpanded
-    ? "bottom-[150px]"
-    : "bottom-[108px]";
+    ? "bottom-[146px]"
+    : "bottom-[100px]";
 
   const scrollerBottomPaddingClass = isChatNavExpanded
-    ? "pb-[206px]"
-    : "pb-[156px]";
+    ? "pb-[194px]"
+    : "pb-[148px]";
 
   const canSend = !!input.trim() && !loading;
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-64px)] flex-col overflow-hidden bg-black text-white">
-      <div className="pointer-events-none fixed inset-x-0 top-[64px] z-10 h-8 bg-gradient-to-b from-black/30 to-transparent" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[24vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.03),transparent_60%)]" />
+    <div className="relative flex h-[calc(100dvh-64px)] flex-col overflow-hidden overscroll-none bg-black text-white">
+      <div className="pointer-events-none fixed inset-x-0 top-[64px] z-10 h-7 bg-gradient-to-b from-black/22 to-transparent" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[22vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.028),transparent_60%)]" />
 
       <div
-        className={`pointer-events-none fixed inset-x-0 top-[64px] z-10 h-10 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          hasScrolled
-            ? "from-black/38 to-transparent"
-            : "from-black/20 to-transparent"
+        className={`pointer-events-none fixed inset-x-0 top-[64px] z-10 h-8 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          hasScrolled ? "from-black/24 to-transparent" : "from-black/10 to-transparent"
         }`}
       />
 
       <div
         ref={scrollContainerRef}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-        className={`flex-1 overflow-y-auto overscroll-y-contain px-4 pt-5 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
+        className={`flex-1 overflow-y-auto overscroll-none px-4 pt-5 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${scrollerBottomPaddingClass}`}
       >
         <div className="mx-auto max-w-xl">
           {showEmptyState && (
@@ -759,59 +695,14 @@ export default function Chat() {
             </motion.div>
           )}
 
-          {!showEmptyState && (
-            <div className="mb-4 space-y-3">
-              {shouldShowSaveNudge && (
-                <div className="rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-white">
-                        This reflection is ready to save
-                      </div>
-                      <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                        You already have enough context here to turn this
-                        conversation into a journal entry.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => setSaveNudgeDismissed(true)}
-                      className="text-sm text-neutral-400 transition hover:text-white"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-
-                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                    <button
-                      onClick={() => {
-                        openCloseFlow("save_nudge");
-                      }}
-                      className="rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                    >
-                      Close & save now
-                    </button>
-
-                    <button
-                      onClick={() => setSaveNudgeDismissed(true)}
-                      className="rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
-                    >
-                      Keep reflecting
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {chatError && (
-                <div className="rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
-                  <div className="text-sm font-medium text-white">
-                    AI conversation limit
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                    {chatError}
-                  </p>
-                </div>
-              )}
+          {!showEmptyState && chatError && (
+            <div className="mb-4 rounded-[24px] border border-red-500/20 bg-red-500/10 px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                AI conversation limit
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                {chatError}
+              </p>
             </div>
           )}
 
@@ -873,7 +764,7 @@ export default function Chat() {
       </div>
 
       <div
-        className={`pointer-events-none fixed inset-x-0 z-20 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/62 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
+        className={`pointer-events-none fixed inset-x-0 z-20 h-12 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
       />
 
       <div
@@ -884,14 +775,28 @@ export default function Chat() {
             e.preventDefault();
             sendMessage();
           }}
-          className={`mx-auto max-w-xl rounded-[22px] border px-3 py-2 backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`mx-auto max-w-xl rounded-[26px] border px-3 py-2.5 transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
             isFocused
-              ? "border-white/14 bg-[#0b0b0b]/96 shadow-[0_18px_40px_rgba(0,0,0,0.36)]"
-              : "border-white/10 bg-[#0b0b0b]/92 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
-          }`}
+              ? "border-white/16 bg-[linear-gradient(180deg,rgba(24,24,24,0.98),rgba(10,10,10,0.96))] shadow-[0_20px_50px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.06)]"
+              : "border-white/10 bg-[linear-gradient(180deg,rgba(20,20,20,0.95),rgba(10,10,10,0.93))] shadow-[0_18px_42px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]"
+          } backdrop-blur-2xl`}
         >
+          <div className="mb-2 flex items-center justify-between px-1">
+            <span className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+              Reflection
+            </span>
+
+            {usage?.ai?.maxCharactersPerMessage ? (
+              <span className="text-[11px] text-neutral-500">
+                {Math.max(usage.ai.maxCharactersPerMessage - input.length, 0)} left
+              </span>
+            ) : (
+              <span className="text-[11px] text-neutral-500">Present moment</span>
+            )}
+          </div>
+
           <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 rounded-[18px] border border-white/[0.05] bg-black/20 px-3">
               <textarea
                 ref={textareaRef}
                 rows={1}
@@ -909,7 +814,7 @@ export default function Chat() {
                   }
                 }}
                 placeholder="Message"
-                className="max-h-[88px] w-full resize-none overflow-y-auto bg-transparent px-1 py-1.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500"
+                className="max-h-[84px] w-full resize-none overflow-y-auto bg-transparent px-0 py-2.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500"
               />
             </div>
 
@@ -917,10 +822,10 @@ export default function Chat() {
               type="submit"
               disabled={!canSend}
               aria-label="Send message"
-              className={`mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              className={`mb-[1px] flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 canSend
-                  ? "bg-white text-black"
-                  : "bg-white/[0.07] text-neutral-500"
+                  ? "border-white bg-white text-black shadow-[0_8px_20px_rgba(255,255,255,0.14)]"
+                  : "border-white/8 bg-white/[0.05] text-neutral-500"
               }`}
             >
               <svg
@@ -948,9 +853,7 @@ export default function Chat() {
             ? "You’ve reached your free plan save limit. Upgrade to Pro to save this conversation."
             : "It will be saved to your journal."
         }
-        confirmLabel={
-          usage?.canSave === false ? "Upgrade to Pro" : "Close & save"
-        }
+        confirmLabel={usage?.canSave === false ? "Upgrade to Pro" : "Close & save"}
         cancelLabel="Stay here"
         danger={false}
         onCancel={() => {
@@ -983,6 +886,7 @@ export default function Chat() {
           const nextHref = pendingLeaveHref;
           setShowLeaveConfirm(false);
           resetChat();
+
           if (nextHref) {
             router.push(nextHref);
           }

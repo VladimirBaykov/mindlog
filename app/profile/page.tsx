@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
 import { supabase } from "@/lib/supabase-browser";
@@ -24,16 +24,8 @@ type GoalOption =
   | "understand_patterns"
   | null;
 
-type MoodOption =
-  | "gentle"
-  | "balanced"
-  | "direct"
-  | null;
-
-type NotificationOption =
-  | "yes"
-  | "not_now"
-  | null;
+type MoodOption = "gentle" | "balanced" | "direct" | null;
+type NotificationOption = "yes" | "not_now" | null;
 
 type PreferencesState = {
   onboardingCompleted: boolean;
@@ -113,6 +105,7 @@ const notificationOptions: {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setHeader, resetHeader } = useHeader();
 
   const [userInfo, setUserInfo] = useState<UserInfo>({
@@ -142,6 +135,8 @@ export default function ProfilePage() {
     useState(false);
   const [restartingOnboarding, setRestartingOnboarding] =
     useState(false);
+
+  const upgraded = searchParams.get("upgraded") === "1";
 
   async function loadUser(signal?: AbortSignal) {
     const {
@@ -343,9 +338,10 @@ export default function ProfilePage() {
         currentStatus: subscription?.status ?? null,
         used: usage?.used ?? null,
         remaining: usage?.remaining ?? null,
+        upgraded,
       },
     });
-  }, [viewTracked, loadingAccount, subscription, usage]);
+  }, [viewTracked, loadingAccount, subscription, usage, upgraded]);
 
   async function savePreferences() {
     if (savingPreferences) return;
@@ -544,6 +540,50 @@ export default function ProfilePage() {
     <AuthGate>
       <div className="min-h-screen bg-black text-white">
         <div className="mx-auto max-w-xl space-y-5 px-4 pt-6 pb-8">
+          {upgraded && isPro && (
+            <div className="rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="inline-flex rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200">
+                    Pro unlocked
+                  </div>
+
+                  <div className="mt-4 text-lg font-medium text-white">
+                    Welcome to MindLog Pro
+                  </div>
+
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-200">
+                    Your subscription is active. Weekly summaries, premium insights,
+                    deeper reflection depth, and export are now available.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => router.replace("/profile")}
+                  className="text-sm text-neutral-300 transition hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={() => router.push("/chat")}
+                  className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                >
+                  Start a Pro reflection
+                </button>
+
+                <button
+                  onClick={() => router.push("/stats")}
+                  className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                >
+                  Open reflection stats
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-5">
             <div className="text-xs text-neutral-500">
               Signed in as
