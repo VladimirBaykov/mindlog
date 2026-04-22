@@ -42,16 +42,46 @@ type GoalOption =
   | "understand_patterns"
   | null;
 
-type MoodOption = "gentle" | "balanced" | "direct" | null;
+type ConversationStyle =
+  | "friend"
+  | "reflective_guide"
+  | "clear_mirror"
+  | null;
+
 type NotificationOption = "yes" | "not_now" | null;
 
 type UserPreferences = {
   goal: GoalOption;
-  moodPreference: MoodOption;
+  conversationStyle: ConversationStyle;
   notifications: NotificationOption;
 };
 
 type CloseIntentSource = "header_close";
+
+const conversationStyleOptions: {
+  value: Exclude<ConversationStyle, null>;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "friend",
+    title: "Friend",
+    description:
+      "Warm, natural, and easy to talk to. For everyday conversations, support, and lighter reflection.",
+  },
+  {
+    value: "reflective_guide",
+    title: "Reflective Guide",
+    description:
+      "Supportive, thoughtful, and a little deeper. For emotional clarity, self-understanding, and meaningful reflection.",
+  },
+  {
+    value: "clear_mirror",
+    title: "Clear Mirror",
+    description:
+      "More direct, focused, and pattern-aware. For clarity, decisions, and breaking loops.",
+  },
+];
 
 export default function Chat() {
   const router = useRouter();
@@ -64,6 +94,8 @@ export default function Chat() {
   const [isSaved, setIsSaved] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showStyleModal, setShowStyleModal] = useState(false);
+  const [savingStyle, setSavingStyle] = useState(false);
   const [pendingLeaveHref, setPendingLeaveHref] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
@@ -72,7 +104,7 @@ export default function Chat() {
   const [starterApplied, setStarterApplied] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({
     goal: null,
-    moodPreference: null,
+    conversationStyle: "friend",
     notifications: null,
   });
   const [scrollTop, setScrollTop] = useState(0);
@@ -129,12 +161,16 @@ export default function Chat() {
         } = await supabase.auth.getUser();
 
         setPreferences({
-          goal: (user?.user_metadata?.onboarding_goal as GoalOption) ?? null,
-          moodPreference:
-            (user?.user_metadata?.conversation_style as MoodOption) ??
+          goal:
+            (user?.user_metadata?.onboarding_goal as GoalOption) ??
             null,
+          conversationStyle:
+            (user?.user_metadata
+              ?.conversation_style as ConversationStyle) ??
+            "friend",
           notifications:
-            (user?.user_metadata?.onboarding_notifications as NotificationOption) ??
+            (user?.user_metadata
+              ?.onboarding_notifications as NotificationOption) ??
             null,
         });
       } catch (error) {
@@ -247,21 +283,29 @@ export default function Chat() {
     ];
   }, [preferences.goal]);
 
+  const currentStyleTitle = useMemo(() => {
+    if (preferences.conversationStyle === "reflective_guide") {
+      return "Reflective Guide";
+    }
+
+    if (preferences.conversationStyle === "clear_mirror") {
+      return "Clear Mirror";
+    }
+
+    return "Friend";
+  }, [preferences.conversationStyle]);
+
   const guidanceLabel = useMemo(() => {
-    if (preferences.moodPreference === "gentle") {
-      return "Gentle reflection tone active";
+    if (preferences.conversationStyle === "reflective_guide") {
+      return "Reflective Guide active";
     }
 
-    if (preferences.moodPreference === "balanced") {
-      return "Balanced reflection tone active";
+    if (preferences.conversationStyle === "clear_mirror") {
+      return "Clear Mirror active";
     }
 
-    if (preferences.moodPreference === "direct") {
-      return "Direct reflection tone active";
-    }
-
-    return "Your reflection space";
-  }, [preferences.moodPreference]);
+    return "Friend active";
+  }, [preferences.conversationStyle]);
 
   async function loadUsage() {
     try {
@@ -303,6 +347,7 @@ export default function Chat() {
         messageCount: messages.length,
         plan: usage?.plan || "free",
         goal: preferences.goal,
+        conversationStyle: preferences.conversationStyle,
       },
     });
 
@@ -325,6 +370,10 @@ export default function Chat() {
       title: "New conversation",
       menuItems: [
         {
+          label: `Style: ${currentStyleTitle}`,
+          onClick: () => setShowStyleModal(true),
+        },
+        {
           label: "New conversation",
           danger: true,
           onClick: resetChat,
@@ -340,7 +389,15 @@ export default function Chat() {
     });
 
     return () => resetHeader();
-  }, [messages, isSaved, setHeader, resetHeader, usage?.plan, preferences.goal]);
+  }, [
+    messages,
+    isSaved,
+    setHeader,
+    resetHeader,
+    usage?.plan,
+    preferences.goal,
+    currentStyleTitle,
+  ]);
 
   function applySuggestedPrompt(prompt: string) {
     setInput(prompt);
@@ -354,9 +411,53 @@ export default function Chat() {
       metadata: {
         prompt,
         goal: preferences.goal,
-        moodPreference: preferences.moodPreference,
+        conversationStyle: preferences.conversationStyle,
       },
     });
+  }
+
+  async function handleStyleChange(
+    nextStyle: Exclude<ConversationStyle, null>
+  ) {
+    if (savingStyle || preferences.conversationStyle === nextStyle) {
+      setShowStyleModal(false);
+      return;
+    }
+
+    try {
+      setSavingStyle(true);
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          conversation_style: nextStyle,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setPreferences((prev) => ({
+        ...prev,
+        conversationStyle: nextStyle,
+      }));
+
+      await trackClientEvent({
+        eventName: "conversation_style_updated",
+        page: "/chat",
+        metadata: {
+          source: "chat_menu",
+          conversationStyle: nextStyle,
+        },
+      });
+
+      setShowStyleModal(false);
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Failed to update conversation style");
+    } finally {
+      setSavingStyle(false);
+    }
   }
 
   async function closeConversation(nextHref?: string) {
@@ -404,6 +505,7 @@ export default function Chat() {
           messageCount: messages.length,
           goal: preferences.goal,
           plan: usage?.plan || "free",
+          conversationStyle: preferences.conversationStyle,
         },
       });
 
@@ -478,7 +580,7 @@ export default function Chat() {
         metadata: {
           source: starter ? "onboarding_starter" : "manual",
           goal: preferences.goal,
-          moodPreference: preferences.moodPreference,
+          conversationStyle: preferences.conversationStyle,
           notifications: preferences.notifications,
           plan: usage?.plan || "free",
         },
@@ -652,6 +754,22 @@ export default function Chat() {
                         : "You’ve reached your free plan limit. Upgrade to Pro to keep saving new conversations."}
                     </p>
                   )}
+                </div>
+
+                <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                    Conversation style
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-white">
+                    {currentStyleTitle}
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                    {preferences.conversationStyle === "friend"
+                      ? "Warm, natural, and easy to talk to."
+                      : preferences.conversationStyle === "reflective_guide"
+                      ? "Supportive, thoughtful, and a little deeper."
+                      : "More direct, focused, and pattern-aware."}
+                  </p>
                 </div>
 
                 <div className="mt-4">
@@ -885,6 +1003,97 @@ export default function Chat() {
           closeConversation(nextHref);
         }}
       />
+
+      <AnimatePresence>
+        {showStyleModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/72 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.985 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#111111]/96 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-[17px] font-medium text-white">
+                    Conversation Style
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                    Choose how MindLog talks with you. You can change it anytime.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setShowStyleModal(false)}
+                  aria-label="Close"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-neutral-400 transition hover:bg-white/[0.07] hover:text-white"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M6 6l12 12" />
+                    <path d="M18 6 6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-2">
+                {conversationStyleOptions.map((option) => {
+                  const selected =
+                    preferences.conversationStyle === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => handleStyleChange(option.value)}
+                      disabled={savingStyle}
+                      className={`w-full rounded-[20px] border px-4 py-4 text-left transition ${
+                        selected
+                          ? "border-white/20 bg-white/[0.08]"
+                          : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                      } ${savingStyle ? "opacity-70" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-white">
+                          {option.title}
+                        </div>
+
+                        {selected && (
+                          <span className="rounded-full border border-white/10 bg-white/[0.08] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-neutral-300">
+                            Active
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                        {option.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setShowStyleModal(false)}
+                className="mt-4 w-full rounded-[18px] px-4 py-3 text-sm text-neutral-400 transition hover:text-white"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

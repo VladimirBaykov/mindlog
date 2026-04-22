@@ -244,16 +244,16 @@ export async function POST(req: NextRequest) {
 
     try {
       const goal =
-        (user?.user_metadata?.onboarding_goal as GoalOption) ??
+        (user.user_metadata?.onboarding_goal as GoalOption) ??
         null;
 
       const conversationStyle =
-        (user?.user_metadata
+        (user.user_metadata
           ?.conversation_style as ConversationStyle) ??
         "friend";
 
       const notifications =
-        (user?.user_metadata
+        (user.user_metadata
           ?.onboarding_notifications as NotificationOption) ??
         null;
 
@@ -281,9 +281,10 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join("\n\n");
 
-    const response = await openai.responses.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      input: [
+      temperature: 0.8,
+      messages: [
         {
           role: "system",
           content: systemPrompt,
@@ -295,11 +296,9 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    let reply = "I’m here with you.";
-
-    if (response.output_text) {
-      reply = response.output_text;
-    }
+    const reply =
+      completion.choices[0]?.message?.content?.trim() ||
+      "I’m here with you.";
 
     return NextResponse.json({
       reply,
