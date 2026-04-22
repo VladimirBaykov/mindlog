@@ -24,10 +24,10 @@ type GoalOption =
   | "understand_patterns"
   | null;
 
-type MoodOption =
-  | "gentle"
-  | "balanced"
-  | "direct"
+type ConversationStyle =
+  | "friend"
+  | "reflective_guide"
+  | "clear_mirror"
   | null;
 
 type NotificationOption =
@@ -38,7 +38,7 @@ type NotificationOption =
 type PreferencesState = {
   onboardingCompleted: boolean;
   goal: GoalOption;
-  moodPreference: MoodOption;
+  conversationStyle: ConversationStyle;
   notifications: NotificationOption;
 };
 
@@ -67,28 +67,28 @@ const goalOptions: {
   },
 ];
 
-const moodOptions: {
-  value: Exclude<MoodOption, null>;
+const conversationStyleOptions: {
+  value: Exclude<ConversationStyle, null>;
   title: string;
   description: string;
 }[] = [
   {
-    value: "gentle",
-    title: "Gentle",
+    value: "friend",
+    title: "Friend",
     description:
-      "Softer reflective prompts and calmer conversational tone.",
+      "Warm, natural, and easy to talk to. For everyday conversations, support, and lighter reflection.",
   },
   {
-    value: "balanced",
-    title: "Balanced",
+    value: "reflective_guide",
+    title: "Reflective Guide",
     description:
-      "A neutral middle ground between support and clarity.",
+      "Supportive, thoughtful, and a little deeper. For emotional clarity, self-understanding, and meaningful reflection.",
   },
   {
-    value: "direct",
-    title: "Direct",
+    value: "clear_mirror",
+    title: "Clear Mirror",
     description:
-      "A slightly clearer, more focused reflective style.",
+      "More direct, focused, and pattern-aware. For clarity, decisions, and breaking loops.",
   },
 ];
 
@@ -135,7 +135,7 @@ export default function ProfilePage() {
     useState<PreferencesState>({
       onboardingCompleted: false,
       goal: null,
-      moodPreference: null,
+      conversationStyle: "friend",
       notifications: null,
     });
 
@@ -174,9 +174,9 @@ export default function ProfilePage() {
       goal:
         (user?.user_metadata
           ?.onboarding_goal as GoalOption) ?? null,
-      moodPreference:
+      conversationStyle:
         (user?.user_metadata
-          ?.onboarding_mood_preference as MoodOption) ?? null,
+          ?.conversation_style as ConversationStyle) ?? "friend",
       notifications:
         (user?.user_metadata
           ?.onboarding_notifications as NotificationOption) ??
@@ -351,9 +351,18 @@ export default function ProfilePage() {
         remaining: usage?.remaining ?? null,
         upgraded,
         checkout,
+        conversationStyle: preferences.conversationStyle,
       },
     });
-  }, [viewTracked, loadingAccount, subscription, usage, upgraded, checkout]);
+  }, [
+    viewTracked,
+    loadingAccount,
+    subscription,
+    usage,
+    upgraded,
+    checkout,
+    preferences.conversationStyle,
+  ]);
 
   async function savePreferences() {
     if (savingPreferences) return;
@@ -366,8 +375,8 @@ export default function ProfilePage() {
           onboarding_completed:
             preferences.onboardingCompleted,
           onboarding_goal: preferences.goal,
-          onboarding_mood_preference:
-            preferences.moodPreference,
+          conversation_style:
+            preferences.conversationStyle ?? "friend",
           onboarding_notifications:
             preferences.notifications,
         },
@@ -376,6 +385,16 @@ export default function ProfilePage() {
       if (error) {
         throw error;
       }
+
+      await trackClientEvent({
+        eventName: "conversation_style_updated",
+        page: "/profile",
+        metadata: {
+          goal: preferences.goal,
+          conversationStyle: preferences.conversationStyle,
+          notifications: preferences.notifications,
+        },
+      });
 
       await loadUser();
     } catch (error: any) {
@@ -432,6 +451,30 @@ export default function ProfilePage() {
         return "Your onboarding starter will appear here once you choose a direction.";
     }
   }, [preferences.goal]);
+
+  const currentStyleTitle = useMemo(() => {
+    if (preferences.conversationStyle === "reflective_guide") {
+      return "Reflective Guide";
+    }
+
+    if (preferences.conversationStyle === "clear_mirror") {
+      return "Clear Mirror";
+    }
+
+    return "Friend";
+  }, [preferences.conversationStyle]);
+
+  const currentStyleDescription = useMemo(() => {
+    if (preferences.conversationStyle === "reflective_guide") {
+      return "A supportive, thoughtful style that goes a little deeper without feeling heavy.";
+    }
+
+    if (preferences.conversationStyle === "clear_mirror") {
+      return "A more direct, focused style for clarity, pattern awareness, and getting to the point.";
+    }
+
+    return "A warm, natural style that feels easy to talk to — like a steady, supportive friend.";
+  }, [preferences.conversationStyle]);
 
   const billingSummary = useMemo(() => {
     const status = subscription?.status || "inactive";
@@ -937,6 +980,18 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            <div className="mt-5 rounded-[20px] border border-white/10 bg-white/[0.02] px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Current conversation style
+              </div>
+              <div className="mt-2 text-sm font-medium text-white">
+                {currentStyleTitle}
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                {currentStyleDescription}
+              </p>
+            </div>
+
             <div className="mt-5 space-y-5">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
@@ -977,13 +1032,13 @@ export default function ProfilePage() {
 
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                  Preferred tone
+                  Conversation style
                 </div>
 
                 <div className="mt-3 space-y-2">
-                  {moodOptions.map((option) => {
+                  {conversationStyleOptions.map((option) => {
                     const selected =
-                      preferences.moodPreference ===
+                      preferences.conversationStyle ===
                       option.value;
 
                     return (
@@ -992,7 +1047,7 @@ export default function ProfilePage() {
                         onClick={() =>
                           setPreferences((prev) => ({
                             ...prev,
-                            moodPreference: option.value,
+                            conversationStyle: option.value,
                           }))
                         }
                         className={`w-full rounded-[18px] border px-4 py-4 text-left transition ${

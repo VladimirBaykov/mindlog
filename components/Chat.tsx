@@ -131,7 +131,7 @@ export default function Chat() {
         setPreferences({
           goal: (user?.user_metadata?.onboarding_goal as GoalOption) ?? null,
           moodPreference:
-            (user?.user_metadata?.onboarding_mood_preference as MoodOption) ??
+            (user?.user_metadata?.conversation_style as MoodOption) ??
             null,
           notifications:
             (user?.user_metadata?.onboarding_notifications as NotificationOption) ??
