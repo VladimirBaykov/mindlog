@@ -15,27 +15,27 @@ export const moodConfig: Record<
 > = {
   calm: {
     label: "Calm",
-    color: "bg-emerald-500",
-    dot: "🟢",
+    color: "bg-emerald-300/75",
+    dot: "●",
   },
   reflective: {
     label: "Reflective",
-    color: "bg-blue-500",
-    dot: "🔵",
+    color: "bg-sky-300/70",
+    dot: "●",
   },
   heavy: {
     label: "Heavy",
-    color: "bg-purple-500",
-    dot: "🟣",
+    color: "bg-violet-300/70",
+    dot: "●",
   },
   anxious: {
     label: "Anxious",
-    color: "bg-amber-500",
-    dot: "🟡",
+    color: "bg-amber-300/75",
+    dot: "●",
   },
   hopeful: {
     label: "Hopeful",
-    color: "bg-sky-400",
-    dot: "🌤️",
+    color: "bg-cyan-200/80",
+    dot: "●",
   },
 };

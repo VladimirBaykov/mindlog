@@ -22,14 +22,14 @@ function getMainClassName(pathname: string, showBottomNav: boolean) {
   }
 
   if (pathname.startsWith("/chat")) {
-    return "pt-[64px]";
+    return "pt-[58px]";
   }
 
   if (showBottomNav) {
-    return "pt-[64px] pb-[50px]";
+    return "pt-[58px] pb-[50px]";
   }
 
-  return "pt-[64px]";
+  return "pt-[58px]";
 }
 
 export default function RootLayout({

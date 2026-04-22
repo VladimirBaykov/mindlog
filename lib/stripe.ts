@@ -24,13 +24,23 @@ export function getAppUrl() {
 }
 
 export function resolveRequestOrigin(req: Request) {
-  const fromEnv = getAppUrl();
+  const forwardedProto =
+    req.headers.get("x-forwarded-proto") ||
+    req.headers.get("x-forwarded-protocol");
+
+  const forwardedHost =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host");
+
+  if (forwardedProto && forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`.replace(/\/+$/, "");
+  }
 
   try {
     const url = new URL(req.url);
-    return `${url.protocol}//${url.host}`;
+    return `${url.protocol}//${url.host}`.replace(/\/+$/, "");
   } catch {
-    return fromEnv;
+    return getAppUrl();
   }
 }
 

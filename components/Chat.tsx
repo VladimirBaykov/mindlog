@@ -562,27 +562,27 @@ export default function Chat() {
   const hasScrolled = scrollTop > 8;
 
   const composerBottomClass = isChatNavExpanded
-    ? "bottom-[calc(env(safe-area-inset-bottom)+76px)]"
-    : "bottom-[calc(env(safe-area-inset-bottom)+30px)]";
+    ? "bottom-[calc(env(safe-area-inset-bottom)+86px)]"
+    : "bottom-[calc(env(safe-area-inset-bottom)+44px)]";
 
   const footerFadeBottomClass = isChatNavExpanded
-    ? "bottom-[146px]"
-    : "bottom-[100px]";
+    ? "bottom-[156px]"
+    : "bottom-[116px]";
 
   const scrollerBottomPaddingClass = isChatNavExpanded
-    ? "pb-[194px]"
-    : "pb-[148px]";
+    ? "pb-[206px]"
+    : "pb-[164px]";
 
   const canSend = !!input.trim() && !loading;
 
   return (
-    <div className="relative flex h-[calc(100dvh-64px)] flex-col overflow-hidden overscroll-none bg-black text-white">
-      <div className="pointer-events-none fixed inset-x-0 top-[64px] z-10 h-7 bg-gradient-to-b from-black/18 to-transparent" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[22vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.02),transparent_60%)]" />
+    <div className="relative flex h-[calc(100dvh-58px)] flex-col overflow-hidden overscroll-none bg-black text-white">
+      <div className="pointer-events-none fixed inset-x-0 top-[58px] z-10 h-6 bg-gradient-to-b from-black/12 to-transparent" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[22vh] bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.018),transparent_60%)]" />
 
       <div
-        className={`pointer-events-none fixed inset-x-0 top-[64px] z-10 h-8 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          hasScrolled ? "from-black/18 to-transparent" : "from-black/8 to-transparent"
+        className={`pointer-events-none fixed inset-x-0 top-[58px] z-10 h-7 bg-gradient-to-b transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          hasScrolled ? "from-black/14 to-transparent" : "from-black/6 to-transparent"
         }`}
       />
 
@@ -764,7 +764,7 @@ export default function Chat() {
       </div>
 
       <div
-        className={`pointer-events-none fixed inset-x-0 z-20 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/52 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
+        className={`pointer-events-none fixed inset-x-0 z-20 h-10 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/48 to-transparent transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${footerFadeBottomClass}`}
       />
 
       <div
@@ -775,15 +775,9 @@ export default function Chat() {
             e.preventDefault();
             sendMessage();
           }}
-          className="mx-auto flex max-w-xl items-end gap-2 rounded-[28px] border border-white/10 bg-[#151515]/92 px-2.5 py-2 shadow-[0_18px_44px_rgba(0,0,0,0.34)] backdrop-blur-2xl transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          className="mx-auto flex max-w-xl items-end gap-2 rounded-[26px] border border-white/10 bg-[#151515]/94 px-2.5 py-2 shadow-[0_18px_44px_rgba(0,0,0,0.34)] backdrop-blur-2xl"
         >
-          <div
-            className={`min-w-0 flex-1 rounded-[22px] border px-3 transition duration-300 ${
-              isFocused
-                ? "border-white/14 bg-white/[0.06]"
-                : "border-transparent bg-transparent"
-            }`}
-          >
+          <div className="flex min-w-0 flex-1 items-end rounded-[22px] bg-transparent px-1">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -801,8 +795,16 @@ export default function Chat() {
                 }
               }}
               placeholder="Message"
-              className="max-h-[88px] w-full resize-none overflow-y-auto bg-transparent px-0 py-2.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500"
+              className={`max-h-[88px] w-full resize-none overflow-y-auto bg-transparent px-2 py-2.5 text-[15px] leading-[1.4] text-white outline-none placeholder-neutral-500 transition ${
+                isFocused ? "opacity-100" : "opacity-95"
+              }`}
             />
+
+            {usage?.ai?.maxCharactersPerMessage && (
+              <div className="mb-2 hidden shrink-0 pr-1 text-[11px] text-neutral-500 sm:block">
+                {Math.max(usage.ai.maxCharactersPerMessage - input.length, 0)}
+              </div>
+            )}
           </div>
 
           <button

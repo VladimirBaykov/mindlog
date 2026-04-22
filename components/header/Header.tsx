@@ -24,27 +24,27 @@ export function Header() {
 
   const { scrollY } = useScroll();
 
-  const height = useTransform(scrollY, [0, 96], [64, 54]);
+  const height = useTransform(scrollY, [0, 96], [58, 52]);
   const backdrop = useTransform(
     scrollY,
     [0, 96],
-    ["blur(8px)", "blur(16px)"]
+    ["blur(8px)", "blur(14px)"]
   );
   const bgColor = useTransform(
     scrollY,
     [0, 96],
-    ["rgba(10,10,10,0.52)", "rgba(10,10,10,0.94)"]
+    ["rgba(10,10,10,0.42)", "rgba(10,10,10,0.88)"]
   );
   const borderOpacity = useTransform(
     scrollY,
     [0, 96],
-    [0.04, 0.1]
+    [0.03, 0.09]
   );
-  const scale = useTransform(scrollY, [0, 96], [1, 0.975]);
+  const scale = useTransform(scrollY, [0, 96], [1, 0.985]);
   const titleOpacity = useTransform(
     scrollY,
     [0, 48],
-    [0.86, 1]
+    [0.9, 1]
   );
 
   useEffect(() => {
@@ -79,9 +79,9 @@ export function Header() {
         backdropFilter: backdrop,
         backgroundColor: bgColor,
       }}
-      className="fixed top-0 left-0 right-0 z-50"
+      className="fixed left-0 right-0 top-0 z-50"
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] via-white/[0.012] to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.03] via-white/[0.008] to-transparent" />
 
       <motion.div
         style={{
@@ -100,12 +100,12 @@ export function Header() {
           className="flex flex-1 flex-col items-center px-3 text-center"
         >
           {title && (
-            <span className="truncate text-sm font-medium text-white">
+            <span className="truncate text-[13px] font-medium text-white">
               {title}
             </span>
           )}
           {subtitle && (
-            <span className="truncate text-[11px] capitalize text-neutral-400">
+            <span className="truncate text-[10.5px] capitalize text-neutral-400">
               {subtitle}
             </span>
           )}
@@ -118,7 +118,7 @@ export function Header() {
             <>
               <button
                 onClick={() => setOpen((v) => !v)}
-                className="flex h-7.5 w-7.5 items-center justify-center rounded-full text-neutral-300 transition-all duration-200 hover:bg-neutral-800/80 hover:text-white active:scale-95"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-300 transition-all duration-200 hover:bg-neutral-800/80 hover:text-white active:scale-95"
               >
                 ⋯
               </button>
