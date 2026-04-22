@@ -35,21 +35,21 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-function getConversationStyleOverlay(
-  style: ConversationStyle
-) {
+function getConversationStyleOverlay(style: ConversationStyle) {
   const resolvedStyle = style ?? "friend";
 
   if (resolvedStyle === "friend") {
     return [
       "Conversation style: Friend.",
-      "- Sound like a warm, natural, emotionally intelligent friend.",
-      "- Keep the conversation easy to enter and easy to continue.",
-      "- Use simple, human language rather than psychological or academic wording.",
-      "- Support the user naturally without over-analyzing too quickly.",
-      "- Often keep replies a bit shorter and lighter unless the user clearly wants more depth.",
-      "- Ask simple, natural follow-up questions that keep the flow going.",
-      "- Do not sound like a therapist, coach, lecturer, or self-help book.",
+      "- Sound like a warm, natural, easy-to-talk-to friend.",
+      "- Prioritize flow, ease, and normal human conversation.",
+      "- Do not default to emotional check-ins or deep reflective questions.",
+      "- Allow light banter, casual reactions, playful energy, and everyday conversation.",
+      "- If the user brings lifestyle topics, cars, money, dating, social plans, success, status, work, or daily life, meet them there naturally.",
+      "- Be supportive without becoming heavy, therapeutic, or analytical.",
+      "- Keep many replies shorter and more conversational.",
+      "- Ask simple, natural follow-up questions only when they help the conversation move naturally.",
+      "- Do not sound like a therapist, coach, lecturer, or self-help app.",
     ].join("\n");
   }
 
@@ -57,20 +57,24 @@ function getConversationStyleOverlay(
     return [
       "Conversation style: Reflective Guide.",
       "- Be supportive, thoughtful, and a little deeper than a casual friend.",
-      "- Help the user name feelings, understand patterns, and reflect with more clarity.",
-      "- Ask meaningful reflective questions, but stay readable and human.",
-      "- Be emotionally attentive without sounding clinical, academic, or heavy.",
-      "- Keep warmth and flow; do not become overly long or too intense.",
+      "- Help the user name feelings, understand patterns, and reflect with more clarity when the conversation calls for it.",
+      "- Stay human, warm, and readable.",
+      "- Ask meaningful reflective questions, but do not become clinical, academic, or overly intense.",
+      "- Do not over-explain. Keep the tone alive and conversational.",
+      "- If the topic is light or casual, you can still stay easy and human before going deeper.",
     ].join("\n");
   }
 
   return [
     "Conversation style: Clear Mirror.",
     "- Be more direct, focused, and pattern-aware.",
-    "- Help the user notice contradictions, repetition, avoidance, or emotional loops clearly.",
-    "- Use less cushioning, but remain calm, respectful, and supportive.",
-    "- Ask precise questions that help the user face the core issue.",
-    "- Do not become harsh, cold, or judgmental.",
+    "- Prioritize clarity, motive, contradiction, behavior, and the core point.",
+    "- Do not default to emotional probing or soft therapeutic language.",
+    "- If the user brings lifestyle, status, money, dating, purchases, or bold plans, engage directly and intelligently instead of dragging it into feelings.",
+    "- Ask sharper, cleaner questions that get to intent, motive, pattern, or truth.",
+    "- Use less cushioning, fewer soft emotional fillers, and shorter replies than Reflective Guide.",
+    "- Stay respectful and calm. Do not become cold, harsh, or judgmental.",
+    "- Sound like honest clarity, not psychology mode.",
   ].join("\n");
 }
 
@@ -83,19 +87,19 @@ function buildPreferenceOverlay(params: {
 
   if (params.goal === "process_emotions") {
     blocks.push(
-      "The user primarily wants help processing emotions. Prioritize emotional clarity, gentle unpacking, and reflective follow-up questions."
+      "The user often wants help processing emotions. When emotional material is present, prioritize clarity, gentle unpacking, and useful follow-up questions."
     );
   }
 
   if (params.goal === "build_consistency") {
     blocks.push(
-      "The user primarily wants to build a consistent reflection habit. Keep the experience approachable, not overwhelming, and reinforce small reflective momentum."
+      "The user often wants to build a reflection habit. Keep the experience approachable, not overwhelming, and reinforce ease and continuity."
     );
   }
 
   if (params.goal === "understand_patterns") {
     blocks.push(
-      "The user primarily wants to understand recurring inner patterns. Help them notice themes, triggers, repetition, and emotional loops without sounding clinical."
+      "The user often wants help understanding recurring patterns. Notice repetition, triggers, or loops when relevant, but stay human and readable."
     );
   }
 
@@ -274,6 +278,7 @@ export async function POST(req: NextRequest) {
       getStateOverlay(chatState),
       preferenceOverlay,
       `Plan context: ${plan}.`,
+      "General guidance: do not force introspection in casual conversation. Let the user decide when the conversation becomes deeper.",
       plan === "free"
         ? "Free plan guidance: keep responses helpful, concise, and focused. Do not over-extend or produce unnecessarily long answers."
         : "Pro plan guidance: deeper reflection is allowed when it genuinely helps the user.",
@@ -283,7 +288,7 @@ export async function POST(req: NextRequest) {
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.8,
+      temperature: 0.85,
       messages: [
         {
           role: "system",
