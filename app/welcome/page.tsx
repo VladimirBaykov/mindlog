@@ -13,10 +13,10 @@ type GoalOption =
   | "build_consistency"
   | "understand_patterns";
 
-type MoodOption =
-  | "gentle"
-  | "balanced"
-  | "direct";
+type ConversationStyle =
+  | "friend"
+  | "reflective_guide"
+  | "clear_mirror";
 
 type NotificationOption =
   | "yes"
@@ -47,28 +47,28 @@ const goalOptions: {
   },
 ];
 
-const moodOptions: {
-  value: MoodOption;
+const conversationStyleOptions: {
+  value: ConversationStyle;
   title: string;
   description: string;
 }[] = [
   {
-    value: "gentle",
-    title: "Gentle",
+    value: "friend",
+    title: "Friend",
     description:
-      "Softer reflective prompts and calmer conversational tone.",
+      "Warm, natural, and easy to talk to. For everyday conversations, support, and lighter reflection.",
   },
   {
-    value: "balanced",
-    title: "Balanced",
+    value: "reflective_guide",
+    title: "Reflective Guide",
     description:
-      "A neutral middle ground between support and clarity.",
+      "Supportive, thoughtful, and a little deeper. For emotional clarity, self-understanding, and meaningful reflection.",
   },
   {
-    value: "direct",
-    title: "Direct",
+    value: "clear_mirror",
+    title: "Clear Mirror",
     description:
-      "A slightly clearer, more focused reflective style.",
+      "More direct, focused, and pattern-aware. For clarity, decisions, and breaking loops.",
   },
 ];
 
@@ -99,8 +99,8 @@ export default function WelcomePage() {
   const [saving, setSaving] = useState(false);
 
   const [goal, setGoal] = useState<GoalOption | null>(null);
-  const [moodPreference, setMoodPreference] =
-    useState<MoodOption | null>(null);
+  const [conversationStyle, setConversationStyle] =
+    useState<ConversationStyle | null>("friend");
   const [notifications, setNotifications] =
     useState<NotificationOption | null>(null);
 
@@ -123,10 +123,12 @@ export default function WelcomePage() {
         (user?.user_metadata?.onboarding_goal as GoalOption) ??
           null
       );
-      setMoodPreference(
+
+      setConversationStyle(
         (user?.user_metadata
-          ?.onboarding_mood_preference as MoodOption) ?? null
+          ?.conversation_style as ConversationStyle) ?? "friend"
       );
+
       setNotifications(
         (user?.user_metadata
           ?.onboarding_notifications as NotificationOption) ??
@@ -157,7 +159,7 @@ export default function WelcomePage() {
   }, [goal]);
 
   async function handleComplete() {
-    if (!goal || !moodPreference || !notifications || saving) {
+    if (!goal || !conversationStyle || !notifications || saving) {
       return;
     }
 
@@ -168,7 +170,7 @@ export default function WelcomePage() {
         data: {
           onboarding_completed: true,
           onboarding_goal: goal,
-          onboarding_mood_preference: moodPreference,
+          conversation_style: conversationStyle,
           onboarding_notifications: notifications,
           onboarding_completed_at: new Date().toISOString(),
         },
@@ -183,7 +185,7 @@ export default function WelcomePage() {
         page: "/welcome",
         metadata: {
           goal,
-          moodPreference,
+          conversationStyle,
           notifications,
           skipped: false,
         },
@@ -210,7 +212,7 @@ export default function WelcomePage() {
         data: {
           onboarding_completed: true,
           onboarding_goal: goal,
-          onboarding_mood_preference: moodPreference,
+          conversation_style: conversationStyle || "friend",
           onboarding_notifications: notifications,
           onboarding_completed_at: new Date().toISOString(),
           onboarding_skipped: true,
@@ -226,7 +228,7 @@ export default function WelcomePage() {
         page: "/welcome",
         metadata: {
           goal,
-          moodPreference,
+          conversationStyle: conversationStyle || "friend",
           notifications,
           skipped: true,
         },
@@ -243,7 +245,7 @@ export default function WelcomePage() {
 
   const canContinue =
     (step === 0 && Boolean(goal)) ||
-    (step === 1 && Boolean(moodPreference)) ||
+    (step === 1 && Boolean(conversationStyle)) ||
     (step === 2 && Boolean(notifications));
 
   return (
@@ -274,9 +276,7 @@ export default function WelcomePage() {
               <div
                 key={index}
                 className={`h-1.5 flex-1 rounded-full transition ${
-                  index <= step
-                    ? "bg-white"
-                    : "bg-white/10"
+                  index <= step ? "bg-white" : "bg-white/10"
                 }`}
               />
             ))}
@@ -348,24 +348,24 @@ export default function WelcomePage() {
                       </div>
 
                       <h1 className="mt-4 text-3xl font-semibold text-white">
-                        What tone do you prefer?
+                        Choose your conversation style
                       </h1>
 
                       <p className="mt-3 text-sm leading-relaxed text-neutral-400">
-                        This helps shape the feeling of your first
-                        reflective session.
+                        This changes how MindLog talks with you. You can
+                        change it later.
                       </p>
 
                       <div className="mt-8 space-y-3">
-                        {moodOptions.map((option) => {
+                        {conversationStyleOptions.map((option) => {
                           const selected =
-                            moodPreference === option.value;
+                            conversationStyle === option.value;
 
                           return (
                             <button
                               key={option.value}
                               onClick={() =>
-                                setMoodPreference(option.value)
+                                setConversationStyle(option.value)
                               }
                               className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
                                 selected

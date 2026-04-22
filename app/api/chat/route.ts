@@ -20,10 +20,10 @@ type GoalOption =
   | "understand_patterns"
   | null;
 
-type MoodOption =
-  | "gentle"
-  | "balanced"
-  | "direct"
+type ConversationStyle =
+  | "friend"
+  | "reflective_guide"
+  | "clear_mirror"
   | null;
 
 type NotificationOption =
@@ -35,9 +35,48 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+function getConversationStyleOverlay(
+  style: ConversationStyle
+) {
+  const resolvedStyle = style ?? "friend";
+
+  if (resolvedStyle === "friend") {
+    return [
+      "Conversation style: Friend.",
+      "- Sound like a warm, natural, emotionally intelligent friend.",
+      "- Keep the conversation easy to enter and easy to continue.",
+      "- Use simple, human language rather than psychological or academic wording.",
+      "- Support the user naturally without over-analyzing too quickly.",
+      "- Often keep replies a bit shorter and lighter unless the user clearly wants more depth.",
+      "- Ask simple, natural follow-up questions that keep the flow going.",
+      "- Do not sound like a therapist, coach, lecturer, or self-help book.",
+    ].join("\n");
+  }
+
+  if (resolvedStyle === "reflective_guide") {
+    return [
+      "Conversation style: Reflective Guide.",
+      "- Be supportive, thoughtful, and a little deeper than a casual friend.",
+      "- Help the user name feelings, understand patterns, and reflect with more clarity.",
+      "- Ask meaningful reflective questions, but stay readable and human.",
+      "- Be emotionally attentive without sounding clinical, academic, or heavy.",
+      "- Keep warmth and flow; do not become overly long or too intense.",
+    ].join("\n");
+  }
+
+  return [
+    "Conversation style: Clear Mirror.",
+    "- Be more direct, focused, and pattern-aware.",
+    "- Help the user notice contradictions, repetition, avoidance, or emotional loops clearly.",
+    "- Use less cushioning, but remain calm, respectful, and supportive.",
+    "- Ask precise questions that help the user face the core issue.",
+    "- Do not become harsh, cold, or judgmental.",
+  ].join("\n");
+}
+
 function buildPreferenceOverlay(params: {
   goal: GoalOption;
-  moodPreference: MoodOption;
+  conversationStyle: ConversationStyle;
   notifications: NotificationOption;
 }) {
   const blocks: string[] = [];
@@ -60,24 +99,6 @@ function buildPreferenceOverlay(params: {
     );
   }
 
-  if (params.moodPreference === "gentle") {
-    blocks.push(
-      "Preferred tone: gentle. Be warm, calm, soft, and emotionally safe. Avoid sounding sharp, cold, or overly analytical."
-    );
-  }
-
-  if (params.moodPreference === "balanced") {
-    blocks.push(
-      "Preferred tone: balanced. Be warm and supportive, but also clear and grounded."
-    );
-  }
-
-  if (params.moodPreference === "direct") {
-    blocks.push(
-      "Preferred tone: direct. Stay thoughtful and kind, but be a little clearer, more focused, and more concise when useful."
-    );
-  }
-
   if (params.notifications === "yes") {
     blocks.push(
       "The user is likely open to building an ongoing reflection habit over time. Support continuity gently when relevant."
@@ -90,14 +111,13 @@ function buildPreferenceOverlay(params: {
     );
   }
 
-  if (!blocks.length) {
-    return "";
-  }
+  const styleOverlay = getConversationStyleOverlay(
+    params.conversationStyle
+  );
 
-  return [
-    "User reflection preferences:",
-    ...blocks.map((line) => `- ${line}`),
-  ].join("\n");
+  return [styleOverlay, ...blocks.map((line) => `- ${line}`)].join(
+    "\n"
+  );
 }
 
 function isValidRole(
@@ -227,9 +247,10 @@ export async function POST(req: NextRequest) {
         (user?.user_metadata?.onboarding_goal as GoalOption) ??
         null;
 
-      const moodPreference =
+      const conversationStyle =
         (user?.user_metadata
-          ?.onboarding_mood_preference as MoodOption) ?? null;
+          ?.conversation_style as ConversationStyle) ??
+        "friend";
 
       const notifications =
         (user?.user_metadata
@@ -238,7 +259,7 @@ export async function POST(req: NextRequest) {
 
       preferenceOverlay = buildPreferenceOverlay({
         goal,
-        moodPreference,
+        conversationStyle,
         notifications,
       });
     } catch (error) {
