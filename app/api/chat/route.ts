@@ -54,6 +54,18 @@ function resolveConversationStyle(
   return "friend";
 }
 
+function getMaxCompletionTokens(style: ResolvedConversationStyle) {
+  if (style === "friend") {
+    return 120;
+  }
+
+  if (style === "reflective_guide") {
+    return 160;
+  }
+
+  return 150;
+}
+
 function getCorePrompt() {
   return [
     "You are MindLog, a conversational AI inside a private journaling app.",
@@ -64,7 +76,11 @@ function getCorePrompt() {
     "Do not turn every topic into reflection. If the user is casual, stay casual.",
     "Do not end every reply with a question.",
     "Do not overuse phrases like 'это нормально', 'главное, чтобы тебе нравилось', 'всё зависит', or 'как ты к этому относишься'.",
-    "Keep replies concise unless the user clearly asks for depth.",
+    "Default to short chat replies, not long essays.",
+    "Use one compact paragraph by default.",
+    "Do not use bullet lists unless the user explicitly asks for a list or comparison.",
+    "Do not offer extra comparisons, breakdowns, or follow-up services unless the user asks.",
+    "Depth should come from precision, not length.",
   ].join("\n");
 }
 
@@ -80,6 +96,7 @@ function getStyleProfile(style: ConversationStyle) {
       "For lifestyle topics like cars, dating, money, status, nightlife, work, or plans, keep it natural and conversational.",
       "Do not list product features unless the user asks for comparison or details.",
       "Use fewer questions. Often answer with a clear reaction and stop.",
+      "Default length: 1–2 short sentences.",
       "Give practical casual suggestions when useful.",
       "Ideal feel: easy to talk to, low-pressure, human, slightly playful when appropriate.",
     ].join("\n");
@@ -94,6 +111,7 @@ function getStyleProfile(style: ConversationStyle) {
       "Prefer insight over generic comfort.",
       "Do not ask formal questions like 'как ты себя чувствуешь?' or 'как ты к этому относишься?'.",
       "For practical or lifestyle topics, stay grounded first, then add one layer of meaning only if it fits.",
+      "Default length: 2–3 short sentences.",
       "Ideal feel: supportive, perceptive, human, quietly insightful.",
     ].join("\n");
   }
@@ -107,6 +125,7 @@ function getStyleProfile(style: ConversationStyle) {
     "Do not become harsh or judgmental. Calm directness only.",
     "For status/luxury topics, do not review the object; read the motive behind wanting it.",
     "Ask at most one sharp question only if it moves the conversation forward.",
+    "Default length: 2–3 short sentences.",
     "Ideal feel: clean, direct, useful, slightly uncomfortable in a good way.",
   ].join("\n");
 }
@@ -168,10 +187,12 @@ function getReplyDirective(style: ConversationStyle) {
     return [
       "Next reply directive:",
       "Answer like a casual friend.",
-      "Use 1–3 sentences.",
+      "Use 1–2 short sentences.",
       "No product review. No consultant questions. No therapy framing.",
+      "No bullet lists.",
       "Give a clear human reaction or opinion first.",
       "Do not ask a question unless it feels truly natural.",
+      "Do not offer extra comparisons or breakdowns.",
     ].join("\n");
   }
 
@@ -179,20 +200,24 @@ function getReplyDirective(style: ConversationStyle) {
     return [
       "Next reply directive:",
       "Give one useful observation about the meaning behind the user's words.",
-      "Use 2–4 sentences.",
+      "Use 2–3 short sentences.",
       "Do not ask formal emotional questions.",
       "Do not review products.",
-      "Make the user feel understood through specificity, not generic reassurance.",
+      "No bullet lists.",
+      "Make the user feel understood through specificity, not length.",
+      "Do not offer extra comparisons or breakdowns.",
     ].join("\n");
   }
 
   return [
     "Next reply directive:",
     "Start with a direct read.",
-    "Use 1–3 concise, high-signal sentences.",
+    "Use 2–3 concise, high-signal sentences.",
     "Do not reassure first.",
     "Do not say 'it depends' unless absolutely necessary.",
     "Name the motive or tradeoff clearly.",
+    "No bullet lists.",
+    "Do not offer extra comparisons or breakdowns.",
     "Ask at most one sharp question.",
   ].join("\n");
 }
@@ -352,7 +377,7 @@ export async function POST(req: NextRequest) {
       `Plan context: ${plan}.`,
       plan === "free"
         ? "Plan guidance: keep replies concise and focused."
-        : "Plan guidance: deeper replies are allowed when genuinely useful.",
+        : "Plan guidance: deeper replies are allowed when genuinely useful, but deeper does not mean longer.",
       getReplyDirective(conversationStyle),
     ]
       .filter(Boolean)
@@ -360,7 +385,8 @@ export async function POST(req: NextRequest) {
 
     const completion = await openai.chat.completions.create({
       model: chatModel,
-      temperature: 0.68,
+      temperature: 0.62,
+      max_completion_tokens: getMaxCompletionTokens(conversationStyle),
       messages: [
         {
           role: "system",
