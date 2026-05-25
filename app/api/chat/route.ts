@@ -287,7 +287,7 @@ function getStyleProfile(style: ConversationStyle) {
       "The user may simply want to talk in a thoughtful style; do not assume they are worried, distressed, or asking for emotional support.",
       "For greetings and small talk, answer simply and naturally. Do not open like a support agent or therapy session.",
       "Do not sound like a therapy room, meditation app, or emotional support hotline.",
-      "Avoid presence phrases like 'I am here and steady', 'calm and here', 'ready to help', or 'what is on your mind today' unless the user clearly needs grounding.",
+      "Avoid presence phrases like 'I am here and steady', 'calm and here', 'ready to help', 'here and paying attention', 'holding space', or 'what is on your mind today' unless the user clearly needs grounding.",
       "Give one useful observation, not a full analysis.",
       "Reflective Guide default length: 12–28 words.",
       "Use 35–50 words only when the user clearly asks for depth or says something emotionally important.",
@@ -452,6 +452,7 @@ function getContextDirective(params: {
         "Answer simply, normally, and lightly thoughtful.",
         "Do not assume the user has a problem.",
         "Do not say you are 'ready to help'.",
+        "Do not say you are 'here and paying attention'.",
         "Do not use therapy-session openings.",
         "Example shape: 'I'm doing well. How are you?'",
       ].join("\n");
@@ -589,6 +590,7 @@ function getReplyDirective(style: ConversationStyle) {
       "If this is a greeting, reply simply and do not sound like a support agent.",
       "Do not sound like a therapist opening a session.",
       "No grounding/presence language unless the user is distressed.",
+      "Avoid phrases like 'here and paying attention' in greetings.",
       "If useful, add one soft simple hook.",
       "No essay tone.",
     ].join("\n");
