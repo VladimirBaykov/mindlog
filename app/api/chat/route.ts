@@ -26,6 +26,11 @@ type ConversationStyle =
   | "clear_mirror"
   | null;
 
+type ResolvedConversationStyle =
+  | "friend"
+  | "reflective_guide"
+  | "clear_mirror";
+
 type NotificationOption =
   | "yes"
   | "not_now"
@@ -34,6 +39,20 @@ type NotificationOption =
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
+
+function resolveConversationStyle(
+  style: ConversationStyle
+): ResolvedConversationStyle {
+  if (
+    style === "friend" ||
+    style === "reflective_guide" ||
+    style === "clear_mirror"
+  ) {
+    return style;
+  }
+
+  return "friend";
+}
 
 function getAntiGenericRules() {
   return [
@@ -53,7 +72,7 @@ function getAntiGenericRules() {
 }
 
 function getConversationStyleOverlay(style: ConversationStyle) {
-  const resolvedStyle = style ?? "friend";
+  const resolvedStyle = resolveConversationStyle(style);
 
   if (resolvedStyle === "friend") {
     return [
@@ -129,6 +148,43 @@ function getConversationStyleOverlay(style: ConversationStyle) {
     "- For dating: separate confidence from fear of looking vulnerable.",
     "- For control: name the cost of control directly.",
     "- For success/image: distinguish real achievement from endless proving.",
+  ].join("\n");
+}
+
+function getReplyDirective(style: ConversationStyle) {
+  const resolvedStyle = resolveConversationStyle(style);
+
+  if (resolvedStyle === "friend") {
+    return [
+      "Immediate next-reply directive:",
+      "- For the next assistant message, answer like a casual friend in the user's language.",
+      "- Keep it short and alive: usually 1–3 sentences.",
+      "- Do not write a product review, feature overview, therapy reflection, or consultant answer.",
+      "- Do not ask a question unless it is truly needed to keep the conversation natural.",
+      "- Give a clear human reaction or opinion first.",
+      "- If the topic is casual/lifestyle/status/dating/cars/money, stay casual and conversational.",
+    ].join("\n");
+  }
+
+  if (resolvedStyle === "reflective_guide") {
+    return [
+      "Immediate next-reply directive:",
+      "- For the next assistant message, give one precise observation about the meaning, pattern, or emotional layer behind the user's words.",
+      "- Keep it human and readable, usually 2–4 sentences.",
+      "- Do not ask formal emotional questions like 'как ты себя чувствуешь?' or 'как ты к этому относишься?'.",
+      "- Do not review products or give generic advice unless the user explicitly asks for practical planning.",
+      "- Prefer insight over softness and specificity over broad reassurance.",
+    ].join("\n");
+  }
+
+  return [
+    "Immediate next-reply directive:",
+    "- For the next assistant message, start with a direct read.",
+    "- Keep it concise and high-signal.",
+    "- Do not reassure first. Do not soften into generic 'if it makes you happy, why not'.",
+    "- If the user asks for honesty, answer clearly before adding nuance.",
+    "- Focus on motive, contradiction, status, avoidance, control, validation, or the real tradeoff.",
+    "- Ask at most one sharp question, and only if it moves the conversation forward.",
   ].join("\n");
 }
 
@@ -301,16 +357,17 @@ export async function POST(req: NextRequest) {
     }
 
     let preferenceOverlay = "";
+    let conversationStyle: ResolvedConversationStyle = "friend";
 
     try {
       const goal =
         (user.user_metadata?.onboarding_goal as GoalOption) ??
         null;
 
-      const conversationStyle =
+      conversationStyle = resolveConversationStyle(
         (user.user_metadata
-          ?.conversation_style as ConversationStyle) ??
-        "friend";
+          ?.conversation_style as ConversationStyle) ?? "friend"
+      );
 
       const notifications =
         (user.user_metadata
@@ -339,13 +396,14 @@ export async function POST(req: NextRequest) {
       plan === "free"
         ? "Free plan guidance: keep responses helpful, concise, and focused. Do not over-extend or produce unnecessarily long answers."
         : "Pro plan guidance: deeper reflection is allowed when it genuinely helps the user.",
+      getReplyDirective(conversationStyle),
     ]
       .filter(Boolean)
       .join("\n\n");
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.74,
+      temperature: 0.72,
       messages: [
         {
           role: "system",
