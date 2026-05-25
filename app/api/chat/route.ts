@@ -74,14 +74,16 @@ function getMaxCompletionTokens(params: {
   }
 
   if (style === "reflective_guide") {
-    if (context === "emotional") return 120;
-    if (context === "practical") return 105;
-    return 95;
+    if (context === "emotional") return 105;
+    if (context === "practical") return 90;
+    if (context === "honesty") return 95;
+    return 80;
   }
 
-  if (context === "emotional") return 110;
-  if (context === "practical") return 95;
-  return 85;
+  if (context === "emotional") return 95;
+  if (context === "practical") return 80;
+  if (context === "honesty") return 85;
+  return 72;
 }
 
 function getLastUserMessage(messages: ChatMessage[]) {
@@ -231,13 +233,17 @@ function getStyleProfile(style: ConversationStyle) {
   if (resolvedStyle === "reflective_guide") {
     return [
       "Current conversation style: Reflective Guide.",
-      "Be thoughtful and supportive, but still conversational.",
+      "Be thoughtful and supportive, but still conversational and normal.",
+      "Do not sound like a therapy room, meditation app, or emotional support hotline.",
+      "Avoid presence phrases like 'I am here and steady', 'calm and here', or 'what is on your mind today' unless the user clearly needs grounding.",
       "Give one useful observation, not a full analysis.",
-      "Reflective Guide default length: 15–35 words.",
-      "Use 40–60 words only when the user clearly asks for depth or says something emotionally important.",
+      "Reflective Guide default length: 12–28 words.",
+      "Use 35–50 words only when the user clearly asks for depth or says something emotionally important.",
       "Do not sound clinical, formal, academic, or like a self-help article.",
       "Do not ask formal questions like 'how does that make you feel?' unless the user clearly wants emotional exploration.",
-      "Good feel: short, perceptive, human.",
+      "For casual topics, be only slightly deeper than Friend, not dramatically more reflective.",
+      "Good feel: compact, perceptive, human, quietly useful.",
+      "Bad feel: therapy opening, polished insight paragraph, formal emotional question, motivational speech.",
     ].join("\n");
   }
 
@@ -245,13 +251,17 @@ function getStyleProfile(style: ConversationStyle) {
     "Current conversation style: Clear Mirror.",
     "Be direct, concise, honest, and pattern-aware.",
     "Start with the clearest read.",
-    "Clear Mirror default length: 10–30 words.",
-    "Use 35–55 words only when the user asks for honesty or the issue needs one clear breakdown.",
+    "Do not lead with emotional support, soothing language, or soft reassurance.",
+    "Avoid soft openings like 'calm and here', 'I am here', or 'that sounds hard' unless the user is clearly distressed.",
+    "Use 'probably', 'yes', 'not really', or 'that sounds like' when the evidence is strong. Do not hide behind 'maybe' too often.",
+    "Clear Mirror default length: 8–24 words.",
+    "Use 28–45 words only when the user asks for honesty or the issue needs one clear breakdown.",
     "Do not soften everything into reassurance.",
     "Do not become harsh or judgmental.",
     "For status, money, luxury, dating, or ambition topics, read the motive instead of reviewing the object.",
     "Use one sharp hook when useful.",
-    "Good feel: short, clean, direct, useful.",
+    "Good feel: short, clean, direct, useful, a little uncomfortable.",
+    "Bad feel: supportive cushioning, gentle reassurance first, therapy voice, long explanation.",
   ].join("\n");
 }
 
@@ -377,49 +387,98 @@ function getContextDirective(params: {
     if (context === "casual") {
       return [
         "Current context: casual or lifestyle.",
-        "Stay compact. Add only one light layer of meaning if it fits.",
-        "Target: 15–30 words.",
+        "Stay compact and normal.",
+        "Add only one light layer of meaning if it genuinely fits.",
+        "Do not open like a therapist.",
+        "Target: 12–25 words.",
+      ].join("\n");
+    }
+
+    if (context === "practical") {
+      return [
+        "Current context: practical help.",
+        "Give one useful answer or one useful observation.",
+        "Stay practical first, reflective second.",
+        "Target: 15–35 words.",
+      ].join("\n");
+    }
+
+    if (context === "honesty") {
+      return [
+        "Current context: honesty or direct opinion.",
+        "Give a clear read, then one thoughtful condition.",
+        "Do not hedge too much.",
+        "Target: 18–38 words.",
       ].join("\n");
     }
 
     if (context === "emotional") {
       return [
         "Current context: emotional.",
-        "Give one clear observation.",
-        "Target: 25–55 words.",
-        "Do not turn it into an essay.",
+        "Give one clear observation that helps the user understand what is happening.",
+        "Do not make it a therapy monologue.",
+        "Use one soft simple hook if useful.",
+        "Target: 20–45 words.",
       ].join("\n");
     }
 
     return [
       "Current context:",
       "Give one useful observation.",
-      "Target: 15–40 words.",
+      "Keep it compact and chat-like.",
+      "Target: 12–32 words.",
     ].join("\n");
   }
 
-  if (context === "casual") {
+  if (style === "clear_mirror") {
+    if (context === "casual") {
+      return [
+        "Current context: casual or lifestyle.",
+        "Give a short direct read.",
+        "Do not add supportive cushioning.",
+        "Target: 8–24 words.",
+        "Use one sharp hook if useful.",
+      ].join("\n");
+    }
+
+    if (context === "practical") {
+      return [
+        "Current context: practical help.",
+        "Give the direct move first.",
+        "Do not over-explain.",
+        "Target: 10–28 words.",
+      ].join("\n");
+    }
+
+    if (context === "honesty") {
+      return [
+        "Current context: honesty or direct opinion.",
+        "Answer clearly in the first sentence.",
+        "Use 'probably', 'yes', 'no', or 'not really' when appropriate.",
+        "Then add one sharp reason.",
+        "Target: 14–36 words.",
+      ].join("\n");
+    }
+
+    if (context === "emotional") {
+      return [
+        "Current context: emotional.",
+        "Name the pattern clearly.",
+        "Do not lead with comfort.",
+        "One direct observation is enough.",
+        "Target: 16–40 words.",
+      ].join("\n");
+    }
+
     return [
-      "Current context: casual or lifestyle.",
-      "Give a short direct read.",
-      "Target: 10–30 words.",
-      "Use one sharp hook if useful.",
+      "Current context:",
+      "Be concise and direct.",
+      "No supportive cushioning.",
+      "Target: 8–30 words.",
     ].join("\n");
   }
 
-  if (context === "emotional") {
-    return [
-      "Current context: emotional.",
-      "Name the pattern clearly.",
-      "Target: 20–50 words.",
-    ].join("\n");
-  }
-
-  return [
-    "Current context:",
-    "Be concise and direct.",
-    "Target: 10–35 words.",
-  ].join("\n");
+  return "";
 }
 
 function getReplyDirective(style: ConversationStyle) {
@@ -442,8 +501,10 @@ function getReplyDirective(style: ConversationStyle) {
     return [
       "Final instruction for the next reply:",
       "Write one compact, perceptive chat message.",
-      "Usually 15–35 words.",
+      "Usually 12–30 words.",
       "Give one insight only.",
+      "Do not sound like a therapist opening a session.",
+      "No grounding/presence language unless the user is distressed.",
       "If useful, add one soft simple hook.",
       "No essay tone.",
     ].join("\n");
@@ -452,9 +513,10 @@ function getReplyDirective(style: ConversationStyle) {
   return [
     "Final instruction for the next reply:",
     "Write one compact, direct chat message.",
-    "Usually 10–30 words.",
+    "Usually 8–28 words.",
     "Give the clear read first.",
-    "If useful, add one sharp simple question.",
+    "Do not start with comfort or validation unless safety requires it.",
+    "Use a sharp simple question only if it moves the conversation forward.",
     "No essay tone.",
   ].join("\n");
 }
