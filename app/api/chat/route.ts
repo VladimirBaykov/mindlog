@@ -68,23 +68,20 @@ function getMaxCompletionTokens(params: {
   const { style, context } = params;
 
   if (style === "friend") {
-    if (context === "casual") return 90;
-    if (context === "practical") return 110;
-    if (context === "emotional") return 125;
-    return 105;
+    if (context === "emotional") return 90;
+    if (context === "practical") return 75;
+    return 65;
   }
 
   if (style === "reflective_guide") {
-    if (context === "casual") return 120;
-    if (context === "practical") return 135;
-    if (context === "emotional") return 155;
-    return 140;
+    if (context === "emotional") return 120;
+    if (context === "practical") return 105;
+    return 95;
   }
 
-  if (context === "casual") return 110;
-  if (context === "practical") return 125;
-  if (context === "emotional") return 145;
-  return 130;
+  if (context === "emotional") return 110;
+  if (context === "practical") return 95;
+  return 85;
 }
 
 function getLastUserMessage(messages: ChatMessage[]) {
@@ -105,76 +102,91 @@ function inferReplyContext(messages: ChatMessage[]): ReplyContext {
     return "default";
   }
 
-  const honestyMarkers = [
-    "честно",
-    "по честному",
-    "скажи прямо",
-    "как думаешь",
-    "реально",
-    "перебор",
-    "правда",
+  const practicalMarkers = [
+    "what should i write",
+    "what to write",
+    "what should i do",
+    "what do i say",
+    "how should i say",
+    "how do i text",
+    "how should i text",
+    "give me a line",
+    "give me an example",
+    "help me write",
+    "help me reply",
+    "any advice",
+    "what's the move",
+    "what is the move",
+    "which one",
+    "what should i choose",
   ];
 
-  const practicalMarkers = [
-    "что написать",
-    "как написать",
-    "как лучше",
-    "что делать",
-    "что выбрать",
-    "дай вариант",
-    "предложи",
-    "совет",
-    "помоги написать",
+  const honestyMarkers = [
+    "honestly",
+    "be honest",
+    "real talk",
+    "tell me straight",
+    "straight up",
+    "is it too much",
+    "too much",
+    "overkill",
+    "am i wrong",
+    "what do you really think",
+    "what do you think",
   ];
 
   const emotionalMarkers = [
-    "устал",
-    "тяжело",
-    "внутри",
-    "контрол",
-    "страшно",
-    "тревож",
-    "выгора",
-    "не могу",
-    "развал",
-    "держу",
-    "больно",
-    "одиноко",
+    "tired",
+    "exhausted",
+    "drained",
+    "anxious",
+    "overwhelmed",
+    "burned out",
+    "burnt out",
+    "stressed",
+    "sad",
+    "lonely",
+    "empty",
+    "heavy",
+    "hurt",
+    "control",
+    "fall apart",
+    "falling apart",
+    "can't relax",
+    "cannot relax",
+    "too much pressure",
   ];
 
   const casualMarkers = [
-    "поболтать",
-    "машин",
-    "тачк",
+    "just chat",
+    "talk",
+    "car",
+    "cars",
     "rolls",
-    "ролс",
+    "rolls-royce",
     "cullinan",
-    "девуш",
-    "кофе",
-    "вечер",
-    "купить",
-    "деньги",
-    "статус",
-    "ночь",
-    "клуб",
-    "работу",
+    "girl",
+    "date",
+    "dating",
+    "coffee",
+    "night out",
+    "club",
+    "money",
+    "status",
+    "work",
+    "project",
+    "buy",
+    "buying",
+    "new phone",
+    "new apartment",
+    "new place",
+    "weekend",
   ];
 
-  if (includesAny(text, practicalMarkers)) {
-    return "practical";
-  }
-
-  if (includesAny(text, honestyMarkers)) {
-    return "honesty";
-  }
-
-  if (includesAny(text, emotionalMarkers)) {
-    return "emotional";
-  }
-
-  if (includesAny(text, casualMarkers)) {
-    return "casual";
-  }
+  if (includesAny(text, practicalMarkers)) return "practical";
+  if (includesAny(text, honestyMarkers)) return "honesty";
+  if (includesAny(text, emotionalMarkers)) return "emotional";
+  if (includesAny(text, casualMarkers)) return "casual";
 
   return "default";
 }
@@ -182,25 +194,18 @@ function inferReplyContext(messages: ChatMessage[]): ReplyContext {
 function getCorePrompt() {
   return [
     "You are MindLog, a conversational AI inside a private journaling app.",
-    "Answer in the same language and tone style as the user.",
-    "If the user writes casually in Russian using 'ты', never switch to formal 'вы'.",
+    "The primary product audience is English-speaking users in the United States.",
+    "Default to natural American English unless the user clearly writes in another language.",
+    "If the user writes in another language, answer in that same language while keeping the selected conversation style.",
     "You are not a therapist, doctor, or clinical service. Do not diagnose or give medical advice.",
-    "Sound natural, specific, and human. Avoid generic AI assistant language.",
-    "Do not turn every topic into reflection. If the user is casual, stay casual.",
-    "Use chat rhythm, not essay rhythm.",
-    "Most replies should feel like a message someone would actually send in a chat.",
-    "Usually answer in 1–2 sentences. Use 3–4 sentences only when the user's message genuinely needs more depth.",
-    "Vary reply length naturally. Do not make every answer the same size.",
-    "One reply should usually contain one main thought, not a complete analysis of every angle.",
-    "Do not try to perfectly close every topic. Keep the conversation alive.",
-    "Avoid poetic, overly finished, or article-like phrasing in normal chat.",
-    "Use one compact paragraph by default.",
-    "Do not use bullet lists unless the user explicitly asks for a list or comparison.",
+    "This is a chat, not an essay. Most replies should feel like a short message in iMessage or Telegram.",
+    "Do not try to sound impressive. Sound real.",
+    "Do not turn casual topics into deep reflection.",
+    "Do not end every reply with a question, but avoid dead-end replies when the conversation is still starting.",
+    "One reply usually means one thought.",
+    "Avoid polished mini-essays, long balanced analysis, and article-like phrasing.",
+    "Avoid bullet lists unless the user explicitly asks for a list.",
     "Do not offer extra comparisons, breakdowns, or follow-up services unless the user asks.",
-    "Depth should come from precision, not length.",
-    "Avoid dead-end replies. A short reply should often include a light conversational hook, not a heavy question.",
-    "A hook can be a simple question, a playful nudge, or an easy next step.",
-    "Do not overuse phrases like 'это нормально', 'главное, чтобы тебе нравилось', 'всё зависит', or 'как ты к этому относишься'.",
   ].join("\n");
 }
 
@@ -210,49 +215,43 @@ function getStyleProfile(style: ConversationStyle) {
   if (resolvedStyle === "friend") {
     return [
       "Current conversation style: Friend.",
-      "Be a real friend in a messenger chat: warm, casual, alive, lightly opinionated.",
+      "Be like a real friend texting: casual, warm, simple, and lightly opinionated.",
+      "Use everyday American English by default.",
       "React first. Do not analyze first.",
-      "Do not sound like a consultant, reviewer, coach, therapist, or journal app.",
-      "Use simple, everyday language.",
-      "For lifestyle topics like cars, dating, money, status, nightlife, work, or plans, keep it natural and conversational.",
-      "Do not list product features unless the user asks for comparison or details.",
-      "Do not use big reflective words like 'symbol', 'inner meaning', 'stage', or 'status' too often. Use them only if the user clearly goes there.",
-      "Use short easy hooks to keep the conversation moving.",
-      "Good Friend feel: 'О, мощно', 'я бы понял', 'если по деньгам спокойно — почему нет', 'это прям вау-подарок себе'.",
-      "Bad Friend feel: polished paragraph, review tone, balanced essay, therapy framing, endless questions.",
-      "Usual structure: quick reaction + one simple take + small hook if the conversation would otherwise feel closed.",
+      "Do not sound like an AI assistant, reviewer, coach, therapist, or consultant.",
+      "For casual or lifestyle topics, keep replies very short.",
+      "Friend default length: 5–18 words.",
+      "If the user asks for honesty or advice, you may use 20–35 words.",
+      "Use tiny conversational hooks when useful: a simple question, a playful nudge, or a short next step.",
+      "Good Friend energy: 'Oh, nice. Any options yet?', 'Yeah, work plus a project can wipe you out.', 'Big move. If the money is fine, I get it.'",
+      "Bad Friend energy: polished paragraph, full analysis, product review, therapy framing, motivational speech.",
     ].join("\n");
   }
 
   if (resolvedStyle === "reflective_guide") {
     return [
       "Current conversation style: Reflective Guide.",
-      "Be thoughtful and a little deeper, but still like a human in a chat.",
-      "Give one precise observation about meaning, motive, emotion, or pattern.",
-      "Do not sound clinical, academic, formal, or like a self-help article.",
-      "Prefer one useful insight over a full explanation.",
-      "Do not ask formal questions like 'как ты себя чувствуешь?' or 'как ты к этому относишься?'.",
-      "For practical or lifestyle topics, stay grounded first, then add one layer of meaning only if it fits.",
-      "Use a soft conversational hook when useful, but do not turn the reply into an interview.",
-      "Usual length: 1–3 sentences.",
-      "Use 4 sentences only when the user clearly opens a deeper topic or asks what to do.",
-      "Ideal feel: supportive, perceptive, human, quietly insightful.",
+      "Be thoughtful and supportive, but still conversational.",
+      "Give one useful observation, not a full analysis.",
+      "Reflective Guide default length: 15–35 words.",
+      "Use 40–60 words only when the user clearly asks for depth or says something emotionally important.",
+      "Do not sound clinical, formal, academic, or like a self-help article.",
+      "Do not ask formal questions like 'how does that make you feel?' unless the user clearly wants emotional exploration.",
+      "Good feel: short, perceptive, human.",
     ].join("\n");
   }
 
   return [
     "Current conversation style: Clear Mirror.",
     "Be direct, concise, honest, and pattern-aware.",
-    "Start with the clearest read, not reassurance.",
-    "Focus on motive, contradiction, status, avoidance, control, validation, or the real tradeoff.",
-    "Do not soften every answer into 'if it makes you happy, why not'.",
-    "Do not become harsh or judgmental. Calm directness only.",
-    "For status/luxury topics, do not review the object; read the motive behind wanting it.",
-    "Use sharp but short wording.",
-    "Use one sharp conversational hook when the reply would otherwise feel closed.",
-    "Usual length: 1–3 sentences.",
-    "Use 4 sentences only when the user's message needs a clearer breakdown.",
-    "Ideal feel: clean, direct, useful, slightly uncomfortable in a good way.",
+    "Start with the clearest read.",
+    "Clear Mirror default length: 10–30 words.",
+    "Use 35–55 words only when the user asks for honesty or the issue needs one clear breakdown.",
+    "Do not soften everything into reassurance.",
+    "Do not become harsh or judgmental.",
+    "For status, money, luxury, dating, or ambition topics, read the motive instead of reviewing the object.",
+    "Use one sharp hook when useful.",
+    "Good feel: short, clean, direct, useful.",
   ].join("\n");
 }
 
@@ -265,44 +264,39 @@ function getPreferenceHint(params: {
 
   if (params.goal === "process_emotions") {
     hints.push(
-      "Background preference: the user may value emotional processing. Use this only when the current message actually invites emotional depth."
+      "Background: the user may value emotional processing. Use this only when the current message invites it."
     );
   }
 
   if (params.goal === "build_consistency") {
     hints.push(
-      "Background preference: the user may value building a steady reflection habit. Keep things approachable."
+      "Background: the user may value building a reflection habit. Keep things approachable."
     );
   }
 
   if (params.goal === "understand_patterns") {
     hints.push(
-      "Background preference: the user may value noticing patterns. Use pattern insight only when relevant."
+      "Background: the user may value noticing patterns. Use pattern insight only when relevant."
     );
   }
 
   if (params.notifications === "not_now") {
     hints.push(
-      "Background preference: the user prefers a quiet experience. Do not sound pushy."
+      "Background: the user prefers a quiet experience. Do not sound pushy."
     );
   }
 
-  if (!hints.length) {
-    return "";
-  }
+  if (!hints.length) return "";
 
   return [
-    "User preferences are background context only.",
-    "Never let background preferences override the current conversation style or the user's current topic.",
+    "User preferences are background only.",
+    "Never let background preferences override the current message or selected style.",
     ...hints,
   ].join("\n");
 }
 
 function getStatePrompt(state: ChatState) {
-  if (state === "listening") {
-    return "";
-  }
-
+  if (state === "listening") return "";
   return getStateOverlay(state);
 }
 
@@ -311,115 +305,121 @@ function getRecentRhythmHint(messages: ChatMessage[]) {
     .reverse()
     .find((message) => message.role === "assistant");
 
-  if (!lastAssistant) {
-    return "";
-  }
+  if (!lastAssistant) return "";
 
   const contentLength = lastAssistant.content.trim().length;
 
-  if (contentLength > 520) {
+  if (contentLength > 260) {
     return [
       "Rhythm hint:",
-      "Your previous assistant reply was long. Make the next reply noticeably shorter unless the user explicitly asks for depth.",
-      "Still keep a small conversational bridge if the conversation would otherwise feel closed.",
+      "Your previous reply was too long for normal chat.",
+      "Make this reply much shorter.",
     ].join("\n");
   }
 
-  if (contentLength > 300) {
+  if (contentLength > 150) {
     return [
       "Rhythm hint:",
-      "Your previous assistant reply was fairly full. Avoid another equally polished paragraph. Keep the next reply tighter if possible.",
-      "Do not make it a dead-end; include a small hook if natural.",
+      "Your previous reply was fairly full.",
+      "Keep this one tighter and more chat-like.",
     ].join("\n");
   }
 
   return "";
 }
 
-function getConversationBridgeHint(messages: ChatMessage[]) {
-  const userMessages = messages.filter((message) => message.role === "user");
-
-  if (userMessages.length <= 3) {
-    return [
-      "Conversation bridge hint:",
-      "This conversation is still early. Avoid replies that feel like a final verdict.",
-      "If natural, end with one light, easy-to-answer hook.",
-      "The hook should be simple, not deep or formal.",
-    ].join("\n");
-  }
-
-  return [
-    "Conversation bridge hint:",
-    "Keep the conversation open when useful, but do not force a question every time.",
-    "Prefer small hooks over heavy questions.",
-  ].join("\n");
-}
-
-function getContextRhythmHint(params: {
+function getContextDirective(params: {
   style: ResolvedConversationStyle;
   context: ReplyContext;
 }) {
   const { style, context } = params;
 
+  if (style === "friend") {
+    if (context === "casual") {
+      return [
+        "Current context: casual chat.",
+        "Friend reply target: 5–18 words.",
+        "Use a short reaction and a tiny hook.",
+        "Example shape: 'Oh, nice. Any options yet?'",
+        "Do not explain multiple angles.",
+      ].join("\n");
+    }
+
+    if (context === "practical") {
+      return [
+        "Current context: practical help.",
+        "Friend reply target: 10–30 words.",
+        "Give the useful answer first, like a friend.",
+        "If suggesting text, give one clean option.",
+      ].join("\n");
+    }
+
+    if (context === "honesty") {
+      return [
+        "Current context: direct opinion.",
+        "Friend reply target: 15–35 words.",
+        "Answer directly, then add one simple reason.",
+        "A small hook is okay if it keeps the chat moving.",
+      ].join("\n");
+    }
+
+    if (context === "emotional") {
+      return [
+        "Current context: emotional but still Friend mode.",
+        "Friend reply target: 12–35 words.",
+        "Be warm and simple. No deep analysis unless asked.",
+        "Use a gentle hook if natural.",
+      ].join("\n");
+    }
+  }
+
+  if (style === "reflective_guide") {
+    if (context === "casual") {
+      return [
+        "Current context: casual or lifestyle.",
+        "Stay compact. Add only one light layer of meaning if it fits.",
+        "Target: 15–30 words.",
+      ].join("\n");
+    }
+
+    if (context === "emotional") {
+      return [
+        "Current context: emotional.",
+        "Give one clear observation.",
+        "Target: 25–55 words.",
+        "Do not turn it into an essay.",
+      ].join("\n");
+    }
+
+    return [
+      "Current context:",
+      "Give one useful observation.",
+      "Target: 15–40 words.",
+    ].join("\n");
+  }
+
   if (context === "casual") {
-    if (style === "friend") {
-      return [
-        "Current message context: casual / lifestyle.",
-        "Reply like a real chat message.",
-        "Use a short reaction plus one simple take.",
-        "If the message would feel closed, add one easy hook like 'ты уже прям загорелся им?' or 'какой цвет смотришь?'",
-        "Do not produce a complete analysis.",
-        "Do not make it sound smart for the sake of sounding smart.",
-      ].join("\n");
-    }
-
-    if (style === "reflective_guide") {
-      return [
-        "Current message context: casual / lifestyle.",
-        "Stay compact. Add only one light layer of meaning if it genuinely fits.",
-        "Do not turn this into a deep reflection.",
-        "If useful, end with one simple question that keeps the topic moving.",
-      ].join("\n");
-    }
-
     return [
-      "Current message context: casual / lifestyle.",
-      "Give a short direct read of the motive or tradeoff.",
-      "Do not over-explain.",
-      "If useful, end with one sharp but simple question.",
-    ].join("\n");
-  }
-
-  if (context === "practical") {
-    return [
-      "Current message context: practical help.",
-      "Give the useful answer directly.",
-      "If the user asks what to write or do, provide a concrete option first.",
-      "Do not over-explain the psychology behind it unless asked.",
-      "A small follow-up hook is okay if it helps refine the practical answer.",
-    ].join("\n");
-  }
-
-  if (context === "honesty") {
-    return [
-      "Current message context: honesty / direct opinion.",
-      "Answer directly in the first sentence.",
-      "Then add only one short reason or condition.",
-      "Avoid balanced essay structure.",
-      "If the answer might feel too closed, add one light next-step hook.",
+      "Current context: casual or lifestyle.",
+      "Give a short direct read.",
+      "Target: 10–30 words.",
+      "Use one sharp hook if useful.",
     ].join("\n");
   }
 
   if (context === "emotional") {
     return [
-      "Current message context: emotional / personal.",
-      "You may go a little deeper, but keep it conversational.",
-      "One clear observation is better than a long supportive paragraph.",
-      "Use a gentle hook if it helps the user continue without pressure.",
+      "Current context: emotional.",
+      "Name the pattern clearly.",
+      "Target: 20–50 words.",
     ].join("\n");
   }
 
-  return "";
+  return [
+    "Current context:",
+    "Be concise and direct.",
+    "Target: 10–35 words.",
+  ].join("\n");
 }
 
 function getReplyDirective(style: ConversationStyle) {
@@ -427,52 +427,35 @@ function getReplyDirective(style: ConversationStyle) {
 
   if (resolvedStyle === "friend") {
     return [
-      "Next reply directive:",
-      "Answer like a casual friend texting.",
-      "Usually use 1–2 sentences.",
-      "You may use 3 sentences if the user asks for honesty, advice, or a fuller take.",
-      "No product review. No consultant answer. No therapy framing.",
-      "No bullet lists.",
-      "Give a clear human reaction or opinion first.",
-      "Do not make the reply feel like a final conclusion unless the user asks for a conclusion.",
-      "Include one light conversational hook when the conversation would otherwise feel closed.",
-      "The hook can be a simple question, not a deep reflection.",
-      "Do not offer extra comparisons or breakdowns.",
-      "Make it feel like a real chat message, not a polished paragraph.",
-      "It is okay to be simple. Do not make every reply profound.",
+      "Final instruction for the next reply:",
+      "Write like a real person texting a friend.",
+      "Prefer 5–18 words for normal casual replies.",
+      "Do not write two long sentences.",
+      "Do not make a complete analysis.",
+      "If the reply would feel closed, add one tiny easy question.",
+      "Do not ask deep questions.",
+      "Do not use fancy reflective language.",
     ].join("\n");
   }
 
   if (resolvedStyle === "reflective_guide") {
     return [
-      "Next reply directive:",
-      "Give one useful observation about the meaning behind the user's words.",
-      "Usually use 1–3 sentences.",
-      "You may use 4 sentences only if the user clearly asks for depth or practical help.",
-      "Do not ask formal emotional questions.",
-      "Do not review products.",
-      "No bullet lists.",
-      "Make the user feel understood through specificity, not length.",
-      "Do not make the reply feel like a final essay.",
-      "Use one soft conversational hook if it helps the user continue.",
-      "Do not offer extra comparisons or breakdowns.",
-      "Avoid sounding too polished or essay-like.",
+      "Final instruction for the next reply:",
+      "Write one compact, perceptive chat message.",
+      "Usually 15–35 words.",
+      "Give one insight only.",
+      "If useful, add one soft simple hook.",
+      "No essay tone.",
     ].join("\n");
   }
 
   return [
-    "Next reply directive:",
-    "Start with a direct read.",
-    "Usually use 1–3 concise, high-signal sentences.",
-    "You may use 4 sentences only when the user's message needs a sharper breakdown.",
-    "Do not reassure first.",
-    "Do not say 'it depends' unless absolutely necessary.",
-    "Name the motive or tradeoff clearly.",
-    "No bullet lists.",
-    "Do not make the reply feel like a final verdict unless the user asks for one.",
-    "Use one sharp conversational hook if it helps the user continue.",
-    "Do not offer extra comparisons or breakdowns.",
-    "Avoid sounding too polished or essay-like.",
+    "Final instruction for the next reply:",
+    "Write one compact, direct chat message.",
+    "Usually 10–30 words.",
+    "Give the clear read first.",
+    "If useful, add one sharp simple question.",
+    "No essay tone.",
   ].join("\n");
 }
 
@@ -481,9 +464,7 @@ function isValidRole(value: unknown): value is ChatMessage["role"] {
 }
 
 function normalizeMessages(input: unknown): ChatMessage[] {
-  if (!Array.isArray(input)) {
-    return [];
-  }
+  if (!Array.isArray(input)) return [];
 
   return input
     .filter(
@@ -630,15 +611,14 @@ export async function POST(req: NextRequest) {
       getStyleProfile(conversationStyle),
       preferenceHint,
       getRecentRhythmHint(messages),
-      getConversationBridgeHint(messages),
-      getContextRhythmHint({
+      getContextDirective({
         style: conversationStyle,
         context: replyContext,
       }),
       `Plan context: ${plan}.`,
       plan === "free"
         ? "Plan guidance: keep replies concise and focused."
-        : "Plan guidance: deeper replies are allowed when genuinely useful, but deeper does not mean longer.",
+        : "Plan guidance: better replies are allowed, but better does not mean longer.",
       getReplyDirective(conversationStyle),
     ]
       .filter(Boolean)
@@ -646,7 +626,7 @@ export async function POST(req: NextRequest) {
 
     const completion = await openai.chat.completions.create({
       model: chatModel,
-      temperature: 0.7,
+      temperature: 0.72,
       max_completion_tokens: getMaxCompletionTokens({
         style: conversationStyle,
         context: replyContext,
