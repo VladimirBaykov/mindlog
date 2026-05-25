@@ -30,14 +30,15 @@ type ResolvedConversationStyle =
   | "reflective_guide"
   | "clear_mirror";
 
-type NotificationOption =
-  | "yes"
-  | "not_now"
-  | null;
+type NotificationOption = "yes" | "not_now" | null;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
+
+function getChatModel() {
+  return process.env.OPENAI_CHAT_MODEL || "gpt-5.4-mini";
+}
 
 function resolveConversationStyle(
   style: ConversationStyle
@@ -196,9 +197,7 @@ function getReplyDirective(style: ConversationStyle) {
   ].join("\n");
 }
 
-function isValidRole(
-  value: unknown
-): value is ChatMessage["role"] {
+function isValidRole(value: unknown): value is ChatMessage["role"] {
   return value === "user" || value === "assistant";
 }
 
@@ -321,18 +320,16 @@ export async function POST(req: NextRequest) {
 
     try {
       const goal =
-        (user.user_metadata?.onboarding_goal as GoalOption) ??
-        null;
+        (user.user_metadata?.onboarding_goal as GoalOption) ?? null;
 
       conversationStyle = resolveConversationStyle(
-        (user.user_metadata
-          ?.conversation_style as ConversationStyle) ?? "friend"
+        (user.user_metadata?.conversation_style as ConversationStyle) ??
+          "friend"
       );
 
       const notifications =
         (user.user_metadata
-          ?.onboarding_notifications as NotificationOption) ??
-        null;
+          ?.onboarding_notifications as NotificationOption) ?? null;
 
       preferenceHint = getPreferenceHint({
         goal,
@@ -345,6 +342,7 @@ export async function POST(req: NextRequest) {
 
     const intent = detectIntent(messages);
     const chatState = resolveChatState(intent, messages);
+    const chatModel = getChatModel();
 
     const systemPrompt = [
       getCorePrompt(),
@@ -361,7 +359,7 @@ export async function POST(req: NextRequest) {
       .join("\n\n");
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: chatModel,
       temperature: 0.68,
       messages: [
         {
@@ -382,6 +380,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       reply,
       chatState,
+      model: chatModel,
     });
   } catch (error) {
     console.error("Chat API error:", error);
