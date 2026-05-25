@@ -33,6 +33,7 @@ type ResolvedConversationStyle =
 type NotificationOption = "yes" | "not_now" | null;
 
 type ReplyContext =
+  | "greeting"
   | "casual"
   | "practical"
   | "emotional"
@@ -68,18 +69,21 @@ function getMaxCompletionTokens(params: {
   const { style, context } = params;
 
   if (style === "friend") {
+    if (context === "greeting") return 45;
     if (context === "emotional") return 90;
     if (context === "practical") return 75;
     return 65;
   }
 
   if (style === "reflective_guide") {
+    if (context === "greeting") return 55;
     if (context === "emotional") return 105;
     if (context === "practical") return 90;
     if (context === "honesty") return 95;
     return 80;
   }
 
+  if (context === "greeting") return 45;
   if (context === "emotional") return 95;
   if (context === "practical") return 80;
   if (context === "honesty") return 85;
@@ -96,12 +100,58 @@ function includesAny(text: string, patterns: string[]) {
   return patterns.some((pattern) => text.includes(pattern));
 }
 
+function isGreetingMessage(text: string) {
+  const normalized = text
+    .toLowerCase()
+    .replace(/[^\w\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  const exactGreetings = [
+    "hi",
+    "hey",
+    "hello",
+    "yo",
+    "sup",
+    "how are you",
+    "how are u",
+    "how's it going",
+    "hows it going",
+    "how are things",
+    "how you doing",
+    "how are you doing",
+    "what's up",
+    "whats up",
+  ];
+
+  if (exactGreetings.includes(normalized)) {
+    return true;
+  }
+
+  return (
+    normalized.startsWith("hi ") ||
+    normalized.startsWith("hey ") ||
+    normalized.startsWith("hello ") ||
+    normalized.includes(" how are you") ||
+    normalized.includes(" what's up") ||
+    normalized.includes(" whats up")
+  );
+}
+
 function inferReplyContext(messages: ChatMessage[]): ReplyContext {
   const lastUserMessage = getLastUserMessage(messages);
   const text = lastUserMessage?.content.toLowerCase() || "";
 
   if (!text) {
     return "default";
+  }
+
+  if (isGreetingMessage(text)) {
+    return "greeting";
   }
 
   const practicalMarkers = [
@@ -234,8 +284,10 @@ function getStyleProfile(style: ConversationStyle) {
     return [
       "Current conversation style: Reflective Guide.",
       "Be thoughtful and supportive, but still conversational and normal.",
+      "The user may simply want to talk in a thoughtful style; do not assume they are worried, distressed, or asking for emotional support.",
+      "For greetings and small talk, answer simply and naturally. Do not open like a support agent or therapy session.",
       "Do not sound like a therapy room, meditation app, or emotional support hotline.",
-      "Avoid presence phrases like 'I am here and steady', 'calm and here', or 'what is on your mind today' unless the user clearly needs grounding.",
+      "Avoid presence phrases like 'I am here and steady', 'calm and here', 'ready to help', or 'what is on your mind today' unless the user clearly needs grounding.",
       "Give one useful observation, not a full analysis.",
       "Reflective Guide default length: 12–28 words.",
       "Use 35–50 words only when the user clearly asks for depth or says something emotionally important.",
@@ -345,6 +397,15 @@ function getContextDirective(params: {
   const { style, context } = params;
 
   if (style === "friend") {
+    if (context === "greeting") {
+      return [
+        "Current context: greeting.",
+        "Friend reply target: 5–12 words.",
+        "Answer casually and pass it back.",
+        "Example shape: 'Hey, I'm good. You?'",
+      ].join("\n");
+    }
+
     if (context === "casual") {
       return [
         "Current context: casual chat.",
@@ -384,6 +445,18 @@ function getContextDirective(params: {
   }
 
   if (style === "reflective_guide") {
+    if (context === "greeting") {
+      return [
+        "Current context: greeting.",
+        "Reflective Guide greeting target: 5–14 words.",
+        "Answer simply, normally, and lightly thoughtful.",
+        "Do not assume the user has a problem.",
+        "Do not say you are 'ready to help'.",
+        "Do not use therapy-session openings.",
+        "Example shape: 'I'm doing well. How are you?'",
+      ].join("\n");
+    }
+
     if (context === "casual") {
       return [
         "Current context: casual or lifestyle.",
@@ -431,6 +504,16 @@ function getContextDirective(params: {
   }
 
   if (style === "clear_mirror") {
+    if (context === "greeting") {
+      return [
+        "Current context: greeting.",
+        "Clear Mirror greeting target: 3–10 words.",
+        "Answer simply and directly.",
+        "No emotional support framing.",
+        "Example shape: 'I'm good. What's up?'",
+      ].join("\n");
+    }
+
     if (context === "casual") {
       return [
         "Current context: casual or lifestyle.",
@@ -503,6 +586,7 @@ function getReplyDirective(style: ConversationStyle) {
       "Write one compact, perceptive chat message.",
       "Usually 12–30 words.",
       "Give one insight only.",
+      "If this is a greeting, reply simply and do not sound like a support agent.",
       "Do not sound like a therapist opening a session.",
       "No grounding/presence language unless the user is distressed.",
       "If useful, add one soft simple hook.",
