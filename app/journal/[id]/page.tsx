@@ -45,6 +45,102 @@ type UsageInfo = {
   };
 } | null;
 
+function normalizeForDetection(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ");
+}
+
+function isLowSignalUserMessage(content: string) {
+  const normalized = normalizeForDetection(content);
+
+  if (!normalized) return true;
+
+  const lowSignalExact = [
+    "hi",
+    "hey",
+    "hello",
+    "yo",
+    "sup",
+    "ok",
+    "okay",
+    "cool",
+    "nice",
+    "thanks",
+    "thank you",
+    "save it",
+    "save this",
+    "save this chat",
+    "save this conversation",
+    "save to journal",
+    "can you save this",
+    "can you save this chat",
+    "can you save this conversation",
+  ];
+
+  if (lowSignalExact.includes(normalized)) {
+    return true;
+  }
+
+  if (normalized.length <= 12) {
+    return true;
+  }
+
+  if (
+    normalized.startsWith("save ") ||
+    normalized.includes(" save this") ||
+    normalized.includes(" save it") ||
+    normalized.includes("save to journal")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getMeaningfulUserMessages(messages: Message[]) {
+  return messages.filter(
+    (message) =>
+      message.role === "user" &&
+      !isLowSignalUserMessage(message.content)
+  );
+}
+
+function getReflectionFocus(messages: Message[]) {
+  const meaningfulUserMessages = getMeaningfulUserMessages(messages);
+
+  const source =
+    meaningfulUserMessages[0]?.content ||
+    messages.find((message) => message.role === "user")?.content ||
+    "";
+
+  const trimmed = source.trim().replace(/\s+/g, " ");
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.length <= 220) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, 220).trim()}…`;
+}
+
+function getReflectionDescription(messages: Message[]) {
+  if (messages.length <= 3) {
+    return "A short saved conversation from MindLog.";
+  }
+
+  return "A saved reflection from your conversation with MindLog.";
+}
+
+function getMessageLabel(count: number) {
+  return `${count} message${count === 1 ? "" : "s"}`;
+}
+
 export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -110,6 +206,11 @@ export default function JournalEntryPage() {
   const assistantMessageCount = useMemo(
     () =>
       normalizedMessages.filter((msg) => msg.role === "assistant").length,
+    [normalizedMessages]
+  );
+
+  const reflectionFocus = useMemo(
+    () => getReflectionFocus(normalizedMessages),
     [normalizedMessages]
   );
 
@@ -281,17 +382,8 @@ export default function JournalEntryPage() {
     item.created_at || item.createdAt || Date.now()
   );
 
-  const reflectionStageCopy = (() => {
-    if (normalizedMessages.length <= 3) {
-      return "A short reflection snapshot you can return to later.";
-    }
-
-    if (normalizedMessages.length <= 8) {
-      return "A solid reflection entry with enough context to revisit meaningfully.";
-    }
-
-    return "A deeper reflection entry with enough texture to support pattern recognition over time.";
-  })();
+  const reflectionDescription =
+    getReflectionDescription(normalizedMessages);
 
   const progressCopy = (() => {
     if (loadingUsage) {
@@ -315,10 +407,10 @@ export default function JournalEntryPage() {
 
   const nextActionCopy = (() => {
     if (subscription?.isPro) {
-      return "Export this entry, continue reflecting, or review your stats to notice longer-term emotional patterns.";
+      return "Keep this entry as-is, export it, or start another conversation when something new feels worth saving.";
     }
 
-    return "Open export to preview Pro value, start another reflection, or keep building your history inside the journal.";
+    return "Keep building your journal, start another reflection, or unlock export when you want to save entries outside the app.";
   })();
 
   return (
@@ -344,7 +436,7 @@ export default function JournalEntryPage() {
               </div>
 
               <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
-                {reflectionStageCopy}
+                {reflectionDescription}
               </p>
             </div>
 
@@ -388,6 +480,17 @@ export default function JournalEntryPage() {
             </div>
           </div>
 
+          {reflectionFocus && (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
+              <div className="text-sm font-medium text-white">
+                Reflection focus
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                {reflectionFocus}
+              </p>
+            </div>
+          )}
+
           <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
             <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
               Journal progress
@@ -396,8 +499,8 @@ export default function JournalEntryPage() {
               {progressCopy}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-              The more entries you keep, the easier it becomes to notice
-              patterns, shifts, and recurring emotional themes.
+              The value of MindLog grows as saved reflections accumulate over
+              time.
             </p>
           </div>
 
@@ -411,7 +514,7 @@ export default function JournalEntryPage() {
                   {loadingSubscription
                     ? "Checking your plan..."
                     : subscription?.isPro
-                    ? "Open a clean export view and save it as a PDF."
+                    ? "Open a clean transcript-style export and save it as a PDF."
                     : "PDF export is available on Pro."}
                 </p>
               </div>
@@ -476,6 +579,16 @@ export default function JournalEntryPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="mb-3 px-1">
+          <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+            Conversation transcript
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            The original conversation is kept below so you can revisit the
+            full context.
+          </p>
         </div>
 
         <div className="space-y-3">

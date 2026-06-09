@@ -20,6 +20,91 @@ function isMoodKey(
   return Boolean(value && value in moodConfig);
 }
 
+function normalizeForDetection(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ");
+}
+
+function isLowSignalUserMessage(content: string) {
+  const normalized = normalizeForDetection(content);
+
+  if (!normalized) return true;
+
+  const lowSignalExact = [
+    "hi",
+    "hey",
+    "hello",
+    "yo",
+    "sup",
+    "ok",
+    "okay",
+    "cool",
+    "nice",
+    "thanks",
+    "thank you",
+    "save it",
+    "save this",
+    "save this chat",
+    "save this conversation",
+    "save to journal",
+    "can you save this",
+    "can you save this chat",
+    "can you save this conversation",
+  ];
+
+  if (lowSignalExact.includes(normalized)) {
+    return true;
+  }
+
+  if (normalized.length <= 12) {
+    return true;
+  }
+
+  if (
+    normalized.startsWith("save ") ||
+    normalized.includes(" save this") ||
+    normalized.includes(" save it") ||
+    normalized.includes("save to journal")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getJournalPreview(item: JournalItem) {
+  const meaningfulUserMessage = item.messages.find(
+    (message) =>
+      message.role === "user" &&
+      !isLowSignalUserMessage(message.content)
+  );
+
+  if (meaningfulUserMessage) {
+    return meaningfulUserMessage.content;
+  }
+
+  const firstUserMessage = item.messages.find(
+    (message) => message.role === "user"
+  );
+
+  if (firstUserMessage) {
+    return firstUserMessage.content;
+  }
+
+  const firstAssistantMessage = item.messages.find(
+    (message) => message.role === "assistant"
+  );
+
+  return firstAssistantMessage?.content ?? "No preview available";
+}
+
+function getMessageLabel(count: number) {
+  return `${count} message${count === 1 ? "" : "s"}`;
+}
+
 export default function JournalList() {
   const {
     items,
@@ -86,10 +171,7 @@ export default function JournalList() {
               : moodConfig.calm;
 
             const isActive = item.id === activeId;
-
-            const preview =
-              item.messages.find((m) => m.role === "user")?.content ??
-              "No preview available";
+            const preview = getJournalPreview(item);
 
             return (
               <motion.div
@@ -127,12 +209,12 @@ export default function JournalList() {
                       active:scale-[0.985]
                     `}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <h3 className="truncate text-sm font-medium text-white">
                         {item.title || "Conversation"}
                       </h3>
 
-                      <span className="text-xs opacity-70">
+                      <span className="shrink-0 text-xs opacity-70">
                         {mood.dot}
                       </span>
                     </div>
@@ -141,11 +223,13 @@ export default function JournalList() {
                       {preview}
                     </p>
 
-                    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-500">
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                       <span
                         className={`h-2 w-2 rounded-full ${mood.color}`}
                       />
                       <span>{mood.label}</span>
+                      <span>·</span>
+                      <span>{getMessageLabel(item.messages.length)}</span>
                       <span>·</span>
                       <span>
                         {new Date(item.createdAt).toLocaleDateString()}

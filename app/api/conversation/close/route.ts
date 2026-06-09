@@ -13,49 +13,217 @@ type Message = {
   content: string;
 };
 
-async function generateTitle(messages: Message[]) {
-  const text = messages
-    .map((m) => `${m.role}: ${m.content}`)
-    .join("\n");
+type Mood = "calm" | "reflective" | "heavy" | "anxious" | "hopeful";
 
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content:
-          "Generate a very short journal title (max 6 words). Emotional, human, calm tone. No punctuation.",
-      },
-      { role: "user", content: text },
-    ],
-  });
+type JournalMetadata = {
+  title: string;
+  mood: Mood;
+};
 
-  return res.choices[0].message.content?.trim();
+const ALLOWED_MOODS: Mood[] = [
+  "calm",
+  "reflective",
+  "heavy",
+  "anxious",
+  "hopeful",
+];
+
+function getJournalModel() {
+  return (
+    process.env.OPENAI_JOURNAL_MODEL ||
+    process.env.OPENAI_CHAT_MODEL ||
+    "gpt-4o-mini"
+  );
 }
 
-async function detectMood(messages: Message[]) {
-  const text = messages
-    .filter((m) => m.role === "user")
-    .map((m) => m.content)
+function normalizeText(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeForDetection(value: string) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLowSignalUserMessage(content: string) {
+  const normalized = normalizeForDetection(content);
+
+  if (!normalized) return true;
+
+  const exactLowSignal = [
+    "hi",
+    "hey",
+    "hello",
+    "yo",
+    "sup",
+    "thanks",
+    "thank you",
+    "ok",
+    "okay",
+    "cool",
+    "nice",
+    "save it",
+    "save this",
+    "save this chat",
+    "save this conversation",
+    "save to journal",
+    "can you save this",
+    "can you save this chat",
+    "can you save this conversation",
+  ];
+
+  if (exactLowSignal.includes(normalized)) {
+    return true;
+  }
+
+  if (normalized.length <= 12) {
+    return true;
+  }
+
+  if (
+    normalized.startsWith("save ") ||
+    normalized.includes(" save this") ||
+    normalized.includes(" save it") ||
+    normalized.includes("save to journal")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getMeaningfulUserMessages(messages: Message[]) {
+  return messages
+    .filter((message) => message.role === "user")
+    .map((message) => normalizeText(message.content))
+    .filter((content) => !isLowSignalUserMessage(content));
+}
+
+function createFallbackTitle(messages: Message[]) {
+  const meaningfulUserMessages = getMeaningfulUserMessages(messages);
+  const source =
+    meaningfulUserMessages[0] ||
+    messages.find((message) => message.role === "user")?.content ||
+    "Conversation";
+
+  const words = normalizeText(source)
+    .replace(/[“”"'.!?]+$/g, "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const fallback = words.join(" ");
+
+  return fallback || "Conversation";
+}
+
+function cleanTitle(value: string | undefined, fallback: string) {
+  const cleaned = normalizeText(value || "")
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .replace(/[.!?]+$/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return fallback;
+  }
+
+  const normalized = normalizeForDetection(cleaned);
+
+  const adviceLikeOpenings = [
+    "just say",
+    "say how",
+    "tell her",
+    "tell him",
+    "you should",
+    "you need",
+    "try to",
+    "tap save",
+    "save to",
+    "write it",
+    "ask her",
+    "ask him",
+  ];
+
+  if (adviceLikeOpenings.some((opening) => normalized.startsWith(opening))) {
+    return fallback;
+  }
+
+  const words = cleaned.split(" ").filter(Boolean);
+
+  if (words.length > 8) {
+    return words.slice(0, 8).join(" ");
+  }
+
+  return cleaned;
+}
+
+function normalizeMood(value: string | undefined): Mood {
+  const normalized = normalizeForDetection(value || "");
+
+  if (ALLOWED_MOODS.includes(normalized as Mood)) {
+    return normalized as Mood;
+  }
+
+  return "calm";
+}
+
+async function generateJournalMetadata(
+  messages: Message[]
+): Promise<JournalMetadata> {
+  const fallbackTitle = createFallbackTitle(messages);
+
+  const conversationText = messages
+    .map((message) => `${message.role}: ${normalizeText(message.content)}`)
     .join("\n");
 
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const response = await openai.chat.completions.create({
+    model: getJournalModel(),
+    temperature: 0.25,
+    max_completion_tokens: 160,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content: `
-You are classifying the emotional tone of a private journal conversation.
-
-Return ONLY one of these moods:
-calm, reflective, heavy, anxious, hopeful
-`,
+        content: [
+          "You create metadata for a saved MindLog journal reflection.",
+          "Return ONLY valid JSON.",
+          "JSON shape: { \"title\": string, \"mood\": string }.",
+          "Allowed mood values: calm, reflective, heavy, anxious, hopeful.",
+          "The title must describe the user's lived moment, not MindLog's advice.",
+          "Do not quote assistant advice as the title.",
+          "Do not create instruction-like titles such as 'Just say how you feel calmly'.",
+          "Do not use generic titles like 'Reflection', 'Conversation', or 'Journal Entry' unless there is no meaningful content.",
+          "Title should be human, specific, calm, and max 6 words when possible.",
+          "No punctuation at the end of the title.",
+          "If the user is nervous but moving toward something meaningful, choose anxious or hopeful based on the dominant tone.",
+        ].join("\n"),
       },
-      { role: "user", content: text },
+      {
+        role: "user",
+        content: conversationText,
+      },
     ],
   });
 
-  return res.choices[0].message.content?.trim()?.toLowerCase();
+  const raw = response.choices[0]?.message?.content || "{}";
+
+  let parsed: Partial<JournalMetadata> = {};
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    parsed = {};
+  }
+
+  return {
+    title: cleanTitle(parsed.title, fallbackTitle),
+    mood: normalizeMood(parsed.mood),
+  };
 }
 
 function isValidMessagesArray(value: unknown): value is Message[] {
@@ -139,26 +307,18 @@ export async function POST(req: Request) {
       }
     }
 
-    const firstUserMessage = messages.find(
-      (m) => m.role === "user"
-    )?.content;
-
-    const fallbackTitle =
-      firstUserMessage?.slice(0, 48) || "Conversation";
+    const fallbackTitle = createFallbackTitle(messages);
 
     let title = fallbackTitle;
-    let mood = "calm";
+    let mood: Mood = "calm";
 
     try {
-      const [t, m] = await Promise.all([
-        generateTitle(messages),
-        detectMood(messages),
-      ]);
+      const metadata = await generateJournalMetadata(messages);
 
-      title = t || fallbackTitle;
-      mood = m || "calm";
-    } catch (e) {
-      console.warn("AI metadata failed:", e);
+      title = metadata.title || fallbackTitle;
+      mood = metadata.mood || "calm";
+    } catch (error) {
+      console.warn("AI metadata failed:", error);
     }
 
     const { data, error } = await supabase
@@ -184,8 +344,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(data);
-  } catch (e) {
-    console.error("CLOSE CONVERSATION ERROR:", e);
+  } catch (error) {
+    console.error("CLOSE CONVERSATION ERROR:", error);
 
     return NextResponse.json(
       { error: "Internal server error" },
