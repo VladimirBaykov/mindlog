@@ -36,6 +36,9 @@ type ReplyContext =
   | "greeting"
   | "casual"
   | "practical"
+  | "writing"
+  | "identity"
+  | "product"
   | "emotional"
   | "honesty"
   | "default";
@@ -70,24 +73,46 @@ function getMaxCompletionTokens(params: {
 
   if (style === "friend") {
     if (context === "greeting") return 45;
+    if (context === "writing") return 180;
+    if (context === "identity") return 130;
+    if (context === "product") return 160;
     if (context === "emotional") return 90;
-    if (context === "practical") return 75;
-    return 65;
+    if (context === "practical") return 100;
+    return 70;
   }
 
   if (style === "reflective_guide") {
     if (context === "greeting") return 55;
-    if (context === "emotional") return 105;
-    if (context === "practical") return 90;
-    if (context === "honesty") return 95;
-    return 80;
+    if (context === "writing") return 260;
+    if (context === "identity") return 150;
+    if (context === "product") return 190;
+    if (context === "emotional") return 115;
+    if (context === "practical") return 120;
+    if (context === "honesty") return 110;
+    return 90;
   }
 
   if (context === "greeting") return 45;
-  if (context === "emotional") return 95;
-  if (context === "practical") return 80;
-  if (context === "honesty") return 85;
-  return 72;
+  if (context === "writing") return 220;
+  if (context === "identity") return 130;
+  if (context === "product") return 170;
+  if (context === "emotional") return 105;
+  if (context === "practical") return 105;
+  if (context === "honesty") return 95;
+  return 80;
+}
+
+function getRetryMaxCompletionTokens(params: {
+  style: ResolvedConversationStyle;
+  context: ReplyContext;
+}) {
+  const base = getMaxCompletionTokens(params);
+
+  if (params.context === "writing") return Math.max(base + 120, 340);
+  if (params.context === "product") return Math.max(base + 80, 240);
+  if (params.context === "identity") return Math.max(base + 60, 180);
+
+  return base + 80;
 }
 
 function getLastUserMessage(messages: ChatMessage[]) {
@@ -96,16 +121,25 @@ function getLastUserMessage(messages: ChatMessage[]) {
     .find((message) => message.role === "user");
 }
 
+function getRecentUserMessagesBeforeLast(messages: ChatMessage[]) {
+  const userMessages = messages.filter((message) => message.role === "user");
+  return userMessages.slice(0, -1).slice(-3);
+}
+
+function normalizeForDetection(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function includesAny(text: string, patterns: string[]) {
   return patterns.some((pattern) => text.includes(pattern));
 }
 
 function isGreetingMessage(text: string) {
-  const normalized = text
-    .toLowerCase()
-    .replace(/[^\w\s']/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const normalized = normalizeForDetection(text);
 
   if (!normalized) {
     return false;
@@ -142,17 +176,115 @@ function isGreetingMessage(text: string) {
   );
 }
 
+function looksLikeDraftContent(text: string) {
+  const trimmed = text.trim();
+
+  if (trimmed.length < 160) {
+    return false;
+  }
+
+  const sentenceLikeParts = trimmed
+    .split(/[.!?。！？]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const questionMarks = (trimmed.match(/\?/g) || []).length;
+
+  const hasDraftShape =
+    trimmed.includes(":") ||
+    trimmed.includes("\n") ||
+    trimmed.includes('"') ||
+    trimmed.includes("“") ||
+    trimmed.includes("”") ||
+    sentenceLikeParts.length >= 2;
+
+  return hasDraftShape && questionMarks <= 1;
+}
+
+function hasRecentDraftContext(messages: ChatMessage[]) {
+  return getRecentUserMessagesBeforeLast(messages).some((message) =>
+    looksLikeDraftContent(message.content)
+  );
+}
+
+function isShortFollowUp(text: string) {
+  const normalized = normalizeForDetection(text);
+  return normalized.length > 0 && normalized.length <= 140;
+}
+
 function inferReplyContext(messages: ChatMessage[]): ReplyContext {
   const lastUserMessage = getLastUserMessage(messages);
-  const text = lastUserMessage?.content.toLowerCase() || "";
+  const text = lastUserMessage?.content || "";
+  const normalized = normalizeForDetection(text);
 
-  if (!text) {
+  if (!normalized) {
     return "default";
   }
 
   if (isGreetingMessage(text)) {
     return "greeting";
   }
+
+  const identityMarkers = [
+    "what model",
+    "which model",
+    "what version",
+    "which version",
+    "model are you",
+    "version are you",
+    "are you gpt",
+    "gpt 4",
+    "gpt4",
+    "gpt 5",
+    "gpt5",
+    "gpt-4",
+    "gpt-5",
+  ];
+
+  const productMarkers = [
+    "what is mindlog",
+    "what's mindlog",
+    "what is this app",
+    "how does mindlog work",
+    "what can you do",
+    "how do i use mindlog",
+    "how do i use this",
+    "how do i write notes",
+    "how do notes work",
+    "how do i save",
+    "saved reflection",
+    "saved reflections",
+    "what is a reflection",
+  ];
+
+  const writingMarkers = [
+    "turn this into",
+    "make this into",
+    "make it a note",
+    "make this a note",
+    "make it a journal entry",
+    "make this a journal entry",
+    "turn it into a journal entry",
+    "clean this up",
+    "rewrite this",
+    "edit this",
+    "polish this",
+    "fix this text",
+    "improve this text",
+    "make it better",
+    "make it more natural",
+    "write this",
+    "help me write",
+    "continue this",
+    "summarize this",
+    "shorten this",
+    "make it more detailed",
+    "add more detail",
+    "draft this",
+    "format this",
+    "note:",
+    "text:",
+  ];
 
   const practicalMarkers = [
     "what should i write",
@@ -235,10 +367,19 @@ function inferReplyContext(messages: ChatMessage[]): ReplyContext {
     "weekend",
   ];
 
-  if (includesAny(text, practicalMarkers)) return "practical";
-  if (includesAny(text, honestyMarkers)) return "honesty";
-  if (includesAny(text, emotionalMarkers)) return "emotional";
-  if (includesAny(text, casualMarkers)) return "casual";
+  if (includesAny(normalized, identityMarkers)) return "identity";
+  if (includesAny(normalized, productMarkers)) return "product";
+  if (includesAny(normalized, writingMarkers)) return "writing";
+  if (looksLikeDraftContent(text)) return "writing";
+
+  if (hasRecentDraftContext(messages) && isShortFollowUp(text)) {
+    return "writing";
+  }
+
+  if (includesAny(normalized, practicalMarkers)) return "practical";
+  if (includesAny(normalized, honestyMarkers)) return "honesty";
+  if (includesAny(normalized, emotionalMarkers)) return "emotional";
+  if (includesAny(normalized, casualMarkers)) return "casual";
 
   return "default";
 }
@@ -258,6 +399,10 @@ function getCorePrompt() {
     "Avoid polished mini-essays, long balanced analysis, and article-like phrasing.",
     "Avoid bullet lists unless the user explicitly asks for a list.",
     "Do not offer extra comparisons, breakdowns, or follow-up services unless the user asks.",
+    "Always finish cleanly. Never end mid-sentence. If the full answer would be too long, give a shorter complete answer instead.",
+    "If the user asks which GPT model or exact version you are, do not claim a specific model version. Say you are MindLog, an AI chat inside this app, powered by OpenAI. The exact model may change as the app improves.",
+    "If the user asks what MindLog is, explain simply: MindLog is a private reflection chat where users can talk things through, save conversations as journal entries, and later notice patterns, themes, and changes over time.",
+    "If the user asks how notes or journal entries work, explain that they can write naturally, even messy, and MindLog can help clean it up, shape it into a journal entry, continue it, or save the conversation when they close it.",
   ].join("\n");
 }
 
@@ -396,6 +541,44 @@ function getContextDirective(params: {
 }) {
   const { style, context } = params;
 
+  if (context === "writing") {
+    return [
+      "Current context: writing, editing, rewriting, or shaping a note.",
+      "Complete the requested text cleanly.",
+      "It is okay to be longer than normal chat for this specific task.",
+      "Do not end mid-sentence.",
+      "Do not add a trailing 'if you want, I can...' sentence when the main written piece is already complete.",
+      "If the user asked for a note or journal entry, provide the finished note directly.",
+      style === "friend"
+        ? "Friend writing target: usually 50–120 words."
+        : style === "reflective_guide"
+        ? "Reflective Guide writing target: usually 60–150 words."
+        : "Clear Mirror writing target: usually 45–110 words.",
+    ].join("\n");
+  }
+
+  if (context === "identity") {
+    return [
+      "Current context: identity or model question.",
+      "Do not claim a specific GPT model or version.",
+      "Say you are MindLog, an AI chat inside this app, powered by OpenAI.",
+      "If useful, say the exact model can change as the app improves.",
+      "Keep it brief and natural.",
+      "Target: 15–40 words.",
+    ].join("\n");
+  }
+
+  if (context === "product") {
+    return [
+      "Current context: product explanation or app help.",
+      "Explain MindLog simply and practically.",
+      "Mention that users can chat, reflect, save conversations as journal entries, and later notice patterns.",
+      "If the user asks how to write notes, explain that they can write naturally and MindLog can clean up, continue, or shape the text.",
+      "Keep it useful but not salesy.",
+      "Target: 35–80 words.",
+    ].join("\n");
+  }
+
   if (style === "friend") {
     if (context === "greeting") {
       return [
@@ -419,7 +602,7 @@ function getContextDirective(params: {
     if (context === "practical") {
       return [
         "Current context: practical help.",
-        "Friend reply target: 10–30 words.",
+        "Friend reply target: 10–35 words.",
         "Give the useful answer first, like a friend.",
         "If suggesting text, give one clean option.",
       ].join("\n");
@@ -473,7 +656,7 @@ function getContextDirective(params: {
         "Current context: practical help.",
         "Give one useful answer or one useful observation.",
         "Stay practical first, reflective second.",
-        "Target: 15–35 words.",
+        "Target: 15–40 words.",
       ].join("\n");
     }
 
@@ -530,7 +713,7 @@ function getContextDirective(params: {
         "Current context: practical help.",
         "Give the direct move first.",
         "Do not over-explain.",
-        "Target: 10–28 words.",
+        "Target: 10–32 words.",
       ].join("\n");
     }
 
@@ -578,6 +761,8 @@ function getReplyDirective(style: ConversationStyle) {
       "If the reply would feel closed, add one tiny easy question.",
       "Do not ask deep questions.",
       "Do not use fancy reflective language.",
+      "For writing or editing tasks, complete the requested text cleanly even if it is longer than normal chat.",
+      "Never end mid-sentence.",
     ].join("\n");
   }
 
@@ -592,6 +777,8 @@ function getReplyDirective(style: ConversationStyle) {
       "No grounding/presence language unless the user is distressed.",
       "Avoid phrases like 'here and paying attention' in greetings.",
       "If useful, add one soft simple hook.",
+      "For writing or editing tasks, complete the requested note or text cleanly even if it is longer than normal chat.",
+      "Never end mid-sentence.",
       "No essay tone.",
     ].join("\n");
   }
@@ -603,7 +790,20 @@ function getReplyDirective(style: ConversationStyle) {
     "Give the clear read first.",
     "Do not start with comfort or validation unless safety requires it.",
     "Use a sharp simple question only if it moves the conversation forward.",
+    "For writing or editing tasks, complete the requested text cleanly even if it is longer than normal chat.",
+    "Never end mid-sentence.",
     "No essay tone.",
+  ].join("\n");
+}
+
+function getRetryDirective() {
+  return [
+    "Retry instruction:",
+    "The previous draft would be too long or incomplete.",
+    "Answer again as a shorter complete response.",
+    "Do not mention truncation, tokens, or retrying.",
+    "Never end mid-sentence.",
+    "If this is a writing task, provide one complete shorter version instead of a long unfinished one.",
   ].join("\n");
 }
 
@@ -772,13 +972,15 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join("\n\n");
 
-    const completion = await openai.chat.completions.create({
+    const completionMaxTokens = getMaxCompletionTokens({
+      style: conversationStyle,
+      context: replyContext,
+    });
+
+    let completion = await openai.chat.completions.create({
       model: chatModel,
       temperature: 0.72,
-      max_completion_tokens: getMaxCompletionTokens({
-        style: conversationStyle,
-        context: replyContext,
-      }),
+      max_completion_tokens: completionMaxTokens,
       messages: [
         {
           role: "system",
@@ -790,6 +992,29 @@ export async function POST(req: NextRequest) {
         })),
       ],
     });
+
+    if (completion.choices[0]?.finish_reason === "length") {
+      completion = await openai.chat.completions.create({
+        model: chatModel,
+        temperature: 0.58,
+        max_completion_tokens: getRetryMaxCompletionTokens({
+          style: conversationStyle,
+          context: replyContext,
+        }),
+        messages: [
+          {
+            role: "system",
+            content: [systemPrompt, getRetryDirective()]
+              .filter(Boolean)
+              .join("\n\n"),
+          },
+          ...messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        ],
+      });
+    }
 
     const reply =
       completion.choices[0]?.message?.content?.trim() ||

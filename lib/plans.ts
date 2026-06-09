@@ -29,9 +29,9 @@ export function getChatUsageLimits(
 ): ChatUsageLimits {
   if (plan === "pro") {
     return {
-      maxMessagesPerConversation: 40,
+      maxMessagesPerConversation: 80,
       maxCharactersPerMessage: 4000,
-      maxTotalInputCharacters: 24000,
+      maxTotalInputCharacters: 48000,
     };
   }
 
