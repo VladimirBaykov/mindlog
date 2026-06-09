@@ -36,6 +36,22 @@ type ApiErrorResponse = {
   plan?: "free" | "pro";
 };
 
+type SuggestedAction = {
+  type: "save_conversation";
+  label: string;
+  description?: string;
+};
+
+type ChatApiResponse = {
+  reply?: string;
+  chatState?: ChatState;
+  suggestedAction?: SuggestedAction | null;
+};
+
+type UIChatMessage = ChatMessage & {
+  suggestedAction?: SuggestedAction | null;
+};
+
 type GoalOption =
   | "process_emotions"
   | "build_consistency"
@@ -87,7 +103,7 @@ export default function Chat() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [chatState, setChatState] = useState<ChatState>("empty");
@@ -119,6 +135,36 @@ export default function Chat() {
 
   const starter = searchParams.get("starter");
   const hasDraftConversation = messages.length > 0 && !isSaved;
+
+  function serializeMessagesForApi(items: UIChatMessage[]): ChatMessage[] {
+    return items.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+    }));
+  }
+
+  function getMessagesForSuggestedSave(actionMessageId: string) {
+    const actionIndex = messages.findIndex(
+      (message) => message.id === actionMessageId
+    );
+
+    if (actionIndex === -1) {
+      return messages.filter((message) => !message.suggestedAction);
+    }
+
+    const previousMessage = messages[actionIndex - 1];
+    const cutoffIndex =
+      previousMessage?.role === "user" ? actionIndex - 1 : actionIndex;
+
+    const messagesToSave = messages.slice(0, Math.max(cutoffIndex, 0));
+
+    if (messagesToSave.length > 0) {
+      return messagesToSave;
+    }
+
+    return messages.filter((message) => message.id !== actionMessageId);
+  }
 
   useEffect(() => {
     const el = scrollContainerRef.current;
@@ -460,8 +506,13 @@ export default function Chat() {
     }
   }
 
-  async function closeConversation(nextHref?: string) {
-    if (messages.length === 0 || isSaved) return;
+  async function closeConversation(
+    nextHref?: string,
+    messagesOverride?: UIChatMessage[]
+  ) {
+    const messagesToSave = messagesOverride || messages;
+
+    if (messagesToSave.length === 0 || isSaved) return;
 
     setLimitError(null);
 
@@ -469,7 +520,9 @@ export default function Chat() {
       const res = await fetch("/api/conversation/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify({
+          messages: serializeMessagesForApi(messagesToSave),
+        }),
       });
 
       if (res.status === 403) {
@@ -502,7 +555,7 @@ export default function Chat() {
         page: "/chat",
         metadata: {
           conversationId: conversation.id,
-          messageCount: messages.length,
+          messageCount: messagesToSave.length,
           goal: preferences.goal,
           plan: usage?.plan || "free",
           conversationStyle: preferences.conversationStyle,
@@ -518,6 +571,33 @@ export default function Chat() {
     } catch (err) {
       console.error(err);
     }
+  }
+
+  async function handleSuggestedAction(
+    action: SuggestedAction,
+    actionMessageId: string
+  ) {
+    if (action.type !== "save_conversation") return;
+
+    await trackClientEvent({
+      eventName: "chat_suggested_action_clicked",
+      page: "/chat",
+      metadata: {
+        type: action.type,
+        plan: usage?.plan || "free",
+        goal: preferences.goal,
+        conversationStyle: preferences.conversationStyle,
+        messageCount: messages.length,
+      },
+    });
+
+    if (usage?.canSave === false) {
+      window.location.href = "/upgrade";
+      return;
+    }
+
+    const messagesToSave = getMessagesForSuggestedSave(actionMessageId);
+    await closeConversation(undefined, messagesToSave);
   }
 
   async function sendMessage() {
@@ -536,7 +616,7 @@ export default function Chat() {
       return;
     }
 
-    const userMessage: ChatMessage = {
+    const userMessage: UIChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: currentInput,
@@ -596,10 +676,15 @@ export default function Chat() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({
+          messages: serializeMessagesForApi(nextMessages),
+        }),
       });
 
-      const data = await res.json().catch(() => null);
+      const data = (await res.json().catch(() => null)) as
+        | ChatApiResponse
+        | ApiErrorResponse
+        | null;
 
       if (!res.ok) {
         const apiError = data as ApiErrorResponse | null;
@@ -639,17 +724,20 @@ export default function Chat() {
         return;
       }
 
+      const chatData = data as ChatApiResponse | null;
+
       setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: (data as { reply?: string })?.reply || "I’m here with you.",
+          content: chatData?.reply || "I’m here with you.",
+          suggestedAction: chatData?.suggestedAction || null,
         },
       ]);
 
-      if ((data as { chatState?: ChatState })?.chatState) {
-        setChatState((data as { chatState: ChatState }).chatState);
+      if (chatData?.chatState) {
+        setChatState(chatData.chatState);
       }
     } catch (err) {
       console.error(err);
@@ -843,13 +931,51 @@ export default function Chat() {
                     }`}
                   >
                     <div
-                      className={`max-w-[79%] rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.58] ${
-                        isUser
-                          ? "border-white/[0.08] bg-white/[0.07] text-white"
-                          : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
+                      className={`flex max-w-[79%] flex-col ${
+                        isUser ? "items-end" : "items-start"
                       }`}
                     >
-                      {msg.content}
+                      <div
+                        className={`rounded-[22px] border px-4 py-3 text-[14.5px] leading-[1.58] ${
+                          isUser
+                            ? "border-white/[0.08] bg-white/[0.07] text-white"
+                            : "border-white/[0.06] bg-white/[0.035] text-neutral-200"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+
+                      {!isUser &&
+                        msg.suggestedAction?.type === "save_conversation" &&
+                        !isSaved && (
+                          <button
+                            onClick={() =>
+                              handleSuggestedAction(
+                                msg.suggestedAction as SuggestedAction,
+                                msg.id
+                              )
+                            }
+                            className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white px-3.5 py-2 text-xs font-medium text-black shadow-[0_10px_28px_rgba(255,255,255,0.08)] transition hover:opacity-90"
+                          >
+                            <span>
+                              {usage?.canSave === false
+                                ? "Upgrade to save"
+                                : msg.suggestedAction.label}
+                            </span>
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-3.5 w-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M5 12h11" />
+                              <path d="m12 5 7 7-7 7" />
+                            </svg>
+                          </button>
+                        )}
                     </div>
                   </motion.div>
                 );

@@ -39,9 +39,16 @@ type ReplyContext =
   | "writing"
   | "identity"
   | "product"
+  | "save_action"
   | "emotional"
   | "honesty"
   | "default";
+
+type SuggestedAction = {
+  type: "save_conversation";
+  label: string;
+  description: string;
+};
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -73,6 +80,7 @@ function getMaxCompletionTokens(params: {
 
   if (style === "friend") {
     if (context === "greeting") return 45;
+    if (context === "save_action") return 70;
     if (context === "writing") return 180;
     if (context === "identity") return 130;
     if (context === "product") return 160;
@@ -83,6 +91,7 @@ function getMaxCompletionTokens(params: {
 
   if (style === "reflective_guide") {
     if (context === "greeting") return 55;
+    if (context === "save_action") return 80;
     if (context === "writing") return 260;
     if (context === "identity") return 150;
     if (context === "product") return 190;
@@ -93,6 +102,7 @@ function getMaxCompletionTokens(params: {
   }
 
   if (context === "greeting") return 45;
+  if (context === "save_action") return 70;
   if (context === "writing") return 220;
   if (context === "identity") return 130;
   if (context === "product") return 170;
@@ -257,6 +267,29 @@ function inferReplyContext(messages: ChatMessage[]): ReplyContext {
     "what is a reflection",
   ];
 
+  const saveActionMarkers = [
+    "save this",
+    "save it",
+    "save this chat",
+    "save this conversation",
+    "save conversation",
+    "save to journal",
+    "save this to journal",
+    "save this to my journal",
+    "save it to journal",
+    "save it to my journal",
+    "save as journal",
+    "save as a journal entry",
+    "save this reflection",
+    "save reflection",
+    "add this to journal",
+    "add it to journal",
+    "put this in my journal",
+    "put it in my journal",
+    "journal this",
+    "close and save",
+  ];
+
   const writingMarkers = [
     "turn this into",
     "make this into",
@@ -369,6 +402,7 @@ function inferReplyContext(messages: ChatMessage[]): ReplyContext {
 
   if (includesAny(normalized, identityMarkers)) return "identity";
   if (includesAny(normalized, productMarkers)) return "product";
+  if (includesAny(normalized, saveActionMarkers)) return "save_action";
   if (includesAny(normalized, writingMarkers)) return "writing";
   if (looksLikeDraftContent(text)) return "writing";
 
@@ -400,6 +434,8 @@ function getCorePrompt() {
     "Avoid bullet lists unless the user explicitly asks for a list.",
     "Do not offer extra comparisons, breakdowns, or follow-up services unless the user asks.",
     "Always finish cleanly. Never end mid-sentence. If the full answer would be too long, give a shorter complete answer instead.",
+    "Never claim you saved, exported, deleted, opened, changed, updated, or completed an app action unless the app explicitly performed that action.",
+    "If the user asks to save the chat, tell them to use the Save to Journal action shown by the app. Do not say the conversation has already been saved.",
     "If the user asks which GPT model or exact version you are, do not claim a specific model version. Say you are MindLog, an AI chat inside this app, powered by OpenAI. The exact model may change as the app improves.",
     "If the user asks what MindLog is, explain simply: MindLog is a private reflection chat where users can talk things through, save conversations as journal entries, and later notice patterns, themes, and changes over time.",
     "If the user asks how notes or journal entries work, explain that they can write naturally, even messy, and MindLog can help clean it up, shape it into a journal entry, continue it, or save the conversation when they close it.",
@@ -540,6 +576,16 @@ function getContextDirective(params: {
   context: ReplyContext;
 }) {
   const { style, context } = params;
+
+  if (context === "save_action") {
+    return [
+      "Current context: the user wants to save the conversation.",
+      "Do not say the conversation has already been saved.",
+      "Tell the user to tap the Save to Journal action shown by the app.",
+      "Keep the reply short and natural.",
+      "Target: 8–24 words.",
+    ].join("\n");
+  }
 
   if (context === "writing") {
     return [
@@ -763,6 +809,7 @@ function getReplyDirective(style: ConversationStyle) {
       "Do not use fancy reflective language.",
       "For writing or editing tasks, complete the requested text cleanly even if it is longer than normal chat.",
       "Never end mid-sentence.",
+      "Never claim an app action is completed unless the app actually completed it.",
     ].join("\n");
   }
 
@@ -779,6 +826,7 @@ function getReplyDirective(style: ConversationStyle) {
       "If useful, add one soft simple hook.",
       "For writing or editing tasks, complete the requested note or text cleanly even if it is longer than normal chat.",
       "Never end mid-sentence.",
+      "Never claim an app action is completed unless the app actually completed it.",
       "No essay tone.",
     ].join("\n");
   }
@@ -792,6 +840,7 @@ function getReplyDirective(style: ConversationStyle) {
     "Use a sharp simple question only if it moves the conversation forward.",
     "For writing or editing tasks, complete the requested text cleanly even if it is longer than normal chat.",
     "Never end mid-sentence.",
+    "Never claim an app action is completed unless the app actually completed it.",
     "No essay tone.",
   ].join("\n");
 }
@@ -805,6 +854,26 @@ function getRetryDirective() {
     "Never end mid-sentence.",
     "If this is a writing task, provide one complete shorter version instead of a long unfinished one.",
   ].join("\n");
+}
+
+function getSaveConversationAction(): SuggestedAction {
+  return {
+    type: "save_conversation",
+    label: "Save to Journal",
+    description: "Save this conversation as a journal entry.",
+  };
+}
+
+function getSaveActionReply(style: ResolvedConversationStyle) {
+  if (style === "clear_mirror") {
+    return "Tap Save to Journal below and I’ll save it.";
+  }
+
+  if (style === "reflective_guide") {
+    return "Yes — tap Save to Journal below and I’ll save this conversation.";
+  }
+
+  return "Yep — tap Save to Journal below and I’ll save it.";
 }
 
 function isValidRole(value: unknown): value is ChatMessage["role"] {
@@ -952,6 +1021,15 @@ export async function POST(req: NextRequest) {
     const chatState = resolveChatState(intent, messages);
     const chatModel = getChatModel();
     const replyContext = inferReplyContext(messages);
+
+    if (replyContext === "save_action") {
+      return NextResponse.json({
+        reply: getSaveActionReply(conversationStyle),
+        chatState,
+        model: chatModel,
+        suggestedAction: getSaveConversationAction(),
+      });
+    }
 
     const systemPrompt = [
       getCorePrompt(),
