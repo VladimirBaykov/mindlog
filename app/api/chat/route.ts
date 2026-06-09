@@ -152,6 +152,109 @@ function includesAny(text: string, patterns: string[]) {
   return patterns.some((pattern) => text.includes(pattern));
 }
 
+function getOpeningPhrase(content: string) {
+  const normalized = normalizeForDetection(content);
+
+  if (!normalized) return null;
+
+  if (normalized.startsWith("yeah")) return "Yeah";
+  if (normalized.startsWith("yep")) return "Yep";
+  if (normalized.startsWith("yes")) return "Yes";
+  if (normalized.startsWith("sure")) return "Sure";
+  if (normalized.startsWith("okay")) return "Okay";
+  if (normalized.startsWith("ok ")) return "Ok";
+  if (normalized === "ok") return "Ok";
+  if (normalized.startsWith("got you")) return "Got you";
+  if (normalized.startsWith("fair")) return "Fair";
+  if (normalized.startsWith("totally")) return "Totally";
+  if (normalized.startsWith("for sure")) return "For sure";
+  if (normalized.startsWith("i'm here")) return "I’m here";
+  if (normalized.startsWith("i am here")) return "I’m here";
+  if (normalized.startsWith("that makes sense")) return "That makes sense";
+  if (normalized.startsWith("sounds like")) return "Sounds like";
+
+  const firstWord = normalized.split(" ")[0];
+
+  if (!firstWord) return null;
+
+  return firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
+}
+
+function getOpeningVarietyHint(messages: ChatMessage[]) {
+  const recentAssistantMessages = messages
+    .filter((message) => message.role === "assistant")
+    .slice(-5);
+
+  if (recentAssistantMessages.length < 2) {
+    return "";
+  }
+
+  const openings = recentAssistantMessages
+    .map((message) => getOpeningPhrase(message.content))
+    .filter((opening): opening is string => Boolean(opening));
+
+  if (openings.length < 2) {
+    return "";
+  }
+
+  const counts = openings.reduce<Record<string, number>>((acc, opening) => {
+    acc[opening] = (acc[opening] || 0) + 1;
+    return acc;
+  }, {});
+
+  const repeatedOpenings = Object.entries(counts)
+    .filter(([, count]) => count >= 2)
+    .map(([opening]) => opening);
+
+  const lastOpening = openings[openings.length - 1];
+
+  const fillerOpenings = [
+    "Yeah",
+    "Yep",
+    "Yes",
+    "Sure",
+    "Okay",
+    "Ok",
+    "Got you",
+    "Fair",
+    "Totally",
+    "For sure",
+    "I’m here",
+  ];
+
+  const repeatedFillers = repeatedOpenings.filter((opening) =>
+    fillerOpenings.includes(opening)
+  );
+
+  const shouldWarn =
+    repeatedFillers.length > 0 ||
+    (lastOpening && fillerOpenings.includes(lastOpening));
+
+  if (!shouldWarn) {
+    return "";
+  }
+
+  const avoidList = Array.from(
+    new Set([
+      ...repeatedFillers,
+      ...(lastOpening && fillerOpenings.includes(lastOpening)
+        ? [lastOpening]
+        : []),
+    ])
+  );
+
+  return [
+    "Opening variety hint:",
+    "Recent replies have used repeated conversational openers.",
+    avoidList.length
+      ? `Do not start this reply with: ${avoidList.join(", ")}.`
+      : "Avoid starting this reply with the same filler as the previous assistant reply.",
+    "Often the best reply starts directly with the useful thought.",
+    "Use 'Yeah', 'Sure', 'Okay', 'Got you', and similar fillers only when they genuinely add warmth.",
+    "Do not use 'I’m here' unless the user is clearly distressed or explicitly asking for support.",
+  ].join("\n");
+}
+
 function getGreetingContext(text: string): ReplyContext | null {
   const normalized = normalizeForDetection(text);
 
@@ -458,6 +561,9 @@ function getCorePrompt() {
     "Avoid polished mini-essays, long balanced analysis, and article-like phrasing.",
     "Avoid bullet lists unless the user explicitly asks for a list.",
     "Do not offer extra comparisons, breakdowns, or follow-up services unless the user asks.",
+    "Avoid repeatedly starting replies with the same conversational filler.",
+    "Do not overuse 'Yeah', 'Sure', 'Okay', 'Got you', 'Fair', 'Totally', or 'I’m here'.",
+    "Often skip the opener entirely and answer directly.",
     "Always finish cleanly. Never end mid-sentence. If the full answer would be too long, give a shorter complete answer instead.",
     "Never claim you saved, exported, deleted, opened, changed, updated, or completed an app action unless the app explicitly performed that action.",
     "If the user asks to save the chat, tell them to use the Save to Journal action shown by the app. Do not say the conversation has already been saved.",
@@ -483,8 +589,10 @@ function getStyleProfile(style: ConversationStyle) {
       "Friend default length: 5–18 words.",
       "If the user asks for honesty or advice, you may use 20–35 words.",
       "Use tiny conversational hooks when useful: a simple question, a playful nudge, or a short next step.",
-      "Good Friend energy: 'Oh, nice. Any options yet?', 'Yeah, work plus a project can wipe you out.', 'Big move. If the money is fine, I get it.'",
-      "Bad Friend energy: polished paragraph, full analysis, product review, therapy framing, motivational speech.",
+      "Do not repeatedly start replies with 'Yeah'. Use it only when it genuinely fits.",
+      "Do not use 'I’m here' for ordinary casual chat.",
+      "Good Friend energy: 'Oh, nice. Any options yet?', 'That’s a big move.', 'If the money is fine, I get it.'",
+      "Bad Friend energy: repeated 'Yeah' openings, polished paragraph, full analysis, product review, therapy framing, motivational speech.",
     ].join("\n");
   }
 
@@ -496,6 +604,7 @@ function getStyleProfile(style: ConversationStyle) {
       "For greetings and small talk, answer simply and naturally. Do not open like a support agent or therapy session.",
       "Do not sound like a therapy room, meditation app, or emotional support hotline.",
       "Avoid presence phrases like 'I am here and steady', 'calm and here', 'ready to help', 'here and paying attention', 'holding space', or 'what is on your mind today' unless the user clearly needs grounding.",
+      "Avoid repeated agreement openings like 'Yeah' or 'That makes sense'.",
       "Give one useful observation, not a full analysis.",
       "Reflective Guide default length: 12–28 words.",
       "Use 35–50 words only when the user clearly asks for depth or says something emotionally important.",
@@ -503,7 +612,7 @@ function getStyleProfile(style: ConversationStyle) {
       "Do not ask formal questions like 'how does that make you feel?' unless the user clearly wants emotional exploration.",
       "For casual topics, be only slightly deeper than Friend, not dramatically more reflective.",
       "Good feel: compact, perceptive, human, quietly useful.",
-      "Bad feel: therapy opening, polished insight paragraph, formal emotional question, motivational speech.",
+      "Bad feel: therapy opening, repeated 'Yeah' openings, polished insight paragraph, formal emotional question, motivational speech.",
     ].join("\n");
   }
 
@@ -513,6 +622,7 @@ function getStyleProfile(style: ConversationStyle) {
     "Start with the clearest read.",
     "Do not lead with emotional support, soothing language, or soft reassurance.",
     "Avoid soft openings like 'calm and here', 'I am here', or 'that sounds hard' unless the user is clearly distressed.",
+    "Avoid repeatedly starting with 'Yeah'. Often start directly with the read.",
     "Use 'probably', 'yes', 'not really', or 'that sounds like' when the evidence is strong. Do not hide behind 'maybe' too often.",
     "Clear Mirror default length: 8–24 words.",
     "Use 28–45 words only when the user asks for honesty or the issue needs one clear breakdown.",
@@ -521,7 +631,7 @@ function getStyleProfile(style: ConversationStyle) {
     "For status, money, luxury, dating, or ambition topics, read the motive instead of reviewing the object.",
     "Use one sharp hook when useful.",
     "Good feel: short, clean, direct, useful, a little uncomfortable.",
-    "Bad feel: supportive cushioning, gentle reassurance first, therapy voice, long explanation.",
+    "Bad feel: repeated 'Yeah' openings, supportive cushioning, gentle reassurance first, therapy voice, long explanation.",
   ].join("\n");
 }
 
@@ -684,6 +794,7 @@ function getContextDirective(params: {
         "Current context: casual chat.",
         "Friend reply target: 5–18 words.",
         "Use a short reaction and a tiny hook.",
+        "Do not start with 'Yeah' if recent replies already used it.",
         "Example shape: 'Oh, nice. Any options yet?'",
         "Do not explain multiple angles.",
       ].join("\n");
@@ -695,6 +806,7 @@ function getContextDirective(params: {
         "Friend reply target: 10–35 words.",
         "Give the useful answer first, like a friend.",
         "If suggesting text, give one clean option.",
+        "Avoid filler openings when the answer can start directly.",
       ].join("\n");
     }
 
@@ -704,6 +816,7 @@ function getContextDirective(params: {
         "Friend reply target: 15–35 words.",
         "Answer directly, then add one simple reason.",
         "A small hook is okay if it keeps the chat moving.",
+        "Do not repeatedly open with 'Yeah'.",
       ].join("\n");
     }
 
@@ -713,6 +826,7 @@ function getContextDirective(params: {
         "Friend reply target: 12–35 words.",
         "Be warm and simple. No deep analysis unless asked.",
         "Use a gentle hook if natural.",
+        "Avoid repeated validation openings.",
       ].join("\n");
     }
   }
@@ -724,6 +838,7 @@ function getContextDirective(params: {
         "Stay compact and normal.",
         "Add only one light layer of meaning if it genuinely fits.",
         "Do not open like a therapist.",
+        "Do not repeatedly start with 'Yeah'.",
         "Target: 12–25 words.",
       ].join("\n");
     }
@@ -733,6 +848,7 @@ function getContextDirective(params: {
         "Current context: practical help.",
         "Give one useful answer or one useful observation.",
         "Stay practical first, reflective second.",
+        "Avoid filler openings when the answer can start directly.",
         "Target: 15–40 words.",
       ].join("\n");
     }
@@ -742,6 +858,7 @@ function getContextDirective(params: {
         "Current context: honesty or direct opinion.",
         "Give a clear read, then one thoughtful condition.",
         "Do not hedge too much.",
+        "Do not repeatedly start with agreement fillers.",
         "Target: 18–38 words.",
       ].join("\n");
     }
@@ -752,6 +869,7 @@ function getContextDirective(params: {
         "Give one clear observation that helps the user understand what is happening.",
         "Do not make it a therapy monologue.",
         "Use one soft simple hook if useful.",
+        "Avoid repeated validation openings.",
         "Target: 20–45 words.",
       ].join("\n");
     }
@@ -760,6 +878,7 @@ function getContextDirective(params: {
       "Current context:",
       "Give one useful observation.",
       "Keep it compact and chat-like.",
+      "Avoid repeated filler openings.",
       "Target: 12–32 words.",
     ].join("\n");
   }
@@ -770,6 +889,7 @@ function getContextDirective(params: {
         "Current context: casual or lifestyle.",
         "Give a short direct read.",
         "Do not add supportive cushioning.",
+        "Do not start with 'Yeah' if the reply can start directly.",
         "Target: 8–24 words.",
         "Use one sharp hook if useful.",
       ].join("\n");
@@ -780,6 +900,7 @@ function getContextDirective(params: {
         "Current context: practical help.",
         "Give the direct move first.",
         "Do not over-explain.",
+        "Avoid filler openings.",
         "Target: 10–32 words.",
       ].join("\n");
     }
@@ -790,6 +911,7 @@ function getContextDirective(params: {
         "Answer clearly in the first sentence.",
         "Use 'probably', 'yes', 'no', or 'not really' when appropriate.",
         "Then add one sharp reason.",
+        "Do not repeatedly start with 'Yeah'.",
         "Target: 14–36 words.",
       ].join("\n");
     }
@@ -800,6 +922,7 @@ function getContextDirective(params: {
         "Name the pattern clearly.",
         "Do not lead with comfort.",
         "One direct observation is enough.",
+        "Avoid repeated validation openings.",
         "Target: 16–40 words.",
       ].join("\n");
     }
@@ -808,6 +931,7 @@ function getContextDirective(params: {
       "Current context:",
       "Be concise and direct.",
       "No supportive cushioning.",
+      "Avoid filler openings.",
       "Target: 8–30 words.",
     ].join("\n");
   }
@@ -826,6 +950,8 @@ function getReplyDirective(style: ConversationStyle) {
       "Do not write two long sentences.",
       "Do not make a complete analysis.",
       "If the user only said hi, hey, or hello, do not say you are good unless they asked how you are.",
+      "Do not repeatedly start with 'Yeah', 'Sure', 'Okay', or 'Got you'.",
+      "If the reply works without an opener, start directly.",
       "If the reply would feel closed, add one tiny easy question.",
       "Do not ask deep questions.",
       "Do not use fancy reflective language.",
@@ -843,6 +969,8 @@ function getReplyDirective(style: ConversationStyle) {
       "Give one insight only.",
       "If this is a plain greeting, reply simply and do not say you are doing well unless asked.",
       "If this is a wellbeing greeting, answer briefly and pass it back.",
+      "Do not repeatedly start with 'Yeah', 'Sure', 'Okay', 'Got you', or 'That makes sense'.",
+      "If the reply works without an opener, start directly.",
       "Do not sound like a therapist opening a session.",
       "No grounding/presence language unless the user is distressed.",
       "Avoid phrases like 'here and paying attention' in greetings.",
@@ -860,6 +988,8 @@ function getReplyDirective(style: ConversationStyle) {
     "Usually 8–28 words.",
     "Give the clear read first.",
     "If the user only said hi, hey, or hello, do not say you are good unless they asked how you are.",
+    "Do not repeatedly start with 'Yeah', 'Sure', 'Okay', or 'Got you'.",
+    "If the reply works without an opener, start directly.",
     "Do not start with comfort or validation unless safety requires it.",
     "Use a sharp simple question only if it moves the conversation forward.",
     "For writing or editing tasks, complete the requested text cleanly even if it is longer than normal chat.",
@@ -1061,6 +1191,7 @@ export async function POST(req: NextRequest) {
       getStyleProfile(conversationStyle),
       preferenceHint,
       getRecentRhythmHint(messages),
+      getOpeningVarietyHint(messages),
       getContextDirective({
         style: conversationStyle,
         context: replyContext,
