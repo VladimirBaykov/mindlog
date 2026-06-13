@@ -6,13 +6,26 @@ import {
   type JournalItem,
 } from "@/components/journal/JournalContext";
 import { moodConfig } from "@/lib/journal/moodMap";
-import { SwipeableItem } from "@/components/ui/SwipeableItem";
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 
 type MoodKey = keyof typeof moodConfig;
+
+type MenuPlacement = "top" | "bottom";
+
+type ActiveMenu = {
+  item: JournalItem;
+  placement: MenuPlacement;
+};
+
+type JournalListProps = {
+  selectionMode?: boolean;
+  batchActionRequest?: number;
+  onSelectionModeChange?: (nextValue: boolean) => void;
+  onSelectionChange?: (count: number) => void;
+};
 
 function isMoodKey(
   value: string | null | undefined
@@ -105,7 +118,39 @@ function getMessageLabel(count: number) {
   return `${count} message${count === 1 ? "" : "s"}`;
 }
 
-export default function JournalList() {
+function getDateLabel(timestamp: number) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  }
+
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getMenuPlacement(element: HTMLElement): MenuPlacement {
+  const rect = element.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+
+  return spaceBelow < 260 ? "top" : "bottom";
+}
+
+export default function JournalList({
+  selectionMode = false,
+  batchActionRequest = 0,
+  onSelectionModeChange,
+  onSelectionChange,
+}: JournalListProps) {
   const {
     items,
     loading,
@@ -113,19 +158,55 @@ export default function JournalList() {
     hasMore,
     loadMore,
     deleteItem,
-    addItem,
+    updateItem,
   } = useJournal();
 
   const router = useRouter();
   const pathname = usePathname();
 
-  const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const deletedItemRef = useRef<JournalItem | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [activeMenu, setActiveMenu] = useState<ActiveMenu | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchMenuOpen, setBatchMenuOpen] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTriggeredRef = useRef(false);
 
   const activeId = pathname?.startsWith("/journal/")
     ? pathname.split("/journal/")[1]
     : null;
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedIds.has(item.id)),
+    [items, selectedIds]
+  );
+
+  useEffect(() => {
+    onSelectionChange?.(selectedIds.size);
+  }, [onSelectionChange, selectedIds.size]);
+
+  useEffect(() => {
+    if (!selectionMode) {
+      setSelectedIds(new Set());
+      setBatchMenuOpen(false);
+    }
+  }, [selectionMode]);
+
+  useEffect(() => {
+    if (batchActionRequest > 0 && selectedIds.size > 0) {
+      setBatchMenuOpen(true);
+    }
+  }, [batchActionRequest, selectedIds.size]);
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveMenu(null);
+        setBatchMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
 
   if (loading) {
     return <JournalSkeleton />;
@@ -135,42 +216,127 @@ export default function JournalList() {
     return <JournalEmpty />;
   }
 
-  const handleSwipeDelete = (item: JournalItem) => {
-    deletedItemRef.current = item;
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
 
-    deleteItem(item.id);
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
 
-    setSnackbarVisible(true);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
 
-    timerRef.current = setTimeout(() => {
-      deletedItemRef.current = null;
-      setSnackbarVisible(false);
-    }, 4000);
-  };
+      return next;
+    });
+  }
 
-  const handleUndo = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
+  function openEntry(id: string) {
+    if (id === activeId) return;
+    router.push(`/journal/${id}`);
+  }
 
-    if (timerRef.current) clearTimeout(timerRef.current);
+  function openItemMenu(item: JournalItem, element: HTMLElement) {
+    clearLongPressTimer();
+    longPressTriggeredRef.current = true;
+    setActiveMenu({
+      item,
+      placement: getMenuPlacement(element),
+    });
+  }
 
-    if (deletedItemRef.current) {
-      addItem(deletedItemRef.current);
+  function handlePointerDown(
+    item: JournalItem,
+    event: React.PointerEvent<HTMLDivElement>
+  ) {
+    if (selectionMode) return;
+
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
+
+    const element = event.currentTarget;
+
+    longPressTimerRef.current = setTimeout(() => {
+      openItemMenu(item, element);
+    }, 420);
+  }
+
+  function handlePointerUp() {
+    clearLongPressTimer();
+  }
+
+  function handlePointerCancel() {
+    clearLongPressTimer();
+  }
+
+  function handleCardClick(item: JournalItem) {
+    if (selectionMode) {
+      toggleSelected(item.id);
+      return;
     }
 
-    deletedItemRef.current = null;
-    setSnackbarVisible(false);
-  };
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      return;
+    }
+
+    openEntry(item.id);
+  }
+
+  async function renameItem(item: JournalItem) {
+    const nextTitle = prompt("New reflection title:", item.title || "");
+
+    if (!nextTitle || nextTitle === item.title) return;
+
+    await updateItem(item.id, { title: nextTitle });
+    setActiveMenu(null);
+  }
+
+  async function deleteSingleItem(item: JournalItem) {
+    const ok = confirm("Delete this reflection?");
+    if (!ok) return;
+
+    await deleteItem(item.id);
+    setActiveMenu(null);
+  }
+
+  async function deleteSelectedItems() {
+    if (selectedItems.length === 0) return;
+
+    const ok = confirm(
+      `Delete ${selectedItems.length} selected reflection${
+        selectedItems.length === 1 ? "" : "s"
+      }?`
+    );
+
+    if (!ok) return;
+
+    for (const item of selectedItems) {
+      await deleteItem(item.id);
+    }
+
+    setSelectedIds(new Set());
+    setBatchMenuOpen(false);
+    onSelectionModeChange?.(false);
+  }
 
   return (
     <>
       <motion.div layout className="space-y-3">
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {items.map((item) => {
             const mood = isMoodKey(item.mood)
               ? moodConfig[item.mood]
               : moodConfig.calm;
 
             const isActive = item.id === activeId;
+            const isSelected = selectedIds.has(item.id);
             const preview = getJournalPreview(item);
 
             return (
@@ -186,57 +352,84 @@ export default function JournalList() {
                   damping: 40,
                 }}
               >
-                <SwipeableItem
-                  onSwipeDelete={() => handleSwipeDelete(item)}
+                <motion.div
+                  onPointerDown={(event) => handlePointerDown(item, event)}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerCancel}
+                  onPointerLeave={handlePointerCancel}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    openItemMenu(item, event.currentTarget);
+                  }}
+                  onClick={() => handleCardClick(item)}
+                  whileTap={{ scale: selectionMode ? 0.99 : 0.985 }}
+                  className={`
+                    relative w-full overflow-hidden rounded-[26px] border px-4 py-4
+                    transition-all duration-200 ease-out
+                    ${
+                      isActive
+                        ? "border-white/16 bg-white/[0.075]"
+                        : "border-white/[0.07] bg-white/[0.035]"
+                    }
+                    ${isSelected ? "border-white/35 bg-white/[0.09]" : ""}
+                    hover:border-white/14 hover:bg-white/[0.055]
+                  `}
                 >
-                  <motion.div
-                    onClick={() => {
-                      if (isActive) return;
+                  <div className="flex items-center gap-4">
+                    {selectionMode && (
+                      <div
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition ${
+                          isSelected
+                            ? "border-white bg-white text-black"
+                            : "border-white/20 bg-white/[0.03] text-transparent"
+                        }`}
+                      >
+                        <span className="text-xs font-semibold">✓</span>
+                      </div>
+                    )}
 
-                      setTimeout(() => {
-                        router.push(`/journal/${item.id}`);
-                      }, 90);
-                    }}
-                    className={`
-                      w-full rounded-2xl border px-4 py-3
-                      transition-all duration-200 ease-out
-                      ${
-                        isActive
-                          ? "border-white/15 bg-neutral-800"
-                          : "border-white/5 bg-neutral-900"
-                      }
-                      hover:border-white/10 hover:bg-neutral-900/90
-                      active:scale-[0.985]
-                    `}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="truncate text-sm font-medium text-white">
-                        {item.title || "Conversation"}
-                      </h3>
+                    <div
+                      className={`h-11 w-[5px] shrink-0 rounded-full ${mood.stripe}`}
+                    />
 
-                      <span className="shrink-0 text-xs opacity-70">
-                        {mood.dot}
-                      </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="truncate text-[15px] font-medium tracking-[-0.01em] text-white">
+                          {item.title || "Conversation"}
+                        </h3>
+
+                        {!selectionMode && (
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openItemMenu(item, event.currentTarget);
+                            }}
+                            className="-mr-1 -mt-1 rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-white/[0.06] hover:text-white"
+                            aria-label="Open reflection actions"
+                          >
+                            ⋯
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="mt-1.5 line-clamp-1 text-[13px] leading-relaxed text-neutral-400">
+                        {preview}
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                        <span
+                          className={`rounded-full px-2.5 py-1 ${mood.softBg} text-neutral-200`}
+                        >
+                          {mood.label}
+                        </span>
+                        <span>·</span>
+                        <span>{getDateLabel(item.createdAt)}</span>
+                        <span>·</span>
+                        <span>{getMessageLabel(item.messages.length)}</span>
+                      </div>
                     </div>
-
-                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-neutral-400">
-                      {preview}
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                      <span
-                        className={`h-2 w-2 rounded-full ${mood.color}`}
-                      />
-                      <span>{mood.label}</span>
-                      <span>·</span>
-                      <span>{getMessageLabel(item.messages.length)}</span>
-                      <span>·</span>
-                      <span>
-                        {new Date(item.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </motion.div>
-                </SwipeableItem>
+                  </div>
+                </motion.div>
               </motion.div>
             );
           })}
@@ -256,33 +449,114 @@ export default function JournalList() {
       </motion.div>
 
       <AnimatePresence>
-        {snackbarVisible && (
+        {activeMenu && (
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 16 }}
-            transition={{
-              type: "spring",
-              stiffness: 500,
-              damping: 40,
-            }}
-            className="fixed inset-x-0 bottom-0 z-[9999] flex justify-center"
-            style={{
-              paddingBottom:
-                "calc(env(safe-area-inset-bottom) + 16px)",
-            }}
+            className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveMenu(null)}
           >
-            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-neutral-900/90 px-4 py-2 backdrop-blur-xl">
-              <span className="whitespace-nowrap text-sm text-white">
-                Conversation deleted
-              </span>
-
-              <button
-                onClick={handleUndo}
-                className="rounded-full px-4 py-2 -my-2 text-sm font-medium text-blue-400 transition hover:text-blue-300 active:scale-95"
+            <div
+              className={`mx-auto flex min-h-full max-w-xl px-4 ${
+                activeMenu.placement === "top"
+                  ? "items-end pb-5"
+                  : "items-center"
+              }`}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                transition={{ type: "spring", stiffness: 520, damping: 38 }}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50"
               >
-                Undo
-              </button>
+                <div className="px-4 py-3">
+                  <div className="truncate text-sm font-medium text-white">
+                    {activeMenu.item.title || "Conversation"}
+                  </div>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    {getMessageLabel(activeMenu.item.messages.length)} · {getDateLabel(activeMenu.item.createdAt)}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <button
+                    onClick={() => openEntry(activeMenu.item.id)}
+                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Open</span>
+                    <span className="text-neutral-500">↗</span>
+                  </button>
+
+                  <button
+                    onClick={() => renameItem(activeMenu.item)}
+                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Rename</span>
+                    <span className="text-neutral-500">✎</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
+                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Export</span>
+                    <span className="text-neutral-500">PDF</span>
+                  </button>
+
+                  <div className="my-1 h-px bg-white/[0.08]" />
+
+                  <button
+                    onClick={() => deleteSingleItem(activeMenu.item)}
+                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
+                  >
+                    <span>Delete</span>
+                    <span>⌫</span>
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {batchMenuOpen && selectedIds.size > 0 && (
+          <motion.div
+            className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setBatchMenuOpen(false)}
+          >
+            <div className="mx-auto flex min-h-full max-w-xl items-end px-4 pb-5">
+              <motion.div
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 18 }}
+                transition={{ type: "spring", stiffness: 520, damping: 38 }}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50"
+              >
+                <div className="px-4 py-3">
+                  <div className="text-sm font-medium text-white">
+                    {selectedIds.size} selected
+                  </div>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    Batch actions for selected reflections
+                  </div>
+                </div>
+
+                <button
+                  onClick={deleteSelectedItems}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
+                >
+                  <span>Delete selected</span>
+                  <span>⌫</span>
+                </button>
+              </motion.div>
             </div>
           </motion.div>
         )}
