@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import JournalList from "@/components/JournalList";
@@ -33,6 +32,9 @@ export default function JournalPage() {
   const [celebrateTracked, setCelebrateTracked] = useState(false);
   const [usage, setUsage] = useState<UsageInfo>(null);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedCount, setSelectedCount] = useState(0);
+  const [batchActionRequest, setBatchActionRequest] = useState(0);
 
   const celebrate = searchParams.get("celebrate");
   const entryId = searchParams.get("entry");
@@ -41,12 +43,35 @@ export default function JournalPage() {
     setHeader({
       title: "Journal",
       rightSlot: (
-        <Link
-          href="/chat"
-          className="text-sm text-neutral-400 hover:text-white transition"
-        >
-          New
-        </Link>
+        <div className="flex items-center gap-2">
+          {selectionMode && (
+            <button
+              onClick={() => setBatchActionRequest((value) => value + 1)}
+              disabled={selectedCount === 0}
+              className="rounded-full px-3 py-1.5 text-lg leading-none text-neutral-300 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-30"
+              aria-label="Open selected actions"
+            >
+              ⋯
+            </button>
+          )}
+
+          {!selectionMode && (
+            <button
+              onClick={() => router.push("/chat")}
+              className="rounded-full px-3 py-1.5 text-sm text-neutral-400 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              New
+            </button>
+          )}
+
+          <button
+            onClick={() => setSelectionMode((value) => !value)}
+            className="rounded-full px-3 py-1.5 text-sm text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+            aria-label={selectionMode ? "Exit selection" : "Select reflections"}
+          >
+            {selectionMode ? "×" : "Select"}
+          </button>
+        </div>
       ),
       menuItems: [
         {
@@ -64,7 +89,13 @@ export default function JournalPage() {
     return () => {
       resetHeader();
     };
-  }, [router, resetHeader, setHeader]);
+  }, [
+    router,
+    resetHeader,
+    selectedCount,
+    selectionMode,
+    setHeader,
+  ]);
 
   useEffect(() => {
     if (celebrate === "1") {
@@ -126,47 +157,39 @@ export default function JournalPage() {
 
   const celebrationCopy = useMemo(() => {
     return entryId
-      ? "Your reflection was saved successfully. This is no longer just a chat — it is now part of your journal history."
+      ? "Your reflection was saved. It now lives in your private journal."
       : "Your reflection was saved successfully.";
   }, [entryId]);
 
-  const progressCopy = useMemo(() => {
+  const saveStatusCopy = useMemo(() => {
     if (usageLoading) {
-      return "Updating your journal progress…";
+      return "Checking your journal…";
     }
 
     if (!usage) {
-      return "Your journal is growing one reflection at a time.";
+      return "Your saved reflections are kept here as a private memory layer.";
     }
 
     if (usage.limit === null) {
-      return `You now have ${usage.used} saved reflection${
+      return `${usage.used} saved reflection${
         usage.used === 1 ? "" : "s"
-      } in your journal.`;
+      } · Unlimited saves active`;
     }
 
-    return `You now have ${usage.used}/${usage.limit} saved reflection${
+    return `${usage.used}/${usage.limit} saved reflection${
       usage.used === 1 ? "" : "s"
-    } on your current plan.`;
+    } used`;
   }, [usageLoading, usage]);
 
-  const milestoneCopy = useMemo(() => {
-    const count = usage?.used ?? 0;
+  const limitPillCopy = useMemo(() => {
+    if (usageLoading) return "Loading";
+    if (!usage) return "Private journal";
+    if (usage.limit === null) return "Pro active";
 
-    if (count <= 1) {
-      return "This is your first saved reflection — the real value starts when your journal begins to accumulate over time.";
-    }
-
-    if (count < 5) {
-      return "You are starting to build a real reflection streak. Each saved entry makes future patterns easier to notice.";
-    }
-
-    if (count < 10) {
-      return "Your journal is gaining enough depth to become meaningfully useful, not just momentary.";
-    }
-
-    return "You already have meaningful history in MindLog. This is where journaling starts turning into self-knowledge.";
-  }, [usage?.used]);
+    return typeof usage.remaining === "number"
+      ? `${usage.remaining} saves left`
+      : "Free plan";
+  }, [usageLoading, usage]);
 
   function dismissCelebrate() {
     setShowCelebrate(false);
@@ -198,27 +221,13 @@ export default function JournalPage() {
     router.push(`/journal/${entryId}`);
   }
 
-  async function startNewReflection() {
-    await trackClientEvent({
-      eventName: "journal_post_save_new_reflection",
-      page: "/journal",
-      metadata: {
-        entryId,
-        used: usage?.used ?? null,
-        plan: usage?.plan ?? null,
-      },
-    });
-
-    router.push("/chat");
-  }
-
   return (
     <AuthGate>
       <div className="h-screen overflow-hidden bg-black text-white">
         <div className="h-full overflow-y-auto overscroll-contain">
           <div className="mx-auto max-w-xl px-4 pt-6 pb-8">
             {showCelebrate && (
-              <div className="mb-5 rounded-[24px] border border-emerald-500/20 bg-emerald-500/10 px-5 py-5">
+              <div className="mb-5 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="inline-flex rounded-full border border-white/10 bg-white/[0.08] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200">
@@ -238,67 +247,69 @@ export default function JournalPage() {
                   </button>
                 </div>
 
-                <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-neutral-400">
-                    Journal progress
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-200">
-                    {progressCopy}
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                    {milestoneCopy}
-                  </p>
-                </div>
-
-                {usage?.plan === "free" &&
-                  typeof usage?.remaining === "number" && (
-                    <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm text-neutral-200">
-                          Free plan saves remaining
-                        </div>
-                        <div className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-xs text-neutral-200">
-                          {usage.remaining}
-                        </div>
-                      </div>
-
-                      <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                        Pro unlocks unlimited saved entries, deeper AI reflection,
-                        weekly summaries, insights, and PDF export.
-                      </p>
-
-                      {usage.remaining <= 3 && (
-                        <button
-                          onClick={() => router.push("/upgrade")}
-                          className="mt-4 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                        >
-                          Upgrade to Pro
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                  {entryId && (
-                    <button
-                      onClick={openSavedEntry}
-                      className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
-                    >
-                      Open saved entry
-                    </button>
-                  )}
-
+                {entryId && (
                   <button
-                    onClick={startNewReflection}
-                    className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                    onClick={openSavedEntry}
+                    className="mt-4 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                   >
-                    Start another reflection
+                    Open saved entry
                   </button>
-                </div>
+                )}
               </div>
             )}
 
-            <JournalList />
+            <div className="mb-5 rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-5 shadow-2xl shadow-black/20">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                    Your reflection journal
+                  </div>
+                  <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
+                    Your reflections, remembered.
+                  </h1>
+                  <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
+                    Saved conversations become private entries you can revisit,
+                    organize, export, and continue later.
+                  </p>
+                </div>
+
+                <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-neutral-200">
+                  {limitPillCopy}
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Journal status
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-200">
+                  {saveStatusCopy}
+                </p>
+                {usage?.plan === "free" && (
+                  <button
+                    onClick={() => router.push("/upgrade")}
+                    className="mt-4 rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.07]"
+                  >
+                    Upgrade for unlimited saves
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {selectionMode && (
+              <div className="mb-4 rounded-[22px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-neutral-300">
+                {selectedCount === 0
+                  ? "Select reflections to manage them."
+                  : `${selectedCount} selected`}
+              </div>
+            )}
+
+            <JournalList
+              selectionMode={selectionMode}
+              batchActionRequest={batchActionRequest}
+              onSelectionModeChange={setSelectionMode}
+              onSelectionChange={setSelectedCount}
+            />
           </div>
         </div>
       </div>
