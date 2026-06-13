@@ -13,10 +13,12 @@ type Message = {
   content: string;
 };
 
+type MoodKey = keyof typeof moodConfig;
+
 type JournalItem = {
   id: string;
   title: string;
-  mood?: keyof typeof moodConfig;
+  mood?: MoodKey | string | null;
   createdAt?: number;
   created_at?: string;
   messages?: Message[];
@@ -44,6 +46,10 @@ type UsageInfo = {
     maxTotalInputCharacters: number;
   };
 } | null;
+
+function isMoodKey(value: string | null | undefined): value is MoodKey {
+  return Boolean(value && value in moodConfig);
+}
 
 function normalizeForDetection(value: string) {
   return value
@@ -122,23 +128,118 @@ function getReflectionFocus(messages: Message[]) {
     return "";
   }
 
-  if (trimmed.length <= 220) {
+  if (trimmed.length <= 240) {
     return trimmed;
   }
 
-  return `${trimmed.slice(0, 220).trim()}…`;
+  return `${trimmed.slice(0, 240).trim()}…`;
 }
 
-function getReflectionDescription(messages: Message[]) {
-  if (messages.length <= 3) {
-    return "A short saved conversation from MindLog.";
-  }
+function getShortFocus(messages: Message[]) {
+  const focus = getReflectionFocus(messages);
 
-  return "A saved reflection from your conversation with MindLog.";
+  if (!focus) return "Saved from your conversation with MindLog.";
+
+  if (focus.length <= 130) return focus;
+
+  return `${focus.slice(0, 130).trim()}…`;
 }
 
 function getMessageLabel(count: number) {
   return `${count} message${count === 1 ? "" : "s"}`;
+}
+
+function getChatType(messages: Message[]) {
+  const text = normalizeForDetection(
+    messages.map((message) => message.content).join(" ")
+  );
+
+  if (
+    text.includes("girl") ||
+    text.includes("girlfriend") ||
+    text.includes("boyfriend") ||
+    text.includes("friend") ||
+    text.includes("relationship") ||
+    text.includes("date") ||
+    text.includes("love")
+  ) {
+    return "Relationship reflection";
+  }
+
+  if (
+    text.includes("work") ||
+    text.includes("project") ||
+    text.includes("business") ||
+    text.includes("job")
+  ) {
+    return "Work reflection";
+  }
+
+  if (
+    text.includes("anxious") ||
+    text.includes("nervous") ||
+    text.includes("scared") ||
+    text.includes("sad") ||
+    text.includes("heavy") ||
+    text.includes("tired")
+  ) {
+    return "Emotional check-in";
+  }
+
+  if (
+    text.includes("car") ||
+    text.includes("porsche") ||
+    text.includes("rolls") ||
+    text.includes("weekend") ||
+    text.includes("talk")
+  ) {
+    return "Casual conversation";
+  }
+
+  if (
+    text.includes("should i") ||
+    text.includes("what should") ||
+    text.includes("decision") ||
+    text.includes("choose")
+  ) {
+    return "Decision moment";
+  }
+
+  return "Personal reflection";
+}
+
+function getThemes(messages: Message[], moodLabel: string) {
+  const text = normalizeForDetection(
+    messages.map((message) => message.content).join(" ")
+  );
+
+  const themes: string[] = [];
+
+  if (moodLabel && !themes.includes(moodLabel)) {
+    themes.push(moodLabel);
+  }
+
+  if (text.includes("friend") || text.includes("relationship")) {
+    themes.push("Connection");
+  }
+
+  if (text.includes("nervous") || text.includes("scared") || text.includes("anxious")) {
+    themes.push("Courage");
+  }
+
+  if (text.includes("work") || text.includes("project")) {
+    themes.push("Work");
+  }
+
+  if (text.includes("car") || text.includes("porsche") || text.includes("rolls")) {
+    themes.push("Lifestyle");
+  }
+
+  if (text.includes("should i") || text.includes("what should")) {
+    themes.push("Decision");
+  }
+
+  return Array.from(new Set(themes)).slice(0, 4);
 }
 
 export default function JournalEntryPage() {
@@ -156,6 +257,7 @@ export default function JournalEntryPage() {
   const [usage, setUsage] = useState<UsageInfo>(null);
   const [loadingUsage, setLoadingUsage] = useState(true);
   const [viewTracked, setViewTracked] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/journal/${id}`)
@@ -244,13 +346,10 @@ export default function JournalEntryPage() {
   useEffect(() => {
     if (!item) return;
 
-    const mood =
-      item.mood && moodConfig[item.mood]
-        ? moodConfig[item.mood]
-        : null;
+    const mood = isMoodKey(item.mood) ? moodConfig[item.mood] : null;
 
     setHeader({
-      title: item.title || "Conversation",
+      title: item.title || "Reflection",
       subtitle: mood?.label,
       leftSlot: (
         <button
@@ -260,69 +359,48 @@ export default function JournalEntryPage() {
           ← Journal
         </button>
       ),
-      menuItems: [
-        {
-          label: subscription?.isPro
-            ? "Export to PDF"
-            : "Export to PDF (Pro)",
-          highlight: true,
-          onClick: async () => {
-            await trackClientEvent({
-              eventName: "journal_entry_export_cta_clicked",
-              page: `/journal/${id}`,
-              metadata: {
-                entryId: item.id,
-                isPro: Boolean(subscription?.isPro),
-                plan: subscription?.plan || "free",
-              },
-            });
-
-            router.push(`/journal/${id}/export`);
-          },
-        },
-        {
-          label: "Rename",
-          onClick: async () => {
-            const nextTitle = prompt(
-              "New conversation title:",
-              item.title || ""
-            );
-
-            if (!nextTitle || nextTitle === item.title) return;
-
-            setItem((prev) =>
-              prev ? { ...prev, title: nextTitle } : prev
-            );
-
-            await updateItem(id, { title: nextTitle });
-          },
-        },
-        {
-          label: "Delete conversation",
-          danger: true,
-          onClick: async () => {
-            const ok = confirm("Delete this conversation?");
-            if (!ok) return;
-
-            await deleteItem(id);
-            router.push("/journal");
-          },
-        },
-      ],
     });
 
     return () => resetHeader();
-  }, [
-    item,
-    id,
-    router,
-    setHeader,
-    resetHeader,
-    updateItem,
-    deleteItem,
-    subscription?.isPro,
-    subscription?.plan,
-  ]);
+  }, [item, router, setHeader, resetHeader]);
+
+  async function renameEntry() {
+    if (!item) return;
+
+    const nextTitle = prompt("New reflection title:", item.title || "");
+
+    if (!nextTitle || nextTitle === item.title) return;
+
+    setItem((prev) => (prev ? { ...prev, title: nextTitle } : prev));
+    await updateItem(id, { title: nextTitle });
+    setActionsOpen(false);
+  }
+
+  async function deleteEntry() {
+    if (!item) return;
+
+    const ok = confirm("Delete this reflection?");
+    if (!ok) return;
+
+    await deleteItem(id);
+    router.push("/journal");
+  }
+
+  async function openExport() {
+    if (!item) return;
+
+    await trackClientEvent({
+      eventName: "journal_entry_export_cta_clicked",
+      page: `/journal/${id}`,
+      metadata: {
+        entryId: item.id,
+        isPro: Boolean(subscription?.isPro),
+        plan: subscription?.plan || "free",
+      },
+    });
+
+    router.push(`/journal/${id}/export`);
+  }
 
   if (loading) {
     return (
@@ -353,7 +431,7 @@ export default function JournalEntryPage() {
             </div>
 
             <h2 className="mt-4 text-lg font-medium text-white">
-              Conversation not found
+              Reflection not found
             </h2>
 
             <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
@@ -373,21 +451,21 @@ export default function JournalEntryPage() {
     );
   }
 
-  const mood =
-    item.mood && moodConfig[item.mood]
-      ? moodConfig[item.mood]
-      : moodConfig.calm;
+  const mood = isMoodKey(item.mood)
+    ? moodConfig[item.mood]
+    : moodConfig.calm;
 
   const createdDate = new Date(
     item.created_at || item.createdAt || Date.now()
   );
 
-  const reflectionDescription =
-    getReflectionDescription(normalizedMessages);
+  const chatType = getChatType(normalizedMessages);
+  const themes = getThemes(normalizedMessages, mood.label);
+  const shortFocus = getShortFocus(normalizedMessages);
 
   const progressCopy = (() => {
     if (loadingUsage) {
-      return "Updating your journal progress…";
+      return "Updating journal status…";
     }
 
     if (!usage) {
@@ -395,22 +473,14 @@ export default function JournalEntryPage() {
     }
 
     if (usage.limit === null) {
-      return `You currently have ${usage.used} saved reflection${
+      return `${usage.used} saved reflection${
         usage.used === 1 ? "" : "s"
       } in your journal.`;
     }
 
-    return `You currently have ${usage.used}/${usage.limit} saved reflection${
+    return `${usage.used}/${usage.limit} saved reflection${
       usage.used === 1 ? "" : "s"
     } on your current plan.`;
-  })();
-
-  const nextActionCopy = (() => {
-    if (subscription?.isPro) {
-      return "Keep this entry as-is, export it, or start another conversation when something new feels worth saving.";
-    }
-
-    return "Keep building your journal, start another reflection, or unlock export when you want to save entries outside the app.";
   })();
 
   return (
@@ -423,171 +493,175 @@ export default function JournalEntryPage() {
         transition={{ duration: 0.25 }}
         className="mx-auto max-w-xl px-4 pt-8 pb-14"
       >
-        <div className="mb-6 rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-300">
-                <span className={`h-2 w-2 rounded-full ${mood.color}`} />
+        <div className="mb-5 overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] shadow-2xl shadow-black/20">
+          <div className="flex gap-4 px-5 py-5">
+            <div className={`mt-1 h-16 w-[5px] shrink-0 rounded-full ${mood.stripe}`} />
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className={`inline-flex rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200 ${mood.softBg}`}>
+                    {mood.label}
+                  </div>
+
+                  <h1 className="mt-4 text-[28px] font-semibold leading-tight tracking-[-0.04em] text-white">
+                    {item.title || "Reflection"}
+                  </h1>
+                </div>
+
+                <button
+                  onClick={() => setActionsOpen(true)}
+                  className="-mr-1 rounded-full px-3 py-1.5 text-xl leading-none text-neutral-400 transition hover:bg-white/[0.06] hover:text-white"
+                  aria-label="Open reflection actions"
+                >
+                  ⋯
+                </button>
+              </div>
+
+              <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+                {shortFocus}
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                <span>{createdDate.toLocaleDateString()}</span>
+                <span>·</span>
+                <span>
+                  {createdDate.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <span>·</span>
+                <span>{getMessageLabel(normalizedMessages.length)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-white/[0.08] px-5 py-4">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <div className="text-lg font-semibold text-white">
+                  {normalizedMessages.length}
+                </div>
+                <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-neutral-500">
+                  Messages
+                </div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-white">
+                  {userMessageCount}
+                </div>
+                <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-neutral-500">
+                  Prompts
+                </div>
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-white">
+                  {assistantMessageCount}
+                </div>
+                <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-neutral-500">
+                  Replies
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-5 rounded-[28px] border border-white/10 bg-white/[0.035] px-5 py-5">
+          <div className="text-sm font-medium text-white">
+            Reflection insight
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            A focused view of this saved conversation only. Broader patterns
+            will live in Stats later.
+          </p>
+
+          <div className="mt-5 grid gap-3">
+            <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Chat type
+              </div>
+              <div className="mt-2 text-sm font-medium text-white">
+                {chatType}
+              </div>
+            </div>
+
+            <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                Mood
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-sm font-medium text-white">
+                <span className={`h-2.5 w-2.5 rounded-full ${mood.stripe}`} />
                 {mood.label}
               </div>
-
-              <div className="mt-4 text-xl font-medium text-white">
-                {item.title || "Conversation"}
-              </div>
-
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
-                {reflectionDescription}
-              </p>
             </div>
 
-            <div className="text-right text-xs text-neutral-500">
-              <div>{createdDate.toLocaleDateString()}</div>
-              <div className="mt-1">
-                {createdDate.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                Messages
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-white">
-                {normalizedMessages.length}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                Your prompts
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-white">
-                {userMessageCount}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                AI replies
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-white">
-                {assistantMessageCount}
-              </div>
-            </div>
-          </div>
-
-          {reflectionFocus && (
-            <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
-              <div className="text-sm font-medium text-white">
-                Reflection focus
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-                {reflectionFocus}
-              </p>
-            </div>
-          )}
-
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-              Journal progress
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-              {progressCopy}
-            </p>
-            <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-              The value of MindLog grows as saved reflections accumulate over
-              time.
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-medium text-white">
-                  Export this reflection
+            {themes.length > 0 && (
+              <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Themes
                 </div>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-                  {loadingSubscription
-                    ? "Checking your plan..."
-                    : subscription?.isPro
-                    ? "Open a clean transcript-style export and save it as a PDF."
-                    : "PDF export is available on Pro."}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {themes.map((theme) => (
+                    <span
+                      key={theme}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-neutral-200"
+                    >
+                      {theme}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {reflectionFocus && (
+              <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Focus
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-300">
+                  {reflectionFocus}
                 </p>
               </div>
-
-              <button
-                onClick={async () => {
-                  await trackClientEvent({
-                    eventName: "journal_entry_export_cta_clicked",
-                    page: `/journal/${id}`,
-                    metadata: {
-                      entryId: item.id,
-                      isPro: Boolean(subscription?.isPro),
-                      plan: subscription?.plan || "free",
-                    },
-                  });
-
-                  router.push(`/journal/${id}/export`);
-                }}
-                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
-              >
-                {loadingSubscription
-                  ? "Open export"
-                  : subscription?.isPro
-                  ? "Export to PDF"
-                  : "Unlock PDF export"}
-              </button>
-            </div>
+            )}
           </div>
+        </div>
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4">
-            <div className="text-sm font-medium text-white">
-              What to do next
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              {nextActionCopy}
-            </p>
+        <div className="mb-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5">
+          <div className="text-sm font-medium text-white">
+            Journal status
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+            {progressCopy}
+          </p>
 
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={async () => {
-                  await trackClientEvent({
-                    eventName: "journal_entry_new_reflection_clicked",
-                    page: `/journal/${id}`,
-                    metadata: {
-                      entryId: item.id,
-                      plan: usage?.plan ?? subscription?.plan ?? null,
-                    },
-                  });
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={() => router.push("/chat")}
+              className="rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+            >
+              Start another reflection
+            </button>
 
-                  router.push("/chat");
-                }}
-                className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
-              >
-                Start another reflection
-              </button>
-
-              <button
-                onClick={() => router.push("/stats")}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
-              >
-                View reflection stats
-              </button>
-            </div>
+            <button
+              onClick={openExport}
+              className="rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+            >
+              {loadingSubscription
+                ? "Open export"
+                : subscription?.isPro
+                ? "Export"
+                : "Unlock export"}
+            </button>
           </div>
         </div>
 
         <div className="mb-3 px-1">
           <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-            Conversation transcript
+            Original conversation
           </div>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-            The original conversation is kept below so you can revisit the
-            full context.
+            The full saved conversation stays here for context.
           </p>
         </div>
 
@@ -634,6 +708,64 @@ export default function JournalEntryPage() {
           </AnimatePresence>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {actionsOpen && (
+          <motion.div
+            className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActionsOpen(false)}
+          >
+            <div className="mx-auto flex min-h-full max-w-xl items-end px-4 pb-5">
+              <motion.div
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 18 }}
+                transition={{ type: "spring", stiffness: 520, damping: 38 }}
+                onClick={(event) => event.stopPropagation()}
+                className="w-full rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50"
+              >
+                <div className="px-4 py-3">
+                  <div className="truncate text-sm font-medium text-white">
+                    {item.title || "Reflection"}
+                  </div>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    Reflection actions
+                  </div>
+                </div>
+
+                <button
+                  onClick={renameEntry}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Rename title</span>
+                  <span className="text-neutral-500">✎</span>
+                </button>
+
+                <button
+                  onClick={openExport}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Export</span>
+                  <span className="text-neutral-500">PDF</span>
+                </button>
+
+                <div className="my-1 h-px bg-white/[0.08]" />
+
+                <button
+                  onClick={deleteEntry}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
+                >
+                  <span>Delete</span>
+                  <span>⌫</span>
+                </button>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
