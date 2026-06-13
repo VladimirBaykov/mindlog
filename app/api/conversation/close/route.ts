@@ -13,7 +13,17 @@ type Message = {
   content: string;
 };
 
-type Mood = "calm" | "reflective" | "heavy" | "anxious" | "hopeful";
+type Mood =
+  | "calm"
+  | "reflective"
+  | "heavy"
+  | "anxious"
+  | "hopeful"
+  | "happy"
+  | "sad"
+  | "excited"
+  | "confused"
+  | "casual";
 
 type JournalMetadata = {
   title: string;
@@ -26,6 +36,11 @@ const ALLOWED_MOODS: Mood[] = [
   "heavy",
   "anxious",
   "hopeful",
+  "happy",
+  "sad",
+  "excited",
+  "confused",
+  "casual",
 ];
 
 function getJournalModel() {
@@ -193,7 +208,9 @@ async function generateJournalMetadata(
           "You create metadata for a saved MindLog journal reflection.",
           "Return ONLY valid JSON.",
           "JSON shape: { \"title\": string, \"mood\": string }.",
-          "Allowed mood values: calm, reflective, heavy, anxious, hopeful.",
+          "Allowed mood values: calm, reflective, heavy, anxious, hopeful, happy, sad, excited, confused, casual.",
+          "Use casual for light everyday chats, simple conversation, status topics, cars, plans, or low-emotion talk.",
+          "Use happy for warm positive moments. Use excited for energetic anticipation. Use sad for clearly sad or disappointed moments. Use confused when the user is unsure or mentally tangled.",
           "The title must describe the user's lived moment, not MindLog's advice.",
           "Do not quote assistant advice as the title.",
           "Do not create instruction-like titles such as 'Just say how you feel calmly'.",
