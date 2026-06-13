@@ -15,10 +15,18 @@ type Message = {
 
 type MoodKey = keyof typeof moodConfig;
 
+type ReflectionMetadata = {
+  summary?: string;
+  keyTakeaway?: string;
+  themes?: string[];
+  chatType?: string;
+};
+
 type JournalItem = {
   id: string;
   title: string;
   mood?: MoodKey | string | null;
+  metadata?: ReflectionMetadata | null;
   createdAt?: number;
   created_at?: string;
   messages?: Message[];
@@ -149,7 +157,7 @@ function getMessageLabel(count: number) {
   return `${count} message${count === 1 ? "" : "s"}`;
 }
 
-function getChatType(messages: Message[]) {
+function getFallbackChatType(messages: Message[]) {
   const text = normalizeForDetection(
     messages.map((message) => message.content).join(" ")
   );
@@ -208,7 +216,23 @@ function getChatType(messages: Message[]) {
   return "Personal reflection";
 }
 
-function getThemes(messages: Message[], moodLabel: string) {
+function formatChatType(value: string | undefined, messages: Message[]) {
+  if (!value) return getFallbackChatType(messages);
+
+  const labels: Record<string, string> = {
+    personal_reflection: "Personal reflection",
+    emotional_check_in: "Emotional check-in",
+    relationship_reflection: "Relationship reflection",
+    decision_moment: "Decision moment",
+    work_reflection: "Work reflection",
+    casual_conversation: "Casual conversation",
+    planning: "Planning",
+  };
+
+  return labels[value] || getFallbackChatType(messages);
+}
+
+function getFallbackThemes(messages: Message[], moodLabel: string) {
   const text = normalizeForDetection(
     messages.map((message) => message.content).join(" ")
   );
@@ -240,6 +264,20 @@ function getThemes(messages: Message[], moodLabel: string) {
   }
 
   return Array.from(new Set(themes)).slice(0, 4);
+}
+
+function getThemes(
+  metadataThemes: string[] | undefined,
+  messages: Message[],
+  moodLabel: string
+) {
+  if (Array.isArray(metadataThemes) && metadataThemes.length > 0) {
+    return metadataThemes
+      .filter((theme) => typeof theme === "string" && theme.trim())
+      .slice(0, 4);
+  }
+
+  return getFallbackThemes(messages, moodLabel);
 }
 
 export default function JournalEntryPage() {
@@ -455,13 +493,14 @@ export default function JournalEntryPage() {
     ? moodConfig[item.mood]
     : moodConfig.calm;
 
+  const metadata = item.metadata || null;
   const createdDate = new Date(
     item.created_at || item.createdAt || Date.now()
   );
-
-  const chatType = getChatType(normalizedMessages);
-  const themes = getThemes(normalizedMessages, mood.label);
-  const shortFocus = getShortFocus(normalizedMessages);
+  const chatType = formatChatType(metadata?.chatType, normalizedMessages);
+  const themes = getThemes(metadata?.themes, normalizedMessages, mood.label);
+  const shortFocus = metadata?.summary || getShortFocus(normalizedMessages);
+  const keyTakeaway = metadata?.keyTakeaway || "This reflection is saved so you can return to the moment and its context later.";
 
   const progressCopy = (() => {
     if (loadingUsage) {
@@ -485,13 +524,11 @@ export default function JournalEntryPage() {
 
   return (
     <div className="relative min-h-screen bg-black text-white">
-      <div className="pointer-events-none fixed top-0 left-0 right-0 z-30 h-20 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a]/80 to-transparent" />
-
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="mx-auto max-w-xl px-4 pt-8 pb-14"
+        className="mx-auto max-w-xl px-4 pt-8 pb-24"
       >
         <div className="mb-5 overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] shadow-2xl shadow-black/20">
           <div className="flex gap-4 px-5 py-5">
@@ -579,20 +616,31 @@ export default function JournalEntryPage() {
           <div className="mt-5 grid gap-3">
             <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                Chat type
+                Key takeaway
               </div>
-              <div className="mt-2 text-sm font-medium text-white">
-                {chatType}
-              </div>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-200">
+                {keyTakeaway}
+              </p>
             </div>
 
-            <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                Mood
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Chat type
+                </div>
+                <div className="mt-2 text-sm font-medium text-white">
+                  {chatType}
+                </div>
               </div>
-              <div className="mt-2 flex items-center gap-2 text-sm font-medium text-white">
-                <span className={`h-2.5 w-2.5 rounded-full ${mood.stripe}`} />
-                {mood.label}
+
+              <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                  Mood
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-sm font-medium text-white">
+                  <span className={`h-2.5 w-2.5 rounded-full ${mood.stripe}`} />
+                  {mood.label}
+                </div>
               </div>
             </div>
 
@@ -617,7 +665,7 @@ export default function JournalEntryPage() {
             {reflectionFocus && (
               <div className="rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                  Focus
+                  Original focus
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-neutral-300">
                   {reflectionFocus}
