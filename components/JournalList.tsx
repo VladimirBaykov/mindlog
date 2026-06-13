@@ -15,9 +15,16 @@ type MoodKey = keyof typeof moodConfig;
 
 type MenuPlacement = "top" | "bottom";
 
+type MenuPosition = {
+  top: number;
+  left: number;
+  width: number;
+  placement: MenuPlacement;
+};
+
 type ActiveMenu = {
   item: JournalItem;
-  placement: MenuPlacement;
+  position: MenuPosition;
 };
 
 type JournalListProps = {
@@ -26,6 +33,10 @@ type JournalListProps = {
   onSelectionModeChange?: (nextValue: boolean) => void;
   onSelectionChange?: (count: number) => void;
 };
+
+const MENU_ESTIMATED_HEIGHT = 292;
+const VIEWPORT_PADDING = 16;
+const HEADER_SAFE_TOP = 66;
 
 function isMoodKey(
   value: string | null | undefined
@@ -138,11 +149,52 @@ function getDateLabel(timestamp: number) {
   });
 }
 
-function getMenuPlacement(element: HTMLElement): MenuPlacement {
+function getMenuPosition(element: HTMLElement): MenuPosition {
   const rect = element.getBoundingClientRect();
-  const spaceBelow = window.innerHeight - rect.bottom;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const maxMenuWidth = Math.min(520, viewportWidth - VIEWPORT_PADDING * 2);
+  const width = Math.min(
+    Math.max(rect.width, 292),
+    maxMenuWidth
+  );
 
-  return spaceBelow < 260 ? "top" : "bottom";
+  const left = Math.min(
+    Math.max(rect.left, VIEWPORT_PADDING),
+    viewportWidth - width - VIEWPORT_PADDING
+  );
+
+  const spaceBelow = viewportHeight - rect.bottom;
+  const shouldOpenTop = spaceBelow < MENU_ESTIMATED_HEIGHT + 18;
+
+  if (shouldOpenTop) {
+    return {
+      top: Math.max(
+        HEADER_SAFE_TOP,
+        rect.top - MENU_ESTIMATED_HEIGHT - 10
+      ),
+      left,
+      width,
+      placement: "top",
+    };
+  }
+
+  return {
+    top: Math.min(
+      rect.bottom + 10,
+      viewportHeight - MENU_ESTIMATED_HEIGHT - VIEWPORT_PADDING
+    ),
+    left,
+    width,
+    placement: "bottom",
+  };
+}
+
+function getCardElement(element: HTMLElement) {
+  return (
+    (element.closest("[data-journal-card='true']") as HTMLElement | null) ||
+    element
+  );
 }
 
 export default function JournalList({
@@ -247,7 +299,7 @@ export default function JournalList({
     longPressTriggeredRef.current = true;
     setActiveMenu({
       item,
-      placement: getMenuPlacement(element),
+      position: getMenuPosition(getCardElement(element)),
     });
   }
 
@@ -328,7 +380,7 @@ export default function JournalList({
 
   return (
     <>
-      <motion.div layout className="space-y-3">
+      <motion.div layout className="mx-auto w-[calc(100%-10px)] space-y-3">
         <AnimatePresence initial={false}>
           {items.map((item) => {
             const mood = isMoodKey(item.mood)
@@ -353,6 +405,7 @@ export default function JournalList({
                 }}
               >
                 <motion.div
+                  data-journal-card="true"
                   onPointerDown={(event) => handlePointerDown(item, event)}
                   onPointerUp={handlePointerUp}
                   onPointerCancel={handlePointerCancel}
@@ -451,73 +504,79 @@ export default function JournalList({
       <AnimatePresence>
         {activeMenu && (
           <motion.div
-            className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-[1px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setActiveMenu(null)}
           >
-            <div
-              className={`mx-auto flex min-h-full max-w-xl px-4 ${
-                activeMenu.placement === "top"
-                  ? "items-end pb-5"
-                  : "items-center"
-              }`}
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.96,
+                y: activeMenu.position.placement === "top" ? 8 : -8,
+              }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: activeMenu.position.placement === "top" ? 8 : -8,
+              }}
+              transition={{ type: "spring", stiffness: 520, damping: 38 }}
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                top: activeMenu.position.top,
+                left: activeMenu.position.left,
+                width: activeMenu.position.width,
+                maxHeight: `calc(100vh - ${VIEWPORT_PADDING * 2}px)`,
+              }}
+              className="fixed overflow-hidden rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl"
             >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 8 }}
-                transition={{ type: "spring", stiffness: 520, damping: 38 }}
-                onClick={(event) => event.stopPropagation()}
-                className="w-full rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50"
-              >
-                <div className="px-4 py-3">
-                  <div className="truncate text-sm font-medium text-white">
-                    {activeMenu.item.title || "Conversation"}
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    {getMessageLabel(activeMenu.item.messages.length)} · {getDateLabel(activeMenu.item.createdAt)}
-                  </div>
+              <div className="px-4 py-3">
+                <div className="truncate text-sm font-medium text-white">
+                  {activeMenu.item.title || "Conversation"}
                 </div>
-
-                <div className="space-y-1">
-                  <button
-                    onClick={() => openEntry(activeMenu.item.id)}
-                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                  >
-                    <span>Open</span>
-                    <span className="text-neutral-500">↗</span>
-                  </button>
-
-                  <button
-                    onClick={() => renameItem(activeMenu.item)}
-                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                  >
-                    <span>Rename</span>
-                    <span className="text-neutral-500">✎</span>
-                  </button>
-
-                  <button
-                    onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
-                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                  >
-                    <span>Export</span>
-                    <span className="text-neutral-500">PDF</span>
-                  </button>
-
-                  <div className="my-1 h-px bg-white/[0.08]" />
-
-                  <button
-                    onClick={() => deleteSingleItem(activeMenu.item)}
-                    className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
-                  >
-                    <span>Delete</span>
-                    <span>⌫</span>
-                  </button>
+                <div className="mt-1 text-xs text-neutral-500">
+                  {getMessageLabel(activeMenu.item.messages.length)} · {getDateLabel(activeMenu.item.createdAt)}
                 </div>
-              </motion.div>
-            </div>
+              </div>
+
+              <div className="space-y-1">
+                <button
+                  onClick={() => openEntry(activeMenu.item.id)}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Open</span>
+                  <span className="text-neutral-500">↗</span>
+                </button>
+
+                <button
+                  onClick={() => renameItem(activeMenu.item)}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Rename</span>
+                  <span className="text-neutral-500">✎</span>
+                </button>
+
+                <button
+                  onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Export</span>
+                  <span className="text-neutral-500">PDF</span>
+                </button>
+
+                <div className="my-1 h-px bg-white/[0.08]" />
+
+                <button
+                  onClick={() => deleteSingleItem(activeMenu.item)}
+                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
+                >
+                  <span>Delete</span>
+                  <span>⌫</span>
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
