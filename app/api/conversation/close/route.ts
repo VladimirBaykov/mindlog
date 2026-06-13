@@ -25,9 +25,24 @@ type Mood =
   | "confused"
   | "casual";
 
+type ReflectionMetadata = {
+  summary: string;
+  keyTakeaway: string;
+  themes: string[];
+  chatType:
+    | "personal_reflection"
+    | "emotional_check_in"
+    | "relationship_reflection"
+    | "decision_moment"
+    | "work_reflection"
+    | "casual_conversation"
+    | "planning";
+};
+
 type JournalMetadata = {
   title: string;
   mood: Mood;
+  reflection: ReflectionMetadata;
 };
 
 const ALLOWED_MOODS: Mood[] = [
@@ -41,6 +56,16 @@ const ALLOWED_MOODS: Mood[] = [
   "excited",
   "confused",
   "casual",
+];
+
+const ALLOWED_CHAT_TYPES: ReflectionMetadata["chatType"][] = [
+  "personal_reflection",
+  "emotional_check_in",
+  "relationship_reflection",
+  "decision_moment",
+  "work_reflection",
+  "casual_conversation",
+  "planning",
 ];
 
 function getJournalModel() {
@@ -137,6 +162,18 @@ function createFallbackTitle(messages: Message[]) {
   return fallback || "Conversation";
 }
 
+function createFallbackSummary(messages: Message[]) {
+  const meaningfulUserMessages = getMeaningfulUserMessages(messages);
+  const source = meaningfulUserMessages[0] || "A saved conversation with MindLog.";
+  const cleaned = normalizeText(source);
+
+  if (cleaned.length <= 180) {
+    return cleaned;
+  }
+
+  return `${cleaned.slice(0, 180).trim()}…`;
+}
+
 function cleanTitle(value: string | undefined, fallback: string) {
   const cleaned = normalizeText(value || "")
     .replace(/^["“”'`]+|["“”'`]+$/g, "")
@@ -177,6 +214,26 @@ function cleanTitle(value: string | undefined, fallback: string) {
   return cleaned;
 }
 
+function cleanShortText(value: unknown, fallback: string, maxLength: number) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const cleaned = normalizeText(value)
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return fallback;
+  }
+
+  if (cleaned.length <= maxLength) {
+    return cleaned;
+  }
+
+  return `${cleaned.slice(0, maxLength).trim()}…`;
+}
+
 function normalizeMood(value: string | undefined): Mood {
   const normalized = normalizeForDetection(value || "");
 
@@ -187,10 +244,35 @@ function normalizeMood(value: string | undefined): Mood {
   return "calm";
 }
 
+function normalizeChatType(value: unknown): ReflectionMetadata["chatType"] {
+  const normalized = normalizeForDetection(
+    typeof value === "string" ? value : ""
+  ).replace(/\s+/g, "_") as ReflectionMetadata["chatType"];
+
+  if (ALLOWED_CHAT_TYPES.includes(normalized)) {
+    return normalized;
+  }
+
+  return "personal_reflection";
+}
+
+function normalizeThemes(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => normalizeText(item))
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 async function generateJournalMetadata(
   messages: Message[]
 ): Promise<JournalMetadata> {
   const fallbackTitle = createFallbackTitle(messages);
+  const fallbackSummary = createFallbackSummary(messages);
 
   const conversationText = messages
     .map((message) => `${message.role}: ${normalizeText(message.content)}`)
@@ -199,7 +281,7 @@ async function generateJournalMetadata(
   const response = await openai.chat.completions.create({
     model: getJournalModel(),
     temperature: 0.25,
-    max_completion_tokens: 160,
+    max_completion_tokens: 360,
     response_format: { type: "json_object" },
     messages: [
       {
@@ -207,8 +289,9 @@ async function generateJournalMetadata(
         content: [
           "You create metadata for a saved MindLog journal reflection.",
           "Return ONLY valid JSON.",
-          "JSON shape: { \"title\": string, \"mood\": string }.",
+          "JSON shape: { \"title\": string, \"mood\": string, \"summary\": string, \"keyTakeaway\": string, \"themes\": string[], \"chatType\": string }.",
           "Allowed mood values: calm, reflective, heavy, anxious, hopeful, happy, sad, excited, confused, casual.",
+          "Allowed chatType values: personal_reflection, emotional_check_in, relationship_reflection, decision_moment, work_reflection, casual_conversation, planning.",
           "Use casual for light everyday chats, simple conversation, status topics, cars, plans, or low-emotion talk.",
           "Use happy for warm positive moments. Use excited for energetic anticipation. Use sad for clearly sad or disappointed moments. Use confused when the user is unsure or mentally tangled.",
           "The title must describe the user's lived moment, not MindLog's advice.",
@@ -216,8 +299,10 @@ async function generateJournalMetadata(
           "Do not create instruction-like titles such as 'Just say how you feel calmly'.",
           "Do not use generic titles like 'Reflection', 'Conversation', or 'Journal Entry' unless there is no meaningful content.",
           "Title should be human, specific, calm, and max 6 words when possible.",
+          "Summary should be one sentence, specific to this saved chat, max 32 words.",
+          "Key takeaway should be one concise sentence the user may want to remember, max 24 words.",
+          "Themes should contain 1-4 short human labels, not hashtags.",
           "No punctuation at the end of the title.",
-          "If the user is nervous but moving toward something meaningful, choose anxious or hopeful based on the dominant tone.",
         ].join("\n"),
       },
       {
@@ -229,7 +314,7 @@ async function generateJournalMetadata(
 
   const raw = response.choices[0]?.message?.content || "{}";
 
-  let parsed: Partial<JournalMetadata> = {};
+  let parsed: Record<string, unknown> = {};
 
   try {
     parsed = JSON.parse(raw);
@@ -237,9 +322,30 @@ async function generateJournalMetadata(
     parsed = {};
   }
 
+  const summary = cleanShortText(
+    parsed.summary,
+    fallbackSummary,
+    220
+  );
+
   return {
-    title: cleanTitle(parsed.title, fallbackTitle),
-    mood: normalizeMood(parsed.mood),
+    title: cleanTitle(
+      typeof parsed.title === "string" ? parsed.title : undefined,
+      fallbackTitle
+    ),
+    mood: normalizeMood(
+      typeof parsed.mood === "string" ? parsed.mood : undefined
+    ),
+    reflection: {
+      summary,
+      keyTakeaway: cleanShortText(
+        parsed.keyTakeaway,
+        summary,
+        180
+      ),
+      themes: normalizeThemes(parsed.themes),
+      chatType: normalizeChatType(parsed.chatType),
+    },
   };
 }
 
@@ -328,12 +434,14 @@ export async function POST(req: Request) {
 
     let title = fallbackTitle;
     let mood: Mood = "calm";
+    let reflectionMetadata: ReflectionMetadata | null = null;
 
     try {
       const metadata = await generateJournalMetadata(messages);
 
       title = metadata.title || fallbackTitle;
       mood = metadata.mood || "calm";
+      reflectionMetadata = metadata.reflection;
     } catch (error) {
       console.warn("AI metadata failed:", error);
     }
@@ -358,6 +466,30 @@ export async function POST(req: Request) {
         { error: "Failed to save conversation" },
         { status: 500 }
       );
+    }
+
+    if (data?.id && reflectionMetadata) {
+      const { data: updatedData, error: metadataError } = await supabase
+        .from("journals")
+        .update({
+          metadata: reflectionMetadata,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.id)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+      if (!metadataError && updatedData) {
+        return NextResponse.json(updatedData);
+      }
+
+      if (metadataError) {
+        console.warn(
+          "Journal metadata update skipped:",
+          metadataError.message
+        );
+      }
     }
 
     return NextResponse.json(data);
