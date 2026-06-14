@@ -57,6 +57,7 @@ export default function JournalPage() {
   });
   const [viewAccessGranted, setViewAccessGranted] = useState(true);
   const [viewCode, setViewCode] = useState("");
+  const [viewCodeError, setViewCodeError] = useState("");
   const [checkingViewCode, setCheckingViewCode] = useState(false);
 
   const celebrate = searchParams.get("celebrate");
@@ -71,6 +72,7 @@ export default function JournalPage() {
     setSelectionMode(false);
     setViewAccessGranted(false);
     setViewCode("");
+    setViewCodeError("");
 
     const params = new URLSearchParams(searchParams.toString());
 
@@ -428,6 +430,7 @@ export default function JournalPage() {
 
     try {
       setCheckingViewCode(true);
+      setViewCodeError("");
 
       const res = await fetch("/api/journal/view-locks", {
         method: "POST",
@@ -443,12 +446,67 @@ export default function JournalPage() {
 
       setViewAccessGranted(true);
       setViewCode("");
+      setViewCodeError("");
     } catch (error) {
       console.error("View unlock failed:", error);
-      alert("Incorrect code.");
+      setViewCodeError("Incorrect code. Try again.");
     } finally {
       setCheckingViewCode(false);
     }
+  }
+
+  if (!canShowCurrentView) {
+    return (
+      <AuthGate>
+        <div className="min-h-screen bg-black text-white">
+          <div className="mx-auto max-w-xl px-4 pt-8 pb-24">
+            <div className="rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-7 text-center shadow-2xl shadow-black/20">
+              <div className="mx-auto h-14 w-[5px] rounded-full bg-white" />
+              <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                Locked folder
+              </div>
+              <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
+                {viewMode === "favorites" ? "Favorites" : "Hidden"}
+              </h1>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
+                Enter the access code to view this folder.
+              </p>
+              <input
+                value={viewCode}
+                onChange={(event) => {
+                  setViewCode(
+                    event.target.value.replace(/\D/g, "").slice(0, 8)
+                  );
+                  setViewCodeError("");
+                }}
+                inputMode="numeric"
+                autoFocus
+                placeholder="Code"
+                className={`mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 ${
+                  viewCodeError
+                    ? "border-red-400/70 focus:border-red-300"
+                    : "border-white/10 focus:border-white/25"
+                }`}
+              />
+
+              {viewCodeError && (
+                <p className="mx-auto mt-3 max-w-[260px] text-sm text-red-300">
+                  {viewCodeError}
+                </p>
+              )}
+
+              <button
+                onClick={verifyCurrentView}
+                disabled={!viewCode || checkingViewCode}
+                className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+              >
+                {checkingViewCode ? "Checking..." : "Unlock folder"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </AuthGate>
+    );
   }
 
   return (

@@ -329,6 +329,7 @@ export default function JournalEntryPage() {
   const [mounted, setMounted] = useState(false);
   const [entryUnlocked, setEntryUnlocked] = useState(false);
   const [entryCode, setEntryCode] = useState("");
+  const [entryCodeError, setEntryCodeError] = useState("");
   const [checkingEntryCode, setCheckingEntryCode] = useState(false);
 
   useEffect(() => {
@@ -338,6 +339,7 @@ export default function JournalEntryPage() {
   useEffect(() => {
     setEntryUnlocked(false);
     setEntryCode("");
+    setEntryCodeError("");
     setViewTracked(false);
   }, [id]);
 
@@ -451,6 +453,7 @@ export default function JournalEntryPage() {
 
     try {
       setCheckingEntryCode(true);
+      setEntryCodeError("");
 
       const res = await fetch(`/api/journal/${item.id}/lock`, {
         method: "POST",
@@ -468,9 +471,10 @@ export default function JournalEntryPage() {
 
       setEntryUnlocked(true);
       setEntryCode("");
+      setEntryCodeError("");
     } catch (error) {
       console.error("Reflection unlock failed:", error);
-      alert("Incorrect code.");
+      setEntryCodeError("Incorrect code. Try again.");
     } finally {
       setCheckingEntryCode(false);
     }
@@ -717,16 +721,27 @@ export default function JournalEntryPage() {
 
             <input
               value={entryCode}
-              onChange={(event) =>
+              onChange={(event) => {
                 setEntryCode(
                   event.target.value.replace(/\D/g, "").slice(0, 8)
-                )
-              }
+                );
+                setEntryCodeError("");
+              }}
               inputMode="numeric"
               autoFocus
               placeholder="Code"
-              className="mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+              className={`mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 ${
+                entryCodeError
+                  ? "border-red-400/70 focus:border-red-300"
+                  : "border-white/10 focus:border-white/25"
+              }`}
             />
+
+            {entryCodeError && (
+              <p className="mx-auto mt-3 max-w-[260px] text-sm text-red-300">
+                {entryCodeError}
+              </p>
+            )}
 
             <button
               onClick={verifyEntryCode}

@@ -114,6 +114,7 @@ export default function JournalCollectionDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [accessGranted, setAccessGranted] = useState(false);
   const [accessCode, setAccessCode] = useState("");
+  const [accessCodeError, setAccessCodeError] = useState("");
   const [checkingAccess, setCheckingAccess] = useState(false);
 
   const collectionId = params.id;
@@ -227,6 +228,7 @@ export default function JournalCollectionDetailPage() {
 
     try {
       setCheckingAccess(true);
+      setAccessCodeError("");
 
       const res = await fetch(`/api/journal/collections/${collection.id}/verify`, {
         method: "POST",
@@ -479,16 +481,27 @@ export default function JournalCollectionDetailPage() {
               </p>
               <input
                 value={accessCode}
-                onChange={(event) =>
+                onChange={(event) => {
                   setAccessCode(
                     event.target.value.replace(/\D/g, "").slice(0, 8)
-                  )
-                }
+                  );
+                  setAccessCodeError("");
+                }}
                 inputMode="numeric"
                 autoFocus
                 placeholder="Code"
-                className="mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+                className={`mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 ${
+                  accessCodeError
+                    ? "border-red-400/70 focus:border-red-300"
+                    : "border-white/10 focus:border-white/25"
+                }`}
               />
+
+              {accessCodeError && (
+                <p className="mx-auto mt-3 max-w-[260px] text-sm text-red-300">
+                  {accessCodeError}
+                </p>
+              )}
               <button
                 onClick={verifyAccess}
                 disabled={!accessCode || checkingAccess}

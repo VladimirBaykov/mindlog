@@ -31,9 +31,7 @@ function hashCode(code: string, userId: string, journalId: string) {
 function getSupabaseErrorStatus(error: SupabaseMaybeError | null | undefined) {
   if (!error) return 404;
 
-  if (error.code === "PGRST116") {
-    return 404;
-  }
+  if (error.code === "PGRST116") return 404;
 
   if (
     error.code === "PGRST204" ||
@@ -49,9 +47,7 @@ function getSupabaseErrorStatus(error: SupabaseMaybeError | null | undefined) {
 function getSupabaseErrorMessage(error: SupabaseMaybeError | null | undefined) {
   if (!error) return "Journal not found";
 
-  if (error.code === "PGRST116") {
-    return "Journal not found";
-  }
+  if (error.code === "PGRST116") return "Journal not found";
 
   if (
     error.code === "PGRST204" ||
@@ -73,23 +69,21 @@ async function getAuthed() {
   return { supabase, user };
 }
 
-async function ensureOwnedJournal(params: {
+async function findOwnedJournal(params: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   userId: string;
   journalId: string;
 }) {
   const { data, error } = await params.supabase
     .from("journals")
-    .select("id, lock_hash")
+    .select("id, lock_hash, deleted_at")
     .eq("id", params.journalId)
     .eq("user_id", params.userId)
-    .is("deleted_at", null)
     .maybeSingle();
 
   if (error) {
     return {
       data: null,
-      error,
       response: NextResponse.json(
         { error: getSupabaseErrorMessage(error), code: error.code },
         { status: getSupabaseErrorStatus(error) }
@@ -97,18 +91,20 @@ async function ensureOwnedJournal(params: {
     };
   }
 
-  if (!data) {
+  if (!data || data.deleted_at) {
     return {
       data: null,
-      error: null,
       response: NextResponse.json(
-        { error: "Journal not found" },
+        {
+          error: "Journal not found",
+          journalId: params.journalId,
+        },
         { status: 404 }
       ),
     };
   }
 
-  return { data, error: null, response: null };
+  return { data, response: null };
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
@@ -118,16 +114,6 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const owned = await ensureOwnedJournal({
-      supabase,
-      userId: user.id,
-      journalId: id,
-    });
-
-    if (owned.response) {
-      return owned.response;
     }
 
     const body = await req.json().catch(() => ({}));
@@ -142,9 +128,7 @@ export async function PATCH(req: Request, context: RouteContext) {
         : (() => {
             const code = normalizeCode(body.code);
 
-            if (!isValidCode(code)) {
-              return null;
-            }
+            if (!isValidCode(code)) return null;
 
             return {
               lock_hash: hashCode(code, user.id, id),
@@ -164,22 +148,30 @@ export async function PATCH(req: Request, context: RouteContext) {
       .update(payload)
       .eq("id", id)
       .eq("user_id", user.id)
-      .is("deleted_at", null)
-      .select("id, lock_hash")
+      .select("id, lock_hash, deleted_at")
       .maybeSingle();
 
     if (error) {
       console.error("JOURNAL LOCK UPDATE ERROR:", error);
-
       return NextResponse.json(
         { error: getSupabaseErrorMessage(error), code: error.code },
         { status: getSupabaseErrorStatus(error) }
       );
     }
 
-    if (!data) {
+    if (!data || data.deleted_at) {
+      const owned = await findOwnedJournal({
+        supabase,
+        userId: user.id,
+        journalId: id,
+      });
+
+      if (owned.response) {
+        return owned.response;
+      }
+
       return NextResponse.json(
-        { error: "Journal not found" },
+        { error: "Journal not found", journalId: id },
         { status: 404 }
       );
     }
@@ -205,7 +197,7 @@ export async function POST(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const owned = await ensureOwnedJournal({
+    const owned = await findOwnedJournal({
       supabase,
       userId: user.id,
       journalId: id,

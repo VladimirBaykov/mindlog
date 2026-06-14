@@ -452,7 +452,7 @@ export default function JournalList({
     }
 
     try {
-      const res = await fetch(`/api/journal/${item.id}/lock`, {
+      const res = await fetch(`/api/journal/${encodeURIComponent(item.id)}/lock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
@@ -460,7 +460,7 @@ export default function JournalList({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not lock reflection");
+        throw new Error(data.error || `Could not lock reflection (${item.id})`);
       }
 
       setActiveMenu(null);
@@ -480,7 +480,7 @@ export default function JournalList({
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/journal/${item.id}/lock`, {
+      const res = await fetch(`/api/journal/${encodeURIComponent(item.id)}/lock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clear: true }),
