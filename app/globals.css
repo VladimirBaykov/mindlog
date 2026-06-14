@@ -72,6 +72,22 @@ body {
   text-shadow: 0 0 16px rgba(255, 255, 255, 0.28);
 }
 
+/* Journal pill action menu: keep long contextual menus inside the viewport. */
+.fixed.overflow-hidden.rounded-\[24px\] {
+  max-height: min(330px, calc(100vh - 96px)) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-thumb {
+  border: 0;
+  background: rgba(255, 255, 255, 0.18);
+}
+
 @keyframes shimmer {
   0% {
     background-position: -400px 0;
