@@ -13,6 +13,7 @@ import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 import AccessCodeDialog from "@/components/journal/AccessCodeDialog";
 import CollectionPickerDialog from "@/components/journal/CollectionPickerDialog";
+import TextInputDialog from "@/components/journal/TextInputDialog";
 
 type MoodKey = keyof typeof moodConfig;
 type JournalViewMode = "all" | "favorites" | "hidden";
@@ -28,6 +29,10 @@ type MenuPosition = {
 type ActiveMenu = {
   item: JournalItem;
   position: MenuPosition;
+};
+
+type RenameDialogState = {
+  item: JournalItem;
 };
 
 type LockDialogState =
@@ -171,8 +176,8 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
   const rect = element.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const maxMenuWidth = Math.min(340, viewportWidth - VIEWPORT_PADDING * 2);
-  const width = Math.min(Math.max(rect.width * 0.82, 250), maxMenuWidth);
+  const maxMenuWidth = Math.min(320, viewportWidth - VIEWPORT_PADDING * 2);
+  const width = Math.min(Math.max(rect.width * 0.78, 244), maxMenuWidth);
 
   const left = Math.min(
     Math.max(rect.left + (rect.width - width) / 2, VIEWPORT_PADDING),
@@ -250,6 +255,40 @@ function EmptyView({ viewMode }: { viewMode: JournalViewMode }) {
   return <JournalEmpty />;
 }
 
+function ActionIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="ml-4 shrink-0 min-w-8 text-right text-[13px] font-semibold leading-none text-neutral-500">
+      {children}
+    </span>
+  );
+}
+
+function ActionButton({
+  children,
+  icon,
+  destructive = false,
+  onClick,
+}: {
+  children: React.ReactNode;
+  icon: React.ReactNode;
+  destructive?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[12px] transition ${
+        destructive
+          ? "text-red-300 hover:bg-red-500/10"
+          : "text-neutral-100 hover:bg-white/[0.06]"
+      }`}
+    >
+      <span className="truncate">{children}</span>
+      <ActionIcon>{icon}</ActionIcon>
+    </button>
+  );
+}
+
 export default function JournalList({
   viewMode = "all",
   selectionMode = false,
@@ -274,6 +313,10 @@ export default function JournalList({
   const [activeMenu, setActiveMenu] = useState<ActiveMenu | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchMenuOpen, setBatchMenuOpen] = useState(false);
+  const [renameDialog, setRenameDialog] = useState<RenameDialogState | null>(
+    null,
+  );
+  const [renameDialogBusy, setRenameDialogBusy] = useState(false);
   const [lockDialog, setLockDialog] = useState<LockDialogState | null>(null);
   const [lockDialogBusy, setLockDialogBusy] = useState(false);
   const [collectionDialog, setCollectionDialog] =
@@ -342,6 +385,7 @@ export default function JournalList({
       if (event.key === "Escape") {
         setActiveMenu(null);
         setBatchMenuOpen(false);
+        if (!renameDialogBusy) setRenameDialog(null);
         if (!lockDialogBusy) setLockDialog(null);
         if (!collectionDialogBusy) setCollectionDialog(null);
         if (!confirmDialogBusy) setConfirmDialog(null);
@@ -350,7 +394,12 @@ export default function JournalList({
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [collectionDialogBusy, confirmDialogBusy, lockDialogBusy]);
+  }, [
+    collectionDialogBusy,
+    confirmDialogBusy,
+    lockDialogBusy,
+    renameDialogBusy,
+  ]);
 
   if (loading) return <JournalSkeleton />;
   if (visibleItems.length === 0) return <EmptyView viewMode={viewMode} />;
@@ -373,6 +422,7 @@ export default function JournalList({
 
   function openEntry(item: JournalItem) {
     if (item.id === activeId) return;
+    setActiveMenu(null);
     router.push(`/journal/${item.id}`);
   }
 
@@ -422,12 +472,29 @@ export default function JournalList({
     openEntry(item);
   }
 
-  async function renameItem(item: JournalItem) {
-    const nextTitle = prompt("New reflection title:", item.title || "");
-    if (!nextTitle || nextTitle === item.title) return;
-
-    await updateItem(item.id, { title: nextTitle });
+  function openRenameItem(item: JournalItem) {
     setActiveMenu(null);
+    setRenameDialog({ item });
+  }
+
+  async function applyRename(nextTitle: string) {
+    if (!renameDialog) return;
+
+    const item = renameDialog.item;
+    const cleanTitle = nextTitle.trim();
+
+    if (!cleanTitle || cleanTitle === item.title) {
+      setRenameDialog(null);
+      return;
+    }
+
+    try {
+      setRenameDialogBusy(true);
+      await updateItem(item.id, { title: cleanTitle });
+      setRenameDialog(null);
+    } finally {
+      setRenameDialogBusy(false);
+    }
   }
 
   async function toggleFavorite(item: JournalItem) {
@@ -455,7 +522,10 @@ export default function JournalList({
     setLockDialog({ mode: "remove", item });
   }
 
-  function openAddToCollection(itemsToAdd: JournalItem[], source: "single" | "batch") {
+  function openAddToCollection(
+    itemsToAdd: JournalItem[],
+    source: "single" | "batch",
+  ) {
     if (itemsToAdd.length === 0) return;
     setActiveMenu(null);
     setBatchMenuOpen(false);
@@ -597,10 +667,10 @@ export default function JournalList({
     onSelectionModeChange?.(false);
   }
 
-  async function hideSelectedItems() {
-    if (selectedItems.length === 0) return;
+  async function hideSelectedItems(itemsToHide = selectedItems) {
+    if (itemsToHide.length === 0) return;
 
-    for (const item of selectedItems) {
+    for (const item of itemsToHide) {
       await updateItem(item.id, { hiddenAt: Date.now() });
     }
 
@@ -621,44 +691,46 @@ export default function JournalList({
     onSelectionModeChange?.(false);
   }
 
-  async function deleteSingleItem(item: JournalItem) {
-    await deleteItem(item.id);
+  function deleteSingleItem(item: JournalItem) {
     setConfirmDialog(null);
+    window.setTimeout(() => {
+      void deleteItem(item.id);
+    }, 80);
   }
 
-  async function deleteSelectedItems() {
-    if (selectedItems.length === 0) return;
-
-    for (const item of selectedItems) {
-      await deleteItem(item.id);
-    }
-
+  function deleteSelectedItems(itemsToDelete: JournalItem[]) {
+    setConfirmDialog(null);
     setSelectedIds(new Set());
     setBatchMenuOpen(false);
     onSelectionModeChange?.(false);
-    setConfirmDialog(null);
+
+    window.setTimeout(() => {
+      void (async () => {
+        for (const item of itemsToDelete) {
+          await deleteItem(item.id);
+        }
+      })();
+    }, 80);
   }
 
   async function runConfirmDialogAction() {
     if (!confirmDialog) return;
 
+    if (confirmDialog.type === "delete-single") {
+      deleteSingleItem(confirmDialog.item);
+      return;
+    }
+
+    if (confirmDialog.type === "delete-selected") {
+      deleteSelectedItems(confirmDialog.items);
+      return;
+    }
+
     try {
       setConfirmDialogBusy(true);
-
-      if (confirmDialog.type === "delete-single") {
-        await deleteSingleItem(confirmDialog.item);
-        return;
-      }
-
       if (confirmDialog.type === "hide-selected") {
-        await hideSelectedItems();
+        await hideSelectedItems(confirmDialog.items);
         setConfirmDialog(null);
-        return;
-      }
-
-      if (confirmDialog.type === "delete-selected") {
-        await deleteSelectedItems();
-        return;
       }
     } finally {
       setConfirmDialogBusy(false);
@@ -756,99 +828,73 @@ export default function JournalList({
             </div>
 
             <div className="space-y-0.5">
-              <button
-                onClick={() => openEntry(activeMenu.item)}
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
-              >
-                <span>Open</span>
-                <span className="text-neutral-500">↗</span>
-              </button>
+              <ActionButton icon="↗" onClick={() => openEntry(activeMenu.item)}>
+                Open
+              </ActionButton>
 
-              <button
-                onClick={() => renameItem(activeMenu.item)}
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              <ActionButton
+                icon="✎"
+                onClick={() => openRenameItem(activeMenu.item)}
               >
-                <span>Rename</span>
-                <span className="text-neutral-500">✎</span>
-              </button>
+                Rename
+              </ActionButton>
 
-              <button
+              <ActionButton
+                icon={activeMenu.item.isFavorite ? "♡" : "♥"}
                 onClick={() => toggleFavorite(activeMenu.item)}
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
-                <span>
-                  {activeMenu.item.isFavorite ? "Remove favorite" : "Favorite"}
-                </span>
-                <span className="text-neutral-500">
-                  {activeMenu.item.isFavorite ? "♡" : "♥"}
-                </span>
-              </button>
+                {activeMenu.item.isFavorite ? "Remove favorite" : "Favorite"}
+              </ActionButton>
 
               {activeMenu.item.hiddenAt ? (
-                <button
-                  onClick={() => unhideItem(activeMenu.item)}
-                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Unhide</span>
-                  <span className="text-neutral-500">◎</span>
-                </button>
+                <ActionButton icon="◎" onClick={() => unhideItem(activeMenu.item)}>
+                  Unhide
+                </ActionButton>
               ) : (
-                <button
-                  onClick={() => hideItem(activeMenu.item)}
-                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Hide</span>
-                  <span className="text-neutral-500">◌</span>
-                </button>
+                <ActionButton icon="◌" onClick={() => hideItem(activeMenu.item)}>
+                  Hide
+                </ActionButton>
               )}
 
-              <button
+              <ActionButton
+                icon="＋"
                 onClick={() => openAddToCollection([activeMenu.item], "single")}
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
-                <span>Add to collection</span>
-                <span className="text-neutral-500">＋</span>
-              </button>
+                Add to collection
+              </ActionButton>
 
-              <button
+              <ActionButton
+                icon="⌁"
                 onClick={() => openSetItemLock(activeMenu.item)}
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
-                <span>
-                  {isItemSoftLocked(activeMenu.item) ? "Change code" : "Lock"}
-                </span>
-                <span className="text-neutral-500">Lock</span>
-              </button>
+                {isItemSoftLocked(activeMenu.item) ? "Change code" : "Lock"}
+              </ActionButton>
 
               {isItemSoftLocked(activeMenu.item) && (
-                <button
+                <ActionButton
+                  icon="○"
                   onClick={() => openRemoveItemLock(activeMenu.item)}
-                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
-                  <span>Remove lock</span>
-                  <span className="text-neutral-500">Open</span>
-                </button>
+                  Remove lock
+                </ActionButton>
               )}
 
-              <button
-                onClick={() =>
-                  router.push(`/journal/${activeMenu.item.id}/export`)
-                }
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              <ActionButton
+                icon="PDF"
+                onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
               >
-                <span>Export</span>
-                <span className="text-neutral-500">PDF</span>
-              </button>
+                Export
+              </ActionButton>
 
               <div className="my-1 h-px bg-white/[0.08]" />
 
-              <button
+              <ActionButton
+                destructive
+                icon="⌫"
                 onClick={() => openDeleteSingle(activeMenu.item)}
-                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
               >
-                <span>Delete</span>
-                <span>⌫</span>
-              </button>
+                Delete
+              </ActionButton>
             </div>
           </motion.div>
         </motion.div>
@@ -885,55 +931,56 @@ export default function JournalList({
               </div>
 
               <div className="space-y-0.5">
-                <button
-                  onClick={favoriteSelectedItems}
-                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Mark as favorite</span>
-                  <span className="text-neutral-500">♥</span>
-                </button>
+                <ActionButton icon="♥" onClick={favoriteSelectedItems}>
+                  Mark as favorite
+                </ActionButton>
 
-                <button
+                <ActionButton
+                  icon="＋"
                   onClick={() => openAddToCollection(selectedItems, "batch")}
-                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
-                  <span>Add selected to collection</span>
-                  <span className="text-neutral-500">＋</span>
-                </button>
+                  Add selected to collection
+                </ActionButton>
 
                 {viewMode === "hidden" ? (
-                  <button
-                    onClick={unhideSelectedItems}
-                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
-                  >
-                    <span>Unhide selected</span>
-                    <span className="text-neutral-500">◎</span>
-                  </button>
+                  <ActionButton icon="◎" onClick={unhideSelectedItems}>
+                    Unhide selected
+                  </ActionButton>
                 ) : (
-                  <button
-                    onClick={openHideSelected}
-                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
-                  >
-                    <span>Hide selected</span>
-                    <span className="text-neutral-500">◌</span>
-                  </button>
+                  <ActionButton icon="◌" onClick={openHideSelected}>
+                    Hide selected
+                  </ActionButton>
                 )}
 
                 <div className="my-1 h-px bg-white/[0.08]" />
 
-                <button
-                  onClick={openDeleteSelected}
-                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
-                >
-                  <span>Delete selected</span>
-                  <span>⌫</span>
-                </button>
+                <ActionButton destructive icon="⌫" onClick={openDeleteSelected}>
+                  Delete selected
+                </ActionButton>
               </div>
             </motion.div>
           </div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+
+  const renameDialogOverlay = (
+    <TextInputDialog
+      open={Boolean(renameDialog)}
+      title="Rename reflection"
+      description="Give this saved reflection a short, clear title."
+      initialValue={renameDialog?.item.title || ""}
+      label="Reflection title"
+      placeholder="New title"
+      confirmLabel="Save title"
+      loading={renameDialogBusy}
+      maxLength={80}
+      onClose={() => {
+        if (!renameDialogBusy) setRenameDialog(null);
+      }}
+      onConfirm={applyRename}
+    />
   );
 
   const lockDialogOverlay = (
@@ -1136,6 +1183,7 @@ export default function JournalList({
 
       {mounted && createPortal(activeMenuOverlay, document.body)}
       {mounted && createPortal(batchMenuOverlay, document.body)}
+      {mounted && createPortal(renameDialogOverlay, document.body)}
       {mounted && createPortal(lockDialogOverlay, document.body)}
       {mounted && createPortal(collectionDialogOverlay, document.body)}
       {mounted && createPortal(confirmDialogOverlay, document.body)}
