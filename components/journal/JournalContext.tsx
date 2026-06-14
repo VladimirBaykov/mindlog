@@ -33,6 +33,7 @@ export type JournalItem = {
   metadata?: JournalMetadata | null;
   isFavorite?: boolean;
   hiddenAt?: number | null;
+  locked?: boolean;
 };
 
 type RawJournalItem = {
@@ -49,12 +50,14 @@ type RawJournalItem = {
   is_favorite?: boolean | null;
   hiddenAt?: number | null;
   hidden_at?: string | null;
+  locked?: boolean;
+  lock_hash?: string | null;
 };
 
 type JournalUpdatePatch = Partial<
   Pick<
     JournalItem,
-    "title" | "mood" | "metadata" | "isFavorite" | "hiddenAt"
+    "title" | "mood" | "metadata" | "isFavorite" | "hiddenAt" | "locked"
   >
 >;
 
@@ -113,6 +116,10 @@ function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
         : item.hidden_at
         ? new Date(item.hidden_at).getTime()
         : null,
+    locked:
+      "locked" in item && typeof item.locked === "boolean"
+        ? item.locked
+        : Boolean(item.lock_hash),
     deleted:
       "deleted" in item
         ? item.deleted
@@ -381,12 +388,8 @@ export function JournalProvider({
       try {
         const res = await fetch(`/api/journal/${id}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            restore: true,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restore: true }),
         });
 
         if (!res.ok) throw new Error();
@@ -420,13 +423,9 @@ export function JournalProvider({
 }
 
 export function useJournal() {
-  const context = useContext(JournalContext);
-
-  if (!context) {
-    throw new Error(
-      "useJournal must be used within JournalProvider"
-    );
+  const ctx = useContext(JournalContext);
+  if (!ctx) {
+    throw new Error("useJournal must be used inside JournalProvider");
   }
-
-  return context;
+  return ctx;
 }
