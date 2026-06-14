@@ -21,6 +21,7 @@ type ReflectionMetadata = {
   keyTakeaway?: string;
   themes?: string[];
   chatType?: string;
+  accessHash?: string;
 };
 
 type JournalItem = {
@@ -310,6 +311,25 @@ function getHiddenAt(item: JournalItem) {
   return null;
 }
 
+function getAccessHash(item: JournalItem | null) {
+  const value = item?.metadata?.accessHash;
+  return typeof value === "string" && value.length > 0 ? value : "";
+}
+
+function isEntrySoftLocked(item: JournalItem | null) {
+  return Boolean(item?.locked || getAccessHash(item));
+}
+
+async function createAccessHash(itemId: string, code: string) {
+  const input = `mindlog-entry-access-v1:${itemId}:${code}`;
+  const bytes = new TextEncoder().encode(input);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -344,9 +364,7 @@ export default function JournalEntryPage() {
   }, [id]);
 
   useEffect(() => {
-    fetch(`/api/journal/${id}`, {
-  cache: "no-store",
-})
+    fetch(`/api/journal/${id}`)
       .then(async (res) => {
         if (!res.ok) return null;
         return res.json();
@@ -402,8 +420,10 @@ export default function JournalEntryPage() {
     [normalizedMessages]
   );
 
+  const entryIsLocked = isEntrySoftLocked(item);
+
   useEffect(() => {
-    if (!item || item.locked || viewTracked) return;
+    if (!item || entryIsLocked || viewTracked) return;
 
     setViewTracked(true);
 
@@ -436,7 +456,7 @@ export default function JournalEntryPage() {
 
     setHeader({
       title: item.title || "Reflection",
-      subtitle: item.locked && !entryUnlocked ? "Locked" : mood?.label,
+      subtitle: entryIsLocked && !entryUnlocked ? "Locked" : mood?.label,
       leftSlot: (
         <button
           onClick={() => router.push("/journal")}
@@ -448,7 +468,7 @@ export default function JournalEntryPage() {
     });
 
     return () => resetHeader();
-  }, [entryUnlocked, item, router, setHeader, resetHeader]);
+  }, [entryIsLocked, entryUnlocked, item, router, setHeader, resetHeader]);
 
   async function verifyEntryCode() {
     if (!item || checkingEntryCode) return;
@@ -456,6 +476,21 @@ export default function JournalEntryPage() {
     try {
       setCheckingEntryCode(true);
       setEntryCodeError("");
+
+      const accessHash = getAccessHash(item);
+
+      if (accessHash) {
+        const nextHash = await createAccessHash(item.id, entryCode.trim());
+
+        if (nextHash !== accessHash) {
+          throw new Error("Incorrect code");
+        }
+
+        setEntryUnlocked(true);
+        setEntryCode("");
+        setEntryCodeError("");
+        return;
+      }
 
       const res = await fetch(`/api/journal/${item.id}/lock`, {
         method: "POST",
@@ -496,31 +531,33 @@ export default function JournalEntryPage() {
     }
 
     try {
-      const res = await fetch(`/api/journal/${item.id}/lock`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ code }),
+      const accessHash = await createAccessHash(item.id, code);
+      const metadata = {
+        ...(item.metadata || {}),
+        accessHash,
+      };
+
+      await updateItem(id, {
+        metadata,
+        locked: true,
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not update access code.");
-      }
+      setItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              metadata,
+              locked: true,
+            }
+          : prev
+      );
 
-      setItem((prev) => (prev ? { ...prev, locked: true } : prev));
       setEntryUnlocked(false);
       setEntryCode("");
       setActionsOpen(false);
-      await refresh();
     } catch (error) {
-      console.error("Set reflection lock failed:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Could not update access code."
-      );
+      console.error("Set reflection soft lock failed:", error);
+      alert("Could not update access code.");
     }
   }
 
@@ -531,31 +568,30 @@ export default function JournalEntryPage() {
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/journal/${item.id}/lock`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ clear: true }),
+      const metadata = { ...(item.metadata || {}) };
+      delete metadata.accessHash;
+
+      await updateItem(id, {
+        metadata,
+        locked: false,
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not remove access code.");
-      }
+      setItem((prev) =>
+        prev
+          ? {
+              ...prev,
+              metadata,
+              locked: false,
+            }
+          : prev
+      );
 
-      setItem((prev) => (prev ? { ...prev, locked: false } : prev));
       setEntryUnlocked(true);
       setEntryCode("");
       setActionsOpen(false);
-      await refresh();
     } catch (error) {
-      console.error("Remove reflection lock failed:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Could not remove access code."
-      );
+      console.error("Remove reflection soft lock failed:", error);
+      alert("Could not remove access code.");
     }
   }
 
@@ -702,7 +738,7 @@ export default function JournalEntryPage() {
     );
   }
 
-  if (item.locked && !entryUnlocked) {
+  if (entryIsLocked && !entryUnlocked) {
     return (
       <div className="relative min-h-screen bg-black text-white">
         <div className="mx-auto max-w-xl px-4 pt-8 pb-24">
@@ -864,11 +900,11 @@ export default function JournalEntryPage() {
                   onClick={setEntryLock}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
-                  <span>{item.locked ? "Change code" : "Lock"}</span>
+                  <span>{entryIsLocked ? "Change code" : "Lock"}</span>
                   <span className="text-neutral-500">Lock</span>
                 </button>
 
-                {item.locked && (
+                {entryIsLocked && (
                   <button
                     onClick={clearEntryLock}
                     className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
@@ -936,7 +972,7 @@ export default function JournalEntryPage() {
                         Hidden
                       </div>
                     )}
-                    {item.locked && (
+                    {entryIsLocked && (
                       <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
                         Locked
                       </div>

@@ -154,6 +154,20 @@ function getDateLabel(timestamp: number) {
   });
 }
 
+function isItemSoftLocked(item: JournalItem) {
+  return Boolean(item.locked || item.metadata?.accessHash);
+}
+
+async function createAccessHash(itemId: string, code: string) {
+  const input = `mindlog-entry-access-v1:${itemId}:${code}`;
+  const bytes = new TextEncoder().encode(input);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function getMenuPosition(element: HTMLElement): MenuPosition {
   const rect = element.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
@@ -452,26 +466,22 @@ export default function JournalList({
     }
 
     try {
-      const res = await fetch(`/api/journal/${encodeURIComponent(item.id)}/lock`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+      const accessHash = await createAccessHash(item.id, code);
+      const metadata = {
+        ...(item.metadata || {}),
+        accessHash,
+      };
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Could not lock reflection (${item.id})`);
-      }
+      await updateItem(item.id, {
+        metadata,
+        locked: true,
+      });
 
       setActiveMenu(null);
       await refresh();
     } catch (error) {
-      console.error("Reflection lock failed:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Could not lock this reflection."
-      );
+      console.error("Reflection soft lock failed:", error);
+      alert("Could not lock this reflection.");
     }
   }
 
@@ -480,22 +490,19 @@ export default function JournalList({
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/journal/${encodeURIComponent(item.id)}/lock`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clear: true }),
-      });
+      const metadata = { ...(item.metadata || {}) };
+      delete metadata.accessHash;
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not remove lock");
-      }
+      await updateItem(item.id, {
+        metadata,
+        locked: false,
+      });
 
       setActiveMenu(null);
       await refresh();
     } catch (error) {
-      console.error("Remove reflection lock failed:", error);
-      alert(error instanceof Error ? error.message : "Could not remove lock.");
+      console.error("Remove reflection soft lock failed:", error);
+      alert("Could not remove lock.");
     }
   }
 
@@ -608,7 +615,7 @@ export default function JournalList({
                 <div className="truncate text-[13px] font-medium text-white">
                   {activeMenu.item.title || "Conversation"}
                 </div>
-                {activeMenu.item.locked && (
+                {isItemSoftLocked(activeMenu.item) && (
                   <span className="shrink-0 text-[11px] text-neutral-400">
                     Lock
                   </span>
@@ -673,11 +680,11 @@ export default function JournalList({
                 onClick={() => setItemLock(activeMenu.item)}
                 className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
-                <span>{activeMenu.item.locked ? "Change code" : "Lock"}</span>
+                <span>{isItemSoftLocked(activeMenu.item) ? "Change code" : "Lock"}</span>
                 <span className="text-neutral-500">Lock</span>
               </button>
 
-              {activeMenu.item.locked && (
+              {isItemSoftLocked(activeMenu.item) && (
                 <button
                   onClick={() => clearItemLock(activeMenu.item)}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
@@ -864,7 +871,7 @@ export default function JournalList({
                                 ♥
                               </span>
                             )}
-                            {item.locked && (
+                            {isItemSoftLocked(item) && (
                               <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
                                 Locked
                               </span>
