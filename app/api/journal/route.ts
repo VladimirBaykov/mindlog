@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
+function normalizeJournalRow(row: any) {
+  const { lock_hash: _lockHash, ...safeRow } = row;
+
+  return {
+    ...safeRow,
+    locked: Boolean(row.lock_hash),
+  };
+}
+
 export async function GET(req: Request) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -47,7 +56,7 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      items: data ?? [],
+      items: (data ?? []).map(normalizeJournalRow),
       total: count ?? 0,
       limit,
       offset,
