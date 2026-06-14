@@ -55,16 +55,6 @@ function getCountLabel(count: number) {
   return `${count} reflection${count === 1 ? "" : "s"}`;
 }
 
-function getCollectionAccessKey(id: string) {
-  return `mindlog:collection-access:${id}`;
-}
-
-function isCollectionAccessGranted(collection: CollectionItem) {
-  if (!collection.locked) return true;
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(getCollectionAccessKey(collection.id)) === "1";
-}
-
 export default function JournalCollectionsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,10 +71,6 @@ export default function JournalCollectionsPage() {
   const [color, setColor] = useState<CollectionColor>("blue");
   const [accessCode, setAccessCode] = useState("");
   const [saving, setSaving] = useState(false);
-  const [verifyOpen, setVerifyOpen] = useState(false);
-  const [verifyCode, setVerifyCode] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [pendingCollection, setPendingCollection] = useState<CollectionItem | null>(null);
 
   const addIds = useMemo(() => parseAddIds(searchParams.get("add")), [searchParams]);
   const isAddMode = addIds.length > 0;
@@ -176,7 +162,6 @@ export default function JournalCollectionsPage() {
       setColor("blue");
       setAccessCode("");
       setCreateOpen(false);
-      window.sessionStorage.removeItem(getCollectionAccessKey(data.id));
       router.push(`/journal/collections/${data.id}`);
     } catch (error) {
       console.error("Create collection failed:", error);
@@ -203,49 +188,12 @@ export default function JournalCollectionsPage() {
   }
 
   async function openOrAdd(collection: CollectionItem) {
-    if (collection.locked && !isCollectionAccessGranted(collection)) {
-      setPendingCollection(collection);
-      setVerifyCode("");
-      setVerifyOpen(true);
-      return;
-    }
-
     if (isAddMode) {
       await addSelectedToCollection(collection);
       return;
     }
 
     router.push(`/journal/collections/${collection.id}`);
-  }
-
-  async function verifyCollectionAccess() {
-    if (!pendingCollection || verifying) return;
-
-    try {
-      setVerifying(true);
-      const res = await fetch(`/api/journal/collections/${pendingCollection.id}/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: verifyCode.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
-
-      window.sessionStorage.setItem(getCollectionAccessKey(pendingCollection.id), "1");
-      setVerifyOpen(false);
-      setVerifyCode("");
-
-      if (isAddMode) {
-        await addSelectedToCollection(pendingCollection);
-      } else {
-        router.push(`/journal/collections/${pendingCollection.id}`);
-      }
-    } catch (error) {
-      console.error("Collection verification failed:", error);
-      alert("Incorrect code.");
-    } finally {
-      setVerifying(false);
-    }
   }
 
   async function renameCollection(collection: CollectionItem) {
@@ -351,38 +299,76 @@ export default function JournalCollectionsPage() {
             )}
 
             {loading ? (
-              Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="h-[86px] animate-pulse rounded-[26px] border border-white/[0.07] bg-white/[0.035]" />
-              ))
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-[86px] animate-pulse rounded-[26px] border border-white/[0.07] bg-white/[0.035]"
+                  />
+                ))}
+              </div>
             ) : items.length === 0 ? (
               <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-8 text-center">
-                <div className="text-sm font-medium text-white">No custom collections yet</div>
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">Create your first collection to group reflections.</p>
-                <button onClick={() => setCreateOpen(true)} className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90">Create collection</button>
+                <div className="text-sm font-medium text-white">No collections yet</div>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">
+                  Create your first collection to group related reflections.
+                </p>
+                <button
+                  onClick={() => setCreateOpen(true)}
+                  className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                >
+                  Create collection
+                </button>
               </div>
             ) : (
-              items.map((collection) => {
-                const style = colorStyles[collection.color] ?? colorStyles.blue;
+              items.map((item) => {
+                const style = colorStyles[item.color] ?? colorStyles.blue;
                 return (
-                  <div key={collection.id} className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]">
+                  <div
+                    key={item.id}
+                    className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]"
+                  >
                     <div className="flex items-center gap-4">
-                      <button onClick={() => openOrAdd(collection)} className={`h-11 w-[5px] shrink-0 rounded-full ${style.stripe}`} aria-label={`Open ${collection.name}`} />
-                      <button onClick={() => openOrAdd(collection)} className="min-w-0 flex-1 text-left">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <h3 className="truncate text-[15px] font-medium text-white">{collection.name}</h3>
-                          {collection.locked && (
-                            <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
-                              Locked
-                            </span>
-                          )}
+                      <button
+                        onClick={() => openOrAdd(item)}
+                        className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                      >
+                        <div className={`h-11 w-[5px] shrink-0 rounded-full ${style.stripe}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="truncate text-[15px] font-medium text-white">
+                              {item.name}
+                            </h3>
+                            {item.locked && (
+                              <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
+                                Locked
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1.5 text-[13px] text-neutral-400">
+                            {getCountLabel(item.count)} · {style.label}
+                          </p>
                         </div>
-                        <p className="mt-1.5 text-[13px] text-neutral-400">{getCountLabel(collection.count)} · {style.label}</p>
                       </button>
+
                       {!isAddMode && (
-                        <button onClick={() => renameCollection(collection)} className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-white/[0.06] hover:text-white" aria-label="Rename collection">✎</button>
+                        <button
+                          onClick={() => renameCollection(item)}
+                          className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-white/[0.06] hover:text-white"
+                          aria-label="Rename collection"
+                        >
+                          ✎
+                        </button>
                       )}
+
                       {!isAddMode && (
-                        <button onClick={() => removeCollection(collection)} className="rounded-full px-2 py-1 text-lg leading-none text-red-300 transition hover:bg-red-500/10" aria-label="Remove collection">×</button>
+                        <button
+                          onClick={() => removeCollection(item)}
+                          className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-red-500/10 hover:text-red-300"
+                          aria-label="Remove collection"
+                        >
+                          ×
+                        </button>
                       )}
                     </div>
                   </div>
@@ -393,47 +379,76 @@ export default function JournalCollectionsPage() {
         </div>
 
         {createOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setCreateOpen(false)}>
-            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[420px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">New collection</div>
-              <h2 className="mt-3 text-xl font-semibold text-white">Create a reflection collection</h2>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">Choose a name, color, and optional access code.</p>
+          <div
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0"
+            onClick={() => setCreateOpen(false)}
+          >
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-[430px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+            >
+              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                New collection
+              </div>
+              <h2 className="mt-3 text-xl font-semibold text-white">
+                Create a collection
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+                Name it, choose a color, and optionally protect it with a code.
+              </p>
 
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Collection name" className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value.slice(0, 60))}
+                placeholder="Collection name"
+                className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+              />
 
-              <input value={accessCode} onChange={(event) => setAccessCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" placeholder="Optional 4–8 digit code" className="mt-3 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
+              <input
+                value={accessCode}
+                onChange={(event) =>
+                  setAccessCode(event.target.value.replace(/\D/g, "").slice(0, 8))
+                }
+                inputMode="numeric"
+                placeholder="Optional 4–8 digit code"
+                className="mt-3 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+              />
 
-              <div className="mt-4 grid grid-cols-4 gap-2">
-                {COLORS.map((option) => {
-                  const style = colorStyles[option];
-                  const active = option === color;
+              <div className="mt-5 grid grid-cols-4 gap-2">
+                {COLORS.map((nextColor) => {
+                  const style = colorStyles[nextColor];
+                  const active = color === nextColor;
                   return (
-                    <button key={option} onClick={() => setColor(option)} className={`rounded-[18px] border px-3 py-3 text-xs transition ${active ? "border-white/35 bg-white/[0.08] text-white" : "border-white/10 bg-white/[0.03] text-neutral-400 hover:bg-white/[0.05]"}`}>
-                      <span className={`mx-auto block h-6 w-1 rounded-full ${style.stripe}`} />
-                      <span className="mt-2 block">{style.label}</span>
+                    <button
+                      key={nextColor}
+                      onClick={() => setColor(nextColor)}
+                      className={`rounded-[18px] border px-3 py-3 text-xs transition ${
+                        active
+                          ? "border-white/35 bg-white/[0.08] text-white"
+                          : "border-white/10 bg-white/[0.03] text-neutral-400 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <span className={`mx-auto mb-2 block h-7 w-[5px] rounded-full ${style.stripe}`} />
+                      {style.label}
                     </button>
                   );
                 })}
               </div>
 
               <div className="mt-5 flex gap-3">
-                <button onClick={() => setCreateOpen(false)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
-                <button onClick={createCollection} disabled={!name.trim() || saving} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{saving ? "Creating..." : "Create"}</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {verifyOpen && pendingCollection && (
-          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setVerifyOpen(false)}>
-            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[380px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked collection</div>
-              <h2 className="mt-3 text-xl font-semibold text-white">Enter access code</h2>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">“{pendingCollection.name}” is locked on this device session.</p>
-              <input value={verifyCode} onChange={(event) => setVerifyCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoFocus placeholder="Code" className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
-              <div className="mt-5 flex gap-3">
-                <button onClick={() => setVerifyOpen(false)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
-                <button onClick={verifyCollectionAccess} disabled={!verifyCode || verifying} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{verifying ? "Checking..." : "Unlock"}</button>
+                <button
+                  onClick={() => setCreateOpen(false)}
+                  className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createCollection}
+                  disabled={!name.trim() || saving}
+                  className="flex-1 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+                >
+                  {saving ? "Creating..." : "Create"}
+                </button>
               </div>
             </div>
           </div>
