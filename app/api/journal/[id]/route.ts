@@ -36,13 +36,16 @@ async function ensureOwnedJournal(
   return data;
 }
 
+function getMetadataAccessHash(value: any) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "";
+  }
+
+  return typeof value.accessHash === "string" ? value.accessHash : "";
+}
+
 function hasMetadataAccessHash(row: any) {
-  return Boolean(
-    row?.metadata &&
-      typeof row.metadata === "object" &&
-      typeof row.metadata.accessHash === "string" &&
-      row.metadata.accessHash.length > 0
-  );
+  return getMetadataAccessHash(row?.metadata).length > 0;
 }
 
 function normalizeJournalRow(row: any) {
@@ -86,6 +89,23 @@ function sanitizeJournalPatch(patch: Record<string, any>) {
   }
 
   return payload;
+}
+
+function getRequestedMetadataAccessChange(patch: Record<string, any>) {
+  if (patch.restore || !("metadata" in patch)) {
+    return { touched: false, nextHash: "" };
+  }
+
+  const metadata = patch.metadata;
+
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return { touched: true, nextHash: "" };
+  }
+
+  return {
+    touched: true,
+    nextHash: getMetadataAccessHash(metadata),
+  };
 }
 
 function withNoStore(response: NextResponse) {
@@ -166,6 +186,7 @@ export async function PATCH(
     }
 
     const patch = await req.json().catch(() => ({}));
+    const accessChange = getRequestedMetadataAccessChange(patch);
     const payload = sanitizeJournalPatch(patch);
 
     const { data, error } = await supabase
@@ -196,6 +217,25 @@ export async function PATCH(
           { status: 409 }
         )
       );
+    }
+
+    if (accessChange.touched) {
+      const savedHash = getMetadataAccessHash(data.metadata);
+
+      if (savedHash !== accessChange.nextHash) {
+        console.error("PATCH JOURNAL ACCESS METADATA MISMATCH:", {
+          id,
+          expected: Boolean(accessChange.nextHash),
+          saved: Boolean(savedHash),
+        });
+
+        return withNoStore(
+          NextResponse.json(
+            { error: "Access code metadata was not saved" },
+            { status: 409 }
+          )
+        );
+      }
     }
 
     return withNoStore(
