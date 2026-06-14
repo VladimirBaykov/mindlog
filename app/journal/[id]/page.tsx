@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import { useHeader } from "@/components/header/HeaderContext";
 import { useJournal } from "@/components/journal/JournalContext";
@@ -31,6 +32,10 @@ type JournalItem = {
   created_at?: string;
   messages?: Message[];
   content?: Message[];
+  isFavorite?: boolean;
+  is_favorite?: boolean | null;
+  hiddenAt?: number | null;
+  hidden_at?: string | null;
 };
 
 type SubscriptionInfo = {
@@ -280,6 +285,22 @@ function getThemes(
   return getFallbackThemes(messages, moodLabel);
 }
 
+function getFavoriteState(item: JournalItem) {
+  return Boolean(item.isFavorite ?? item.is_favorite);
+}
+
+function getHiddenAt(item: JournalItem) {
+  if (typeof item.hiddenAt === "number") {
+    return item.hiddenAt;
+  }
+
+  if (item.hidden_at) {
+    return new Date(item.hidden_at).getTime();
+  }
+
+  return null;
+}
+
 export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -296,6 +317,11 @@ export default function JournalEntryPage() {
   const [loadingUsage, setLoadingUsage] = useState(true);
   const [viewTracked, setViewTracked] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetch(`/api/journal/${id}`)
@@ -414,6 +440,62 @@ export default function JournalEntryPage() {
     setActionsOpen(false);
   }
 
+  async function toggleFavoriteEntry() {
+    if (!item) return;
+
+    const nextValue = !getFavoriteState(item);
+
+    setItem((prev) =>
+      prev
+        ? {
+            ...prev,
+            isFavorite: nextValue,
+            is_favorite: nextValue,
+          }
+        : prev
+    );
+
+    await updateItem(id, { isFavorite: nextValue });
+    setActionsOpen(false);
+  }
+
+  async function hideEntry() {
+    if (!item) return;
+
+    const now = Date.now();
+
+    setItem((prev) =>
+      prev
+        ? {
+            ...prev,
+            hiddenAt: now,
+            hidden_at: new Date(now).toISOString(),
+          }
+        : prev
+    );
+
+    await updateItem(id, { hiddenAt: now });
+    setActionsOpen(false);
+    router.push("/journal");
+  }
+
+  async function unhideEntry() {
+    if (!item) return;
+
+    setItem((prev) =>
+      prev
+        ? {
+            ...prev,
+            hiddenAt: null,
+            hidden_at: null,
+          }
+        : prev
+    );
+
+    await updateItem(id, { hiddenAt: null });
+    setActionsOpen(false);
+  }
+
   async function deleteEntry() {
     if (!item) return;
 
@@ -501,6 +583,8 @@ export default function JournalEntryPage() {
   const themes = getThemes(metadata?.themes, normalizedMessages, mood.label);
   const shortFocus = metadata?.summary || getShortFocus(normalizedMessages);
   const keyTakeaway = metadata?.keyTakeaway || "This reflection is saved so you can return to the moment and its context later.";
+  const isFavorite = getFavoriteState(item);
+  const hiddenAt = getHiddenAt(item);
 
   const progressCopy = (() => {
     if (loadingUsage) {
@@ -522,6 +606,94 @@ export default function JournalEntryPage() {
     } on your current plan.`;
   })();
 
+  const actionsOverlay = (
+    <AnimatePresence>
+      {actionsOpen && (
+        <motion.div
+          className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setActionsOpen(false)}
+        >
+          <div className="fixed inset-x-0 bottom-0 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+18px)]">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              transition={{ type: "spring", stiffness: 560, damping: 42 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-[360px] rounded-[24px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            >
+              <div className="px-3 py-2.5">
+                <div className="truncate text-[13px] font-medium text-white">
+                  {item.title || "Reflection"}
+                </div>
+                <div className="mt-0.5 text-[11px] text-neutral-500">
+                  Reflection actions
+                </div>
+              </div>
+
+              <div className="space-y-0.5">
+                <button
+                  onClick={renameEntry}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Rename title</span>
+                  <span className="text-neutral-500">✎</span>
+                </button>
+
+                <button
+                  onClick={toggleFavoriteEntry}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>{isFavorite ? "Remove favorite" : "Favorite"}</span>
+                  <span className="text-neutral-500">{isFavorite ? "♡" : "♥"}</span>
+                </button>
+
+                {hiddenAt ? (
+                  <button
+                    onClick={unhideEntry}
+                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Unhide</span>
+                    <span className="text-neutral-500">◎</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={hideEntry}
+                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Hide</span>
+                    <span className="text-neutral-500">◌</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={openExport}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Export</span>
+                  <span className="text-neutral-500">PDF</span>
+                </button>
+
+                <div className="my-1 h-px bg-white/[0.08]" />
+
+                <button
+                  onClick={deleteEntry}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
+                >
+                  <span>Delete</span>
+                  <span>⌫</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   return (
     <div className="relative min-h-screen bg-black text-white">
       <motion.div
@@ -537,8 +709,20 @@ export default function JournalEntryPage() {
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className={`inline-flex rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200 ${mood.softBg}`}>
-                    {mood.label}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className={`inline-flex rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200 ${mood.softBg}`}>
+                      {mood.label}
+                    </div>
+                    {isFavorite && (
+                      <div className="inline-flex rounded-full border border-rose-300/20 bg-rose-300/10 px-2.5 py-1 text-[11px] text-rose-200">
+                        ♥ Favorite
+                      </div>
+                    )}
+                    {hiddenAt && (
+                      <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
+                        Hidden
+                      </div>
+                    )}
                   </div>
 
                   <h1 className="mt-4 text-[28px] font-semibold leading-tight tracking-[-0.04em] text-white">
@@ -757,63 +941,7 @@ export default function JournalEntryPage() {
         </div>
       </motion.div>
 
-      <AnimatePresence>
-        {actionsOpen && (
-          <motion.div
-            className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setActionsOpen(false)}
-          >
-            <div className="mx-auto flex min-h-full max-w-xl items-end px-4 pb-5">
-              <motion.div
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 18 }}
-                transition={{ type: "spring", stiffness: 520, damping: 38 }}
-                onClick={(event) => event.stopPropagation()}
-                className="w-full rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50"
-              >
-                <div className="px-4 py-3">
-                  <div className="truncate text-sm font-medium text-white">
-                    {item.title || "Reflection"}
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Reflection actions
-                  </div>
-                </div>
-
-                <button
-                  onClick={renameEntry}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Rename title</span>
-                  <span className="text-neutral-500">✎</span>
-                </button>
-
-                <button
-                  onClick={openExport}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Export</span>
-                  <span className="text-neutral-500">PDF</span>
-                </button>
-
-                <div className="my-1 h-px bg-white/[0.08]" />
-
-                <button
-                  onClick={deleteEntry}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
-                >
-                  <span>Delete</span>
-                  <span>⌫</span>
-                </button>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {mounted && createPortal(actionsOverlay, document.body)}
     </div>
   );
 }
