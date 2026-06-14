@@ -38,6 +38,11 @@ export default function AccessCodeDialog({
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [shakeKey, setShakeKey] = useState(0);
+  const hideImmediatelyForDelete =
+    mode === "confirm" &&
+    destructive &&
+    loading &&
+    confirmLabel.toLowerCase().includes("delete");
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +85,7 @@ export default function AccessCodeDialog({
 
   return (
     <AnimatePresence>
-      {open && (
+      {open && !hideImmediatelyForDelete && (
         <motion.div
           className="fixed inset-0 z-[10020] flex items-end justify-center bg-black/[0.62] px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-6 backdrop-blur-md sm:items-center sm:pb-6"
           initial={{ opacity: 0 }}
