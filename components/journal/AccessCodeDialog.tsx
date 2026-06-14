@@ -46,7 +46,7 @@ export default function AccessCodeDialog({
     setError("");
     setShakeKey(0);
 
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 140);
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 110);
     return () => window.clearTimeout(timer);
   }, [open]);
 
@@ -86,13 +86,14 @@ export default function AccessCodeDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.12, ease: [0.22, 1, 0.36, 1] }}
           onClick={() => {
             if (!loading) onClose();
           }}
         >
           <motion.div
             key={shakeKey}
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            initial={{ opacity: 0, y: 14, scale: 0.985 }}
             animate={
               error
                 ? {
@@ -102,8 +103,12 @@ export default function AccessCodeDialog({
                   }
                 : { opacity: 1, y: 0, scale: 1 }
             }
-            exit={{ opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 520, damping: 42 }}
+            exit={{ opacity: 0, y: 10, scale: 0.985 }}
+            transition={
+              error
+                ? { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+                : { type: "spring", stiffness: 760, damping: 46, mass: 0.72 }
+            }
             onClick={(event) => event.stopPropagation()}
             className="w-full max-w-[390px] overflow-hidden rounded-[30px] border border-white/10 bg-neutral-950/96 p-1.5 shadow-2xl shadow-black/55 backdrop-blur-2xl"
           >
