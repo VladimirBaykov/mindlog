@@ -15,6 +15,7 @@ export type ToastItem = {
   id: string;
   type: ToastType;
   message: string;
+  durationMs: number;
   onUndo?: () => void;
 };
 
@@ -26,6 +27,9 @@ type ToastContextValue = {
 
 const ToastContext =
   createContext<ToastContextValue | null>(null);
+
+const DEFAULT_TOAST_DURATION_MS = 3600;
+const UNDO_TOAST_DURATION_MS = 4200;
 
 export function ToastProvider({
   children,
@@ -61,7 +65,7 @@ export function ToastProvider({
 
       const timer = setTimeout(() => {
         removeToast(toast.id);
-      }, 5000);
+      }, toast.durationMs);
 
       timers.current.set(toast.id, timer);
     },
@@ -76,6 +80,7 @@ export function ToastProvider({
         id,
         type: "undo",
         message,
+        durationMs: UNDO_TOAST_DURATION_MS,
         onUndo,
       });
     },
@@ -90,6 +95,7 @@ export function ToastProvider({
         id,
         type: "success",
         message,
+        durationMs: DEFAULT_TOAST_DURATION_MS,
       });
     },
     [addToast]
@@ -103,6 +109,7 @@ export function ToastProvider({
         id,
         type: "error",
         message,
+        durationMs: DEFAULT_TOAST_DURATION_MS,
       });
     },
     [addToast]
@@ -118,15 +125,15 @@ export function ToastProvider({
     >
       {children}
 
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-3 w-full max-w-md px-4">
+      <div className="fixed bottom-6 left-1/2 z-50 flex w-full max-w-md -translate-x-1/2 flex-col gap-3 px-4">
         <AnimatePresence>
           {toasts.map((toast) => (
             <motion.div
               key={toast.id}
               initial={{
                 opacity: 0,
-                y: 40,
-                scale: 0.95,
+                y: 34,
+                scale: 0.96,
               }}
               animate={{
                 opacity: 1,
@@ -135,32 +142,48 @@ export function ToastProvider({
               }}
               exit={{
                 opacity: 0,
-                y: 20,
-                scale: 0.97,
+                y: 16,
+                scale: 0.98,
               }}
               transition={{
                 type: "spring",
-                stiffness: 400,
-                damping: 30,
+                stiffness: 520,
+                damping: 34,
               }}
-              className="rounded-xl bg-neutral-900/90 backdrop-blur-md border border-neutral-800 px-5 py-3 shadow-2xl flex items-center justify-between gap-4"
+              className="relative overflow-hidden rounded-[22px] border border-white/10 bg-neutral-950/92 px-4 py-3 shadow-2xl shadow-black/45 backdrop-blur-xl"
             >
-              <span className="text-sm text-neutral-200">
-                {toast.message}
-              </span>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[13.5px] font-medium text-neutral-100">
+                  {toast.message}
+                </span>
 
-              {toast.type === "undo" &&
-                toast.onUndo && (
-                  <button
-                    onClick={() => {
-                      toast.onUndo?.();
-                      removeToast(toast.id);
+                {toast.type === "undo" &&
+                  toast.onUndo && (
+                    <button
+                      onClick={() => {
+                        toast.onUndo?.();
+                        removeToast(toast.id);
+                      }}
+                      className="rounded-full bg-white/[0.06] px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-white/[0.1]"
+                    >
+                      Undo
+                    </button>
+                  )}
+              </div>
+
+              {toast.type === "undo" && (
+                <div className="absolute inset-x-3 bottom-1.5 h-[2px] overflow-hidden rounded-full bg-white/[0.08]">
+                  <motion.div
+                    className="h-full rounded-full bg-white/55"
+                    initial={{ width: "100%" }}
+                    animate={{ width: "0%" }}
+                    transition={{
+                      duration: toast.durationMs / 1000,
+                      ease: "linear",
                     }}
-                    className="text-sm font-medium text-blue-400 hover:text-blue-300 transition"
-                  >
-                    Undo
-                  </button>
-                )}
+                  />
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
