@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -188,8 +189,9 @@ export async function PATCH(
     const patch = await req.json().catch(() => ({}));
     const accessChange = getRequestedMetadataAccessChange(patch);
     const payload = sanitizeJournalPatch(patch);
+    const writer = createSupabaseAdminClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await writer
       .from("journals")
       .update(payload)
       .eq("id", id)
@@ -209,13 +211,62 @@ export async function PATCH(
     }
 
     if (!data) {
-      console.error("PATCH JOURNAL EMPTY UPDATE RESULT:", { id, payload });
+      const { data: afterUpdate, error: afterError } = await writer
+        .from("journals")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (afterError) {
+        console.error("PATCH JOURNAL VERIFY SELECT ERROR:", afterError, {
+          id,
+          payload,
+        });
+
+        return withNoStore(
+          NextResponse.json(
+            { error: afterError.message || "Failed to verify journal update" },
+            { status: 500 }
+          )
+        );
+      }
+
+      if (!afterUpdate) {
+        console.error("PATCH JOURNAL EMPTY UPDATE RESULT:", { id, payload });
+
+        return withNoStore(
+          NextResponse.json(
+            { error: "Journal update did not return an updated row" },
+            { status: 409 }
+          )
+        );
+      }
+
+      if (accessChange.touched) {
+        const savedHash = getMetadataAccessHash(afterUpdate.metadata);
+
+        if (savedHash !== accessChange.nextHash) {
+          console.error("PATCH JOURNAL ACCESS METADATA MISMATCH:", {
+            id,
+            expected: Boolean(accessChange.nextHash),
+            saved: Boolean(savedHash),
+          });
+
+          return withNoStore(
+            NextResponse.json(
+              { error: "Access code metadata was not saved" },
+              { status: 409 }
+            )
+          );
+        }
+      }
 
       return withNoStore(
-        NextResponse.json(
-          { error: "Journal update did not return an updated row" },
-          { status: 409 }
-        )
+        NextResponse.json({
+          success: true,
+          item: normalizeJournalRow(afterUpdate),
+        })
       );
     }
 
@@ -277,8 +328,9 @@ export async function DELETE(
     }
 
     const now = new Date().toISOString();
+    const writer = createSupabaseAdminClient();
 
-    const { error } = await supabase
+    const { error } = await writer
       .from("journals")
       .update({
         deleted_at: now,
