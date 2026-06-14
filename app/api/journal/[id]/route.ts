@@ -33,12 +33,21 @@ async function ensureOwnedJournal(
   return data;
 }
 
+function hasMetadataAccessHash(row: any) {
+  return Boolean(
+    row?.metadata &&
+      typeof row.metadata === "object" &&
+      typeof row.metadata.accessHash === "string" &&
+      row.metadata.accessHash.length > 0
+  );
+}
+
 function normalizeJournalRow(row: any) {
   const { lock_hash: _lockHash, ...safeRow } = row;
 
   return {
     ...safeRow,
-    locked: Boolean(row.lock_hash),
+    locked: Boolean(row.lock_hash || hasMetadataAccessHash(row)),
   };
 }
 
