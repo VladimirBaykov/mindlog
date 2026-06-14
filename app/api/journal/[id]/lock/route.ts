@@ -13,6 +13,12 @@ type SupabaseMaybeError = {
   hint?: string;
 };
 
+type OwnedJournal = {
+  id: string;
+  lock_hash: string | null;
+  deleted_at: string | null;
+};
+
 function normalizeCode(value: unknown) {
   if (typeof value !== "string") return "";
   return value.trim();
@@ -73,7 +79,10 @@ async function findOwnedJournal(params: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   userId: string;
   journalId: string;
-}) {
+}): Promise<{
+  data: OwnedJournal | null;
+  response: NextResponse | null;
+}> {
   const { data, error } = await params.supabase
     .from("journals")
     .select("id, lock_hash, deleted_at")
@@ -104,7 +113,7 @@ async function findOwnedJournal(params: {
     };
   }
 
-  return { data, response: null };
+  return { data: data as OwnedJournal, response: null };
 }
 
 export async function PATCH(req: Request, context: RouteContext) {
@@ -114,6 +123,16 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const ownedBefore = await findOwnedJournal({
+      supabase,
+      userId: user.id,
+      journalId: id,
+    });
+
+    if (ownedBefore.response) {
+      return ownedBefore.response;
     }
 
     const body = await req.json().catch(() => ({}));
@@ -143,13 +162,11 @@ export async function PATCH(req: Request, context: RouteContext) {
       );
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("journals")
       .update(payload)
       .eq("id", id)
-      .eq("user_id", user.id)
-      .select("id, lock_hash, deleted_at")
-      .maybeSingle();
+      .eq("user_id", user.id);
 
     if (error) {
       console.error("JOURNAL LOCK UPDATE ERROR:", error);
@@ -159,25 +176,18 @@ export async function PATCH(req: Request, context: RouteContext) {
       );
     }
 
-    if (!data || data.deleted_at) {
-      const owned = await findOwnedJournal({
-        supabase,
-        userId: user.id,
-        journalId: id,
-      });
+    const ownedAfter = await findOwnedJournal({
+      supabase,
+      userId: user.id,
+      journalId: id,
+    });
 
-      if (owned.response) {
-        return owned.response;
-      }
-
-      return NextResponse.json(
-        { error: "Journal not found", journalId: id },
-        { status: 404 }
-      );
+    if (ownedAfter.response) {
+      return ownedAfter.response;
     }
 
     return NextResponse.json({
-      locked: Boolean(data.lock_hash),
+      locked: Boolean(ownedAfter.data?.lock_hash),
     });
   } catch (error: any) {
     console.error("JOURNAL LOCK PATCH ERROR:", error);
