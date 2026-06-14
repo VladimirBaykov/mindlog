@@ -41,11 +41,23 @@ const colorStyles: Record<CollectionColor, { label: string; stripe: string }> = 
 
 function parseAddIds(value: string | null) {
   if (!value) return [];
-  return Array.from(new Set(value.split(",").map((item) => item.trim()).filter(Boolean)));
+  return Array.from(
+    new Set(value.split(",").map((item) => item.trim()).filter(Boolean))
+  );
 }
 
 function getCountLabel(count: number) {
   return `${count} reflection${count === 1 ? "" : "s"}`;
+}
+
+function getCollectionAccessKey(id: string) {
+  return `mindlog:collection-access:${id}`;
+}
+
+function isCollectionAccessGranted(collection: CollectionItem) {
+  if (!collection.locked) return true;
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(getCollectionAccessKey(collection.id)) === "1";
 }
 
 export default function JournalCollectionsPage() {
@@ -58,7 +70,12 @@ export default function JournalCollectionsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<CollectionColor>("blue");
+  const [accessCode, setAccessCode] = useState("");
   const [saving, setSaving] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [pendingCollection, setPendingCollection] = useState<CollectionItem | null>(null);
 
   const addIds = useMemo(() => parseAddIds(searchParams.get("add")), [searchParams]);
   const isAddMode = addIds.length > 0;
@@ -82,7 +99,10 @@ export default function JournalCollectionsPage() {
     setHeader({
       title: "Collections",
       leftSlot: (
-        <button onClick={() => router.push("/journal")} className="text-sm text-neutral-400 transition hover:text-white">
+        <button
+          onClick={() => router.push("/journal")}
+          className="text-sm text-neutral-400 transition hover:text-white"
+        >
           ← Journal
         </button>
       ),
@@ -106,20 +126,38 @@ export default function JournalCollectionsPage() {
 
   async function createCollection() {
     const trimmed = name.trim();
+    const trimmedCode = accessCode.trim();
+
     if (!trimmed || saving) return;
+
+    if (trimmedCode && !/^\d{4,8}$/.test(trimmedCode)) {
+      alert("Use a 4–8 digit code.");
+      return;
+    }
 
     try {
       setSaving(true);
       const res = await fetch("/api/journal/collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, color, journalIds: addIds }),
+        body: JSON.stringify({
+          name: trimmed,
+          color,
+          pin: trimmedCode || undefined,
+          journalIds: addIds,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create collection");
       setName("");
       setColor("blue");
+      setAccessCode("");
       setCreateOpen(false);
+
+      if (data.locked && typeof window !== "undefined") {
+        window.sessionStorage.setItem(getCollectionAccessKey(data.id), "1");
+      }
+
       router.push(`/journal/collections/${data.id}`);
     } catch (error) {
       console.error("Create collection failed:", error);
@@ -129,12 +167,7 @@ export default function JournalCollectionsPage() {
     }
   }
 
-  async function openOrAdd(collection: CollectionItem) {
-    if (!isAddMode) {
-      router.push(`/journal/collections/${collection.id}`);
-      return;
-    }
-
+  async function addSelectedToCollection(collection: CollectionItem) {
     try {
       const res = await fetch(`/api/journal/collections/${collection.id}/items`, {
         method: "POST",
@@ -147,6 +180,52 @@ export default function JournalCollectionsPage() {
     } catch (error) {
       console.error("Add to collection failed:", error);
       alert("Could not add reflections to this collection.");
+    }
+  }
+
+  async function openOrAdd(collection: CollectionItem) {
+    if (collection.locked && !isCollectionAccessGranted(collection)) {
+      setPendingCollection(collection);
+      setVerifyCode("");
+      setVerifyOpen(true);
+      return;
+    }
+
+    if (isAddMode) {
+      await addSelectedToCollection(collection);
+      return;
+    }
+
+    router.push(`/journal/collections/${collection.id}`);
+  }
+
+  async function verifyCollectionAccess() {
+    if (!pendingCollection || verifying) return;
+
+    try {
+      setVerifying(true);
+      const res = await fetch(`/api/journal/collections/${pendingCollection.id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: verifyCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
+
+      window.sessionStorage.setItem(getCollectionAccessKey(pendingCollection.id), "1");
+      setVerifyOpen(false);
+      setVerifyCode("");
+
+      if (isAddMode) {
+        await addSelectedToCollection(pendingCollection);
+      } else {
+        router.push(`/journal/collections/${pendingCollection.id}`);
+      }
+    } catch (error) {
+      console.error("Collection verification failed:", error);
+      alert("Incorrect code.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -186,7 +265,9 @@ export default function JournalCollectionsPage() {
         <div className="mx-auto max-w-xl px-4 pt-6 pb-28">
           {isAddMode && (
             <div className="mb-5 rounded-[26px] border border-cyan-300/20 bg-cyan-300/10 px-5 py-5">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/80">Add to collection</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/80">
+                Add to collection
+              </div>
               <p className="mt-3 text-sm leading-relaxed text-cyan-50/90">
                 Choose a collection for {addIds.length} selected reflection{addIds.length === 1 ? "" : "s"}, or create a new one.
               </p>
@@ -194,8 +275,12 @@ export default function JournalCollectionsPage() {
           )}
 
           <div className="mb-5 rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-5 shadow-2xl shadow-black/20">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Reflection collections</div>
-            <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">Organize what matters.</h1>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+              Reflection collections
+            </div>
+            <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
+              Organize what matters.
+            </h1>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
               Group saved reflections by theme, chapter, person, project, or anything you want to revisit together.
             </p>
@@ -204,9 +289,12 @@ export default function JournalCollectionsPage() {
           <div className="mx-auto w-[calc(100%-14px)] space-y-3">
             {!isAddMode && (
               <>
-                <button onClick={() => router.push("/journal?view=favorites")} className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]">
+                <button
+                  onClick={() => router.push("/journal?view=favorites")}
+                  className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]"
+                >
                   <div className="flex items-center gap-4">
-                    <div className="h-11 w-[5px] shrink-0 rounded-full bg-rose-400" />
+                    <div className="h-11 w-[5px] shrink-0 rounded-full bg-white" />
                     <div className="min-w-0 flex-1">
                       <h3 className="truncate text-[15px] font-medium text-white">Favorites ♥</h3>
                       <p className="mt-1.5 text-[13px] text-neutral-400">Reflections you marked as important.</p>
@@ -214,7 +302,10 @@ export default function JournalCollectionsPage() {
                   </div>
                 </button>
 
-                <button onClick={() => router.push("/journal?view=hidden")} className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]">
+                <button
+                  onClick={() => router.push("/journal?view=hidden")}
+                  className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]"
+                >
                   <div className="flex items-center gap-4">
                     <div className="h-11 w-[5px] shrink-0 rounded-full bg-neutral-400" />
                     <div className="min-w-0 flex-1">
@@ -244,7 +335,14 @@ export default function JournalCollectionsPage() {
                     <div className="flex items-center gap-4">
                       <button onClick={() => openOrAdd(collection)} className={`h-11 w-[5px] shrink-0 rounded-full ${style.stripe}`} aria-label={`Open ${collection.name}`} />
                       <button onClick={() => openOrAdd(collection)} className="min-w-0 flex-1 text-left">
-                        <h3 className="truncate text-[15px] font-medium text-white">{collection.name}{collection.locked ? "  Lock" : ""}</h3>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <h3 className="truncate text-[15px] font-medium text-white">{collection.name}</h3>
+                          {collection.locked && (
+                            <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
+                              Locked
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-1.5 text-[13px] text-neutral-400">{getCountLabel(collection.count)} · {style.label}</p>
                       </button>
                       {!isAddMode && (
@@ -266,9 +364,11 @@ export default function JournalCollectionsPage() {
             <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[420px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
               <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">New collection</div>
               <h2 className="mt-3 text-xl font-semibold text-white">Create a reflection collection</h2>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">Choose a name and color. PIN locks come in the next phase.</p>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">Choose a name, color, and optional access code.</p>
 
               <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Collection name" className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
+
+              <input value={accessCode} onChange={(event) => setAccessCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" placeholder="Optional 4–8 digit code" className="mt-3 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
 
               <div className="mt-4 grid grid-cols-4 gap-2">
                 {COLORS.map((option) => {
@@ -285,7 +385,22 @@ export default function JournalCollectionsPage() {
 
               <div className="mt-5 flex gap-3">
                 <button onClick={() => setCreateOpen(false)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
-                <button onClick={createCollection} disabled={!name.trim() || saving} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{saving ? "Creating..." : isAddMode ? "Create & add" : "Create"}</button>
+                <button onClick={createCollection} disabled={!name.trim() || saving} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{saving ? "Creating..." : "Create"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {verifyOpen && pendingCollection && (
+          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setVerifyOpen(false)}>
+            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[380px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked collection</div>
+              <h2 className="mt-3 text-xl font-semibold text-white">Enter access code</h2>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">“{pendingCollection.name}” is locked on this device session.</p>
+              <input value={verifyCode} onChange={(event) => setVerifyCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoFocus placeholder="Code" className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
+              <div className="mt-5 flex gap-3">
+                <button onClick={() => setVerifyOpen(false)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
+                <button onClick={verifyCollectionAccess} disabled={!verifyCode || verifying} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{verifying ? "Checking..." : "Unlock"}</button>
               </div>
             </div>
           </div>
