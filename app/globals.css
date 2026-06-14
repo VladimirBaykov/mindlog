@@ -72,20 +72,51 @@ body {
   text-shadow: 0 0 16px rgba(255, 255, 255, 0.28);
 }
 
-/* Journal pill action menu: keep long contextual menus inside the viewport. */
+/* Journal pill action menu: compact iOS-like floating menu. */
 .fixed.overflow-hidden.rounded-\[24px\] {
-  max-height: min(330px, calc(100vh - 96px)) !important;
+  width: min(312px, calc(100vw - 32px)) !important;
+  max-height: min(324px, calc(100vh - 96px)) !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 0.25rem !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 {
+  padding-right: 0.1rem;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button {
+  border-radius: 17px !important;
+  padding: 0.7rem 0.9rem !important;
+  font-size: 0.875rem !important;
+  letter-spacing: -0.005em;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child {
+  font-size: 0.93rem;
+  line-height: 1;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-track {
+  margin-block: 13px;
+  background: transparent;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-thumb {
-  border: 0;
-  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: content-box;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+  background-clip: content-box;
 }
 
 @keyframes shimmer {
@@ -112,6 +143,11 @@ body {
   * {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+
+  .fixed.overflow-hidden.rounded-\[24px\] {
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+    scrollbar-width: thin;
   }
 }
 
