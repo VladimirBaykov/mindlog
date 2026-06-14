@@ -7,11 +7,14 @@ import {
 } from "@/components/journal/JournalContext";
 import { moodConfig } from "@/lib/journal/moodMap";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 
 type MoodKey = keyof typeof moodConfig;
+
+type JournalViewMode = "all" | "favorites" | "hidden";
 
 type MenuPlacement = "top" | "bottom";
 
@@ -28,14 +31,15 @@ type ActiveMenu = {
 };
 
 type JournalListProps = {
+  viewMode?: JournalViewMode;
   selectionMode?: boolean;
   batchActionRequest?: number;
   onSelectionModeChange?: (nextValue: boolean) => void;
   onSelectionChange?: (count: number) => void;
 };
 
-const MENU_ESTIMATED_HEIGHT = 292;
-const VIEWPORT_PADDING = 16;
+const MENU_ESTIMATED_HEIGHT = 252;
+const VIEWPORT_PADDING = 14;
 const HEADER_SAFE_TOP = 66;
 
 function isMoodKey(
@@ -153,14 +157,14 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
   const rect = element.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const maxMenuWidth = Math.min(520, viewportWidth - VIEWPORT_PADDING * 2);
+  const maxMenuWidth = Math.min(360, viewportWidth - VIEWPORT_PADDING * 2);
   const width = Math.min(
-    Math.max(rect.width, 292),
+    Math.max(rect.width * 0.82, 260),
     maxMenuWidth
   );
 
   const left = Math.min(
-    Math.max(rect.left, VIEWPORT_PADDING),
+    Math.max(rect.left + (rect.width - width) / 2, VIEWPORT_PADDING),
     viewportWidth - width - VIEWPORT_PADDING
   );
 
@@ -171,7 +175,7 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
     return {
       top: Math.max(
         HEADER_SAFE_TOP,
-        rect.top - MENU_ESTIMATED_HEIGHT - 10
+        rect.top - MENU_ESTIMATED_HEIGHT - 8
       ),
       left,
       width,
@@ -181,7 +185,7 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
 
   return {
     top: Math.min(
-      rect.bottom + 10,
+      rect.bottom + 8,
       viewportHeight - MENU_ESTIMATED_HEIGHT - VIEWPORT_PADDING
     ),
     left,
@@ -197,7 +201,46 @@ function getCardElement(element: HTMLElement) {
   );
 }
 
+function getVisibleItems(items: JournalItem[], viewMode: JournalViewMode) {
+  if (viewMode === "favorites") {
+    return items.filter((item) => item.isFavorite && !item.hiddenAt);
+  }
+
+  if (viewMode === "hidden") {
+    return items.filter((item) => item.hiddenAt);
+  }
+
+  return items.filter((item) => !item.hiddenAt);
+}
+
+function EmptyView({ viewMode }: { viewMode: JournalViewMode }) {
+  if (viewMode === "favorites") {
+    return (
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-8 text-center">
+        <div className="text-sm font-medium text-white">No favorites yet</div>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">
+          Mark meaningful reflections as favorites and they will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  if (viewMode === "hidden") {
+    return (
+      <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-8 text-center">
+        <div className="text-sm font-medium text-white">No hidden reflections</div>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">
+          Hidden reflections stay out of your main journal and can be restored from here.
+        </p>
+      </div>
+    );
+  }
+
+  return <JournalEmpty />;
+}
+
 export default function JournalList({
+  viewMode = "all",
   selectionMode = false,
   batchActionRequest = 0,
   onSelectionModeChange,
@@ -219,6 +262,7 @@ export default function JournalList({
   const [activeMenu, setActiveMenu] = useState<ActiveMenu | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchMenuOpen, setBatchMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggeredRef = useRef(false);
 
@@ -226,10 +270,19 @@ export default function JournalList({
     ? pathname.split("/journal/")[1]
     : null;
 
-  const selectedItems = useMemo(
-    () => items.filter((item) => selectedIds.has(item.id)),
-    [items, selectedIds]
+  const visibleItems = useMemo(
+    () => getVisibleItems(items, viewMode),
+    [items, viewMode]
   );
+
+  const selectedItems = useMemo(
+    () => visibleItems.filter((item) => selectedIds.has(item.id)),
+    [visibleItems, selectedIds]
+  );
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     onSelectionChange?.(selectedIds.size);
@@ -241,6 +294,23 @@ export default function JournalList({
       setBatchMenuOpen(false);
     }
   }, [selectionMode]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBatchMenuOpen(false);
+    setActiveMenu(null);
+  }, [viewMode]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const visibleIds = new Set(visibleItems.map((item) => item.id));
+      const next = new Set(
+        Array.from(prev).filter((id) => visibleIds.has(id))
+      );
+
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visibleItems]);
 
   useEffect(() => {
     if (batchActionRequest > 0 && selectedIds.size > 0) {
@@ -264,8 +334,8 @@ export default function JournalList({
     return <JournalSkeleton />;
   }
 
-  if (items.length === 0) {
-    return <JournalEmpty />;
+  if (visibleItems.length === 0) {
+    return <EmptyView viewMode={viewMode} />;
   }
 
   function clearLongPressTimer() {
@@ -350,12 +420,77 @@ export default function JournalList({
     setActiveMenu(null);
   }
 
+  async function toggleFavorite(item: JournalItem) {
+    await updateItem(item.id, {
+      isFavorite: !item.isFavorite,
+    });
+    setActiveMenu(null);
+  }
+
+  async function hideItem(item: JournalItem) {
+    await updateItem(item.id, {
+      hiddenAt: Date.now(),
+    });
+    setActiveMenu(null);
+  }
+
+  async function unhideItem(item: JournalItem) {
+    await updateItem(item.id, {
+      hiddenAt: null,
+    });
+    setActiveMenu(null);
+  }
+
   async function deleteSingleItem(item: JournalItem) {
     const ok = confirm("Delete this reflection?");
     if (!ok) return;
 
     await deleteItem(item.id);
     setActiveMenu(null);
+  }
+
+  async function favoriteSelectedItems() {
+    if (selectedItems.length === 0) return;
+
+    for (const item of selectedItems) {
+      await updateItem(item.id, { isFavorite: true });
+    }
+
+    setSelectedIds(new Set());
+    setBatchMenuOpen(false);
+    onSelectionModeChange?.(false);
+  }
+
+  async function hideSelectedItems() {
+    if (selectedItems.length === 0) return;
+
+    const ok = confirm(
+      `Hide ${selectedItems.length} selected reflection${
+        selectedItems.length === 1 ? "" : "s"
+      }?`
+    );
+
+    if (!ok) return;
+
+    for (const item of selectedItems) {
+      await updateItem(item.id, { hiddenAt: Date.now() });
+    }
+
+    setSelectedIds(new Set());
+    setBatchMenuOpen(false);
+    onSelectionModeChange?.(false);
+  }
+
+  async function unhideSelectedItems() {
+    if (selectedItems.length === 0) return;
+
+    for (const item of selectedItems) {
+      await updateItem(item.id, { hiddenAt: null });
+    }
+
+    setSelectedIds(new Set());
+    setBatchMenuOpen(false);
+    onSelectionModeChange?.(false);
   }
 
   async function deleteSelectedItems() {
@@ -378,11 +513,197 @@ export default function JournalList({
     onSelectionModeChange?.(false);
   }
 
+  const activeMenuOverlay = (
+    <AnimatePresence>
+      {activeMenu && (
+        <motion.div
+          className="fixed inset-0 z-[9998] bg-black/18 backdrop-blur-[1px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setActiveMenu(null)}
+        >
+          <motion.div
+            initial={{
+              opacity: 0,
+              scale: 0.97,
+              y: activeMenu.position.placement === "top" ? 6 : -6,
+            }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{
+              opacity: 0,
+              scale: 0.97,
+              y: activeMenu.position.placement === "top" ? 6 : -6,
+            }}
+            transition={{ type: "spring", stiffness: 560, damping: 42 }}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              top: activeMenu.position.top,
+              left: activeMenu.position.left,
+              width: activeMenu.position.width,
+              maxHeight: `calc(100vh - ${VIEWPORT_PADDING * 2}px)`,
+            }}
+            className="fixed overflow-hidden rounded-[24px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+          >
+            <div className="px-3 py-2.5">
+              <div className="truncate text-[13px] font-medium text-white">
+                {activeMenu.item.title || "Conversation"}
+              </div>
+              <div className="mt-0.5 text-[11px] text-neutral-500">
+                {getMessageLabel(activeMenu.item.messages.length)} · {getDateLabel(activeMenu.item.createdAt)}
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <button
+                onClick={() => openEntry(activeMenu.item.id)}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>Open</span>
+                <span className="text-neutral-500">↗</span>
+              </button>
+
+              <button
+                onClick={() => renameItem(activeMenu.item)}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>Rename</span>
+                <span className="text-neutral-500">✎</span>
+              </button>
+
+              <button
+                onClick={() => toggleFavorite(activeMenu.item)}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>
+                  {activeMenu.item.isFavorite
+                    ? "Remove favorite"
+                    : "Favorite"}
+                </span>
+                <span className="text-neutral-500">
+                  {activeMenu.item.isFavorite ? "♡" : "♥"}
+                </span>
+              </button>
+
+              {activeMenu.item.hiddenAt ? (
+                <button
+                  onClick={() => unhideItem(activeMenu.item)}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Unhide</span>
+                  <span className="text-neutral-500">◎</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => hideItem(activeMenu.item)}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Hide</span>
+                  <span className="text-neutral-500">◌</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>Export</span>
+                <span className="text-neutral-500">PDF</span>
+              </button>
+
+              <div className="my-1 h-px bg-white/[0.08]" />
+
+              <button
+                onClick={() => deleteSingleItem(activeMenu.item)}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
+              >
+                <span>Delete</span>
+                <span>⌫</span>
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  const batchMenuOverlay = (
+    <AnimatePresence>
+      {batchMenuOpen && selectedIds.size > 0 && (
+        <motion.div
+          className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setBatchMenuOpen(false)}
+        >
+          <div className="fixed inset-x-0 bottom-0 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+18px)]">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 18 }}
+              transition={{ type: "spring", stiffness: 560, damping: 42 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-[360px] rounded-[24px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            >
+              <div className="px-3 py-2.5">
+                <div className="text-[13px] font-medium text-white">
+                  {selectedIds.size} selected
+                </div>
+                <div className="mt-0.5 text-[11px] text-neutral-500">
+                  Batch actions
+                </div>
+              </div>
+
+              <div className="space-y-0.5">
+                <button
+                  onClick={favoriteSelectedItems}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Mark as favorite</span>
+                  <span className="text-neutral-500">♥</span>
+                </button>
+
+                {viewMode === "hidden" ? (
+                  <button
+                    onClick={unhideSelectedItems}
+                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Unhide selected</span>
+                    <span className="text-neutral-500">◎</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={hideSelectedItems}
+                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Hide selected</span>
+                    <span className="text-neutral-500">◌</span>
+                  </button>
+                )}
+
+                <div className="my-1 h-px bg-white/[0.08]" />
+
+                <button
+                  onClick={deleteSelectedItems}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
+                >
+                  <span>Delete selected</span>
+                  <span>⌫</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   return (
     <>
-      <motion.div layout className="mx-auto w-[calc(100%-10px)] space-y-3">
+      <motion.div layout className="mx-auto w-[calc(100%-14px)] space-y-3">
         <AnimatePresence initial={false}>
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const mood = isMoodKey(item.mood)
               ? moodConfig[item.mood]
               : moodConfig.calm;
@@ -447,9 +768,18 @@ export default function JournalList({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
-                        <h3 className="truncate text-[15px] font-medium tracking-[-0.01em] text-white">
-                          {item.title || "Conversation"}
-                        </h3>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h3 className="truncate text-[15px] font-medium tracking-[-0.01em] text-white">
+                              {item.title || "Conversation"}
+                            </h3>
+                            {item.isFavorite && (
+                              <span className="shrink-0 text-[13px] text-rose-300">
+                                ♥
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
                         {!selectionMode && (
                           <button
@@ -488,7 +818,7 @@ export default function JournalList({
           })}
         </AnimatePresence>
 
-        {hasMore && (
+        {hasMore && viewMode === "all" && (
           <div className="pt-2">
             <button
               onClick={loadMore}
@@ -501,125 +831,8 @@ export default function JournalList({
         )}
       </motion.div>
 
-      <AnimatePresence>
-        {activeMenu && (
-          <motion.div
-            className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-[1px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setActiveMenu(null)}
-          >
-            <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.96,
-                y: activeMenu.position.placement === "top" ? 8 : -8,
-              }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{
-                opacity: 0,
-                scale: 0.96,
-                y: activeMenu.position.placement === "top" ? 8 : -8,
-              }}
-              transition={{ type: "spring", stiffness: 520, damping: 38 }}
-              onClick={(event) => event.stopPropagation()}
-              style={{
-                top: activeMenu.position.top,
-                left: activeMenu.position.left,
-                width: activeMenu.position.width,
-                maxHeight: `calc(100vh - ${VIEWPORT_PADDING * 2}px)`,
-              }}
-              className="fixed overflow-hidden rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl"
-            >
-              <div className="px-4 py-3">
-                <div className="truncate text-sm font-medium text-white">
-                  {activeMenu.item.title || "Conversation"}
-                </div>
-                <div className="mt-1 text-xs text-neutral-500">
-                  {getMessageLabel(activeMenu.item.messages.length)} · {getDateLabel(activeMenu.item.createdAt)}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <button
-                  onClick={() => openEntry(activeMenu.item.id)}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Open</span>
-                  <span className="text-neutral-500">↗</span>
-                </button>
-
-                <button
-                  onClick={() => renameItem(activeMenu.item)}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Rename</span>
-                  <span className="text-neutral-500">✎</span>
-                </button>
-
-                <button
-                  onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
-                >
-                  <span>Export</span>
-                  <span className="text-neutral-500">PDF</span>
-                </button>
-
-                <div className="my-1 h-px bg-white/[0.08]" />
-
-                <button
-                  onClick={() => deleteSingleItem(activeMenu.item)}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
-                >
-                  <span>Delete</span>
-                  <span>⌫</span>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {batchMenuOpen && selectedIds.size > 0 && (
-          <motion.div
-            className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setBatchMenuOpen(false)}
-          >
-            <div className="mx-auto flex min-h-full max-w-xl items-end px-4 pb-5">
-              <motion.div
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 18 }}
-                transition={{ type: "spring", stiffness: 520, damping: 38 }}
-                onClick={(event) => event.stopPropagation()}
-                className="w-full rounded-[28px] border border-white/10 bg-neutral-950/95 p-2 shadow-2xl shadow-black/50"
-              >
-                <div className="px-4 py-3">
-                  <div className="text-sm font-medium text-white">
-                    {selectedIds.size} selected
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Batch actions for selected reflections
-                  </div>
-                </div>
-
-                <button
-                  onClick={deleteSelectedItems}
-                  className="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-sm text-red-300 transition hover:bg-red-500/10"
-                >
-                  <span>Delete selected</span>
-                  <span>⌫</span>
-                </button>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {mounted && createPortal(activeMenuOverlay, document.body)}
+      {mounted && createPortal(batchMenuOverlay, document.body)}
     </>
   );
 }
