@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getAuthedUserId() {
   const supabase = await createSupabaseServerClient();
 
@@ -51,6 +54,45 @@ function normalizeJournalRow(row: any) {
   };
 }
 
+function sanitizeJournalPatch(patch: Record<string, any>) {
+  const payload: Record<string, any> = patch.restore
+    ? {
+        deleted_at: null,
+        updated_at: new Date().toISOString(),
+      }
+    : {
+        ...patch,
+        updated_at: new Date().toISOString(),
+      };
+
+  delete payload.id;
+  delete payload.user_id;
+  delete payload.created_at;
+  delete payload.updated_at_client;
+  delete payload.deleted;
+  delete payload.lock_hash;
+  delete payload.locked;
+
+  if ("metadata" in payload) {
+    const metadata = payload.metadata;
+
+    if (
+      metadata === null ||
+      typeof metadata !== "object" ||
+      Array.isArray(metadata)
+    ) {
+      payload.metadata = {};
+    }
+  }
+
+  return payload;
+}
+
+function withNoStore(response: NextResponse) {
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  return response;
+}
+
 // ================= GET =================
 export async function GET(
   req: Request,
@@ -61,9 +103,8 @@ export async function GET(
     const { id } = await context.params;
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+      return withNoStore(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       );
     }
 
@@ -73,22 +114,30 @@ export async function GET(
       .eq("id", id)
       .eq("user_id", userId)
       .is("deleted_at", null)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
-      return NextResponse.json(
-        { error: "Journal not found" },
-        { status: 404 }
+    if (error) {
+      console.error("GET JOURNAL SELECT ERROR:", error);
+      return withNoStore(
+        NextResponse.json(
+          { error: error.message || "Failed to load journal" },
+          { status: 500 }
+        )
       );
     }
 
-    return NextResponse.json(normalizeJournalRow(data));
+    if (!data) {
+      return withNoStore(
+        NextResponse.json({ error: "Journal not found" }, { status: 404 })
+      );
+    }
+
+    return withNoStore(NextResponse.json(normalizeJournalRow(data)));
   } catch (e) {
     console.error("GET JOURNAL ERROR:", e);
 
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return withNoStore(
+      NextResponse.json({ error: "Internal server error" }, { status: 500 })
     );
   }
 }
@@ -103,61 +152,63 @@ export async function PATCH(
     const { id } = await context.params;
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+      return withNoStore(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       );
     }
 
     const owned = await ensureOwnedJournal(supabase, id, userId);
 
     if (!owned) {
-      return NextResponse.json(
-        { error: "Journal not found" },
-        { status: 404 }
+      return withNoStore(
+        NextResponse.json({ error: "Journal not found" }, { status: 404 })
       );
     }
 
     const patch = await req.json().catch(() => ({}));
+    const payload = sanitizeJournalPatch(patch);
 
-    const payload = patch.restore
-      ? {
-          deleted_at: null,
-          updated_at: new Date().toISOString(),
-        }
-      : {
-          ...patch,
-          updated_at: new Date().toISOString(),
-        };
-
-    delete payload.id;
-    delete payload.user_id;
-    delete payload.created_at;
-    delete payload.lock_hash;
-    delete payload.locked;
-
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("journals")
       .update(payload)
       .eq("id", id)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .select("*")
+      .maybeSingle();
 
     if (error) {
-      console.error("PATCH JOURNAL UPDATE ERROR:", error);
+      console.error("PATCH JOURNAL UPDATE ERROR:", error, { id, payload });
 
-      return NextResponse.json(
-        { error: error.message || "Failed to update journal" },
-        { status: 500 }
+      return withNoStore(
+        NextResponse.json(
+          { error: error.message || "Failed to update journal" },
+          { status: 500 }
+        )
       );
     }
 
-    return NextResponse.json({ success: true });
+    if (!data) {
+      console.error("PATCH JOURNAL EMPTY UPDATE RESULT:", { id, payload });
+
+      return withNoStore(
+        NextResponse.json(
+          { error: "Journal update did not return an updated row" },
+          { status: 409 }
+        )
+      );
+    }
+
+    return withNoStore(
+      NextResponse.json({
+        success: true,
+        item: normalizeJournalRow(data),
+      })
+    );
   } catch (e) {
     console.error("PATCH JOURNAL ERROR:", e);
 
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return withNoStore(
+      NextResponse.json({ error: "Internal server error" }, { status: 500 })
     );
   }
 }
@@ -172,18 +223,16 @@ export async function DELETE(
     const { id } = await context.params;
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+      return withNoStore(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       );
     }
 
     const owned = await ensureOwnedJournal(supabase, id, userId);
 
     if (!owned) {
-      return NextResponse.json(
-        { error: "Journal not found" },
-        { status: 404 }
+      return withNoStore(
+        NextResponse.json({ error: "Journal not found" }, { status: 404 })
       );
     }
 
@@ -201,19 +250,20 @@ export async function DELETE(
     if (error) {
       console.error("DELETE JOURNAL UPDATE ERROR:", error);
 
-      return NextResponse.json(
-        { error: error.message || "Failed to delete journal" },
-        { status: 500 }
+      return withNoStore(
+        NextResponse.json(
+          { error: error.message || "Failed to delete journal" },
+          { status: 500 }
+        )
       );
     }
 
-    return NextResponse.json({ success: true });
+    return withNoStore(NextResponse.json({ success: true }));
   } catch (e) {
     console.error("DELETE JOURNAL ERROR:", e);
 
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return withNoStore(
+      NextResponse.json({ error: "Internal server error" }, { status: 500 })
     );
   }
 }
