@@ -334,6 +334,17 @@ export default function JournalPage() {
                 <span className="text-neutral-500">◌</span>
               </button>
 
+              <button
+                onClick={() => {
+                  setPageMenuOpen(false);
+                  router.push("/journal/collections");
+                }}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>Collections</span>
+                <span className="text-neutral-500">▦</span>
+              </button>
+
               <div className="my-1 h-px bg-white/[0.08]" />
 
               <button
