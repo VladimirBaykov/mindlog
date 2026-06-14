@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function hasMetadataAccessHash(row: any) {
   return Boolean(
     row?.metadata &&
@@ -19,6 +22,11 @@ function normalizeJournalRow(row: any) {
   };
 }
 
+function withNoStore(response: NextResponse) {
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  return response;
+}
+
 export async function GET(req: Request) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -29,9 +37,8 @@ export async function GET(req: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+      return withNoStore(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       );
     }
 
@@ -58,24 +65,27 @@ export async function GET(req: Request) {
       .range(from, to);
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
+      return withNoStore(
+        NextResponse.json({ error: error.message }, { status: 500 })
       );
     }
 
-    return NextResponse.json({
-      items: (data ?? []).map(normalizeJournalRow),
-      total: count ?? 0,
-      limit,
-      offset,
-      hasMore:
-        typeof count === "number" ? to + 1 < count : false,
-    });
+    return withNoStore(
+      NextResponse.json({
+        items: (data ?? []).map(normalizeJournalRow),
+        total: count ?? 0,
+        limit,
+        offset,
+        hasMore:
+          typeof count === "number" ? to + 1 < count : false,
+      })
+    );
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || "Internal server error" },
-      { status: 500 }
+    return withNoStore(
+      NextResponse.json(
+        { error: err.message || "Internal server error" },
+        { status: 500 }
+      )
     );
   }
 }
