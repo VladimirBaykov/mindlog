@@ -15,6 +15,13 @@ type Message = {
   content: string;
 };
 
+export type JournalMetadata = {
+  summary?: string;
+  keyTakeaway?: string;
+  themes?: string[];
+  chatType?: string;
+};
+
 export type JournalItem = {
   id: string;
   title?: string;
@@ -23,6 +30,9 @@ export type JournalItem = {
   messages: Message[];
   deleted?: boolean;
   updatedAt?: number | null;
+  metadata?: JournalMetadata | null;
+  isFavorite?: boolean;
+  hiddenAt?: number | null;
 };
 
 type RawJournalItem = {
@@ -34,7 +44,19 @@ type RawJournalItem = {
   deleted_at?: string | null;
   content?: Message[];
   messages?: Message[];
+  metadata?: JournalMetadata | null;
+  isFavorite?: boolean;
+  is_favorite?: boolean | null;
+  hiddenAt?: number | null;
+  hidden_at?: string | null;
 };
+
+type JournalUpdatePatch = Partial<
+  Pick<
+    JournalItem,
+    "title" | "mood" | "metadata" | "isFavorite" | "hiddenAt"
+  >
+>;
 
 type JournalContextValue = {
   items: JournalItem[];
@@ -46,7 +68,7 @@ type JournalContextValue = {
   addItem: (item: JournalItem | RawJournalItem) => void;
   updateItem: (
     id: string,
-    patch: Partial<JournalItem>
+    patch: JournalUpdatePatch
   ) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
@@ -80,6 +102,17 @@ function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
         : Array.isArray(item.content)
         ? item.content
         : [],
+    metadata: item.metadata ?? null,
+    isFavorite:
+      "isFavorite" in item && typeof item.isFavorite === "boolean"
+        ? item.isFavorite
+        : Boolean(item.is_favorite),
+    hiddenAt:
+      "hiddenAt" in item && typeof item.hiddenAt === "number"
+        ? item.hiddenAt
+        : item.hidden_at
+        ? new Date(item.hidden_at).getTime()
+        : null,
     deleted:
       "deleted" in item
         ? item.deleted
@@ -104,6 +137,34 @@ function mergeUnique(
   return Array.from(map.values()).sort(
     (a, b) => b.createdAt - a.createdAt
   );
+}
+
+function toApiPatch(patch: JournalUpdatePatch) {
+  const payload: Record<string, unknown> = {};
+
+  if ("title" in patch) {
+    payload.title = patch.title;
+  }
+
+  if ("mood" in patch) {
+    payload.mood = patch.mood;
+  }
+
+  if ("metadata" in patch) {
+    payload.metadata = patch.metadata;
+  }
+
+  if ("isFavorite" in patch) {
+    payload.is_favorite = Boolean(patch.isFavorite);
+  }
+
+  if ("hiddenAt" in patch) {
+    payload.hidden_at = patch.hiddenAt
+      ? new Date(patch.hiddenAt).toISOString()
+      : null;
+  }
+
+  return payload;
 }
 
 export function JournalProvider({
@@ -249,7 +310,7 @@ export function JournalProvider({
   }, []);
 
   const updateItem = useCallback(
-    async (id: string, patch: Partial<JournalItem>) => {
+    async (id: string, patch: JournalUpdatePatch) => {
       const snapshot = [...items];
 
       setItems((prev) =>
@@ -270,7 +331,7 @@ export function JournalProvider({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(patch),
+          body: JSON.stringify(toApiPatch(patch)),
         });
 
         if (!res.ok) throw new Error();
