@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 import AccessCodeDialog from "@/components/journal/AccessCodeDialog";
+import CollectionPickerDialog from "@/components/journal/CollectionPickerDialog";
 
 type MoodKey = keyof typeof moodConfig;
 type JournalViewMode = "all" | "favorites" | "hidden";
@@ -33,6 +34,16 @@ type LockDialogState =
   | { mode: "set"; item: JournalItem }
   | { mode: "remove"; item: JournalItem };
 
+type CollectionDialogState = {
+  items: JournalItem[];
+  source: "single" | "batch";
+};
+
+type ConfirmDialogState =
+  | { type: "delete-single"; item: JournalItem }
+  | { type: "hide-selected"; items: JournalItem[] }
+  | { type: "delete-selected"; items: JournalItem[] };
+
 type JournalListProps = {
   viewMode?: JournalViewMode;
   selectionMode?: boolean;
@@ -41,7 +52,7 @@ type JournalListProps = {
   onSelectionChange?: (count: number) => void;
 };
 
-const MENU_ESTIMATED_HEIGHT = 300;
+const MENU_ESTIMATED_HEIGHT = 330;
 const VIEWPORT_PADDING = 14;
 const HEADER_SAFE_TOP = 66;
 
@@ -84,13 +95,8 @@ function isLowSignalUserMessage(content: string) {
     "can you save this conversation",
   ];
 
-  if (lowSignalExact.includes(normalized)) {
-    return true;
-  }
-
-  if (normalized.length <= 12) {
-    return true;
-  }
+  if (lowSignalExact.includes(normalized)) return true;
+  if (normalized.length <= 12) return true;
 
   if (
     normalized.startsWith("save ") ||
@@ -112,17 +118,13 @@ function getJournalPreview(item: JournalItem) {
       message.role === "user" && !isLowSignalUserMessage(message.content),
   );
 
-  if (meaningfulUserMessage) {
-    return meaningfulUserMessage.content;
-  }
+  if (meaningfulUserMessage) return meaningfulUserMessage.content;
 
   const firstUserMessage = item.messages.find(
     (message) => message.role === "user",
   );
 
-  if (firstUserMessage) {
-    return firstUserMessage.content;
-  }
+  if (firstUserMessage) return firstUserMessage.content;
 
   const firstAssistantMessage = item.messages.find(
     (message) => message.role === "assistant",
@@ -142,13 +144,8 @@ function getDateLabel(timestamp: number) {
 
   yesterday.setDate(today.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) {
-    return "Today";
-  }
-
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  }
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
 
   return date.toLocaleDateString(undefined, {
     month: "short",
@@ -279,6 +276,13 @@ export default function JournalList({
   const [batchMenuOpen, setBatchMenuOpen] = useState(false);
   const [lockDialog, setLockDialog] = useState<LockDialogState | null>(null);
   const [lockDialogBusy, setLockDialogBusy] = useState(false);
+  const [collectionDialog, setCollectionDialog] =
+    useState<CollectionDialogState | null>(null);
+  const [collectionDialogBusy, setCollectionDialogBusy] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(
+    null,
+  );
+  const [confirmDialogBusy, setConfirmDialogBusy] = useState(false);
   const [mounted, setMounted] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -338,20 +342,18 @@ export default function JournalList({
       if (event.key === "Escape") {
         setActiveMenu(null);
         setBatchMenuOpen(false);
+        if (!lockDialogBusy) setLockDialog(null);
+        if (!collectionDialogBusy) setCollectionDialog(null);
+        if (!confirmDialogBusy) setConfirmDialog(null);
       }
     }
 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, []);
+  }, [collectionDialogBusy, confirmDialogBusy, lockDialogBusy]);
 
-  if (loading) {
-    return <JournalSkeleton />;
-  }
-
-  if (visibleItems.length === 0) {
-    return <EmptyView viewMode={viewMode} />;
-  }
+  if (loading) return <JournalSkeleton />;
+  if (visibleItems.length === 0) return <EmptyView viewMode={viewMode} />;
 
   function clearLongPressTimer() {
     if (longPressTimerRef.current) {
@@ -363,13 +365,8 @@ export default function JournalList({
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -398,7 +395,6 @@ export default function JournalList({
     longPressTriggeredRef.current = false;
 
     const element = event.currentTarget;
-
     longPressTimerRef.current = setTimeout(() => {
       openItemMenu(item, element);
     }, 420);
@@ -428,7 +424,6 @@ export default function JournalList({
 
   async function renameItem(item: JournalItem) {
     const nextTitle = prompt("New reflection title:", item.title || "");
-
     if (!nextTitle || nextTitle === item.title) return;
 
     await updateItem(item.id, { title: nextTitle });
@@ -436,23 +431,17 @@ export default function JournalList({
   }
 
   async function toggleFavorite(item: JournalItem) {
-    await updateItem(item.id, {
-      isFavorite: !item.isFavorite,
-    });
+    await updateItem(item.id, { isFavorite: !item.isFavorite });
     setActiveMenu(null);
   }
 
   async function hideItem(item: JournalItem) {
-    await updateItem(item.id, {
-      hiddenAt: Date.now(),
-    });
+    await updateItem(item.id, { hiddenAt: Date.now() });
     setActiveMenu(null);
   }
 
   async function unhideItem(item: JournalItem) {
-    await updateItem(item.id, {
-      hiddenAt: null,
-    });
+    await updateItem(item.id, { hiddenAt: null });
     setActiveMenu(null);
   }
 
@@ -464,6 +453,30 @@ export default function JournalList({
   function openRemoveItemLock(item: JournalItem) {
     setActiveMenu(null);
     setLockDialog({ mode: "remove", item });
+  }
+
+  function openAddToCollection(itemsToAdd: JournalItem[], source: "single" | "batch") {
+    if (itemsToAdd.length === 0) return;
+    setActiveMenu(null);
+    setBatchMenuOpen(false);
+    setCollectionDialog({ items: itemsToAdd, source });
+  }
+
+  function openDeleteSingle(item: JournalItem) {
+    setActiveMenu(null);
+    setConfirmDialog({ type: "delete-single", item });
+  }
+
+  function openHideSelected() {
+    if (selectedItems.length === 0) return;
+    setBatchMenuOpen(false);
+    setConfirmDialog({ type: "hide-selected", items: selectedItems });
+  }
+
+  function openDeleteSelected() {
+    if (selectedItems.length === 0) return;
+    setBatchMenuOpen(false);
+    setConfirmDialog({ type: "delete-selected", items: selectedItems });
   }
 
   async function applyItemLock(code: string) {
@@ -533,12 +546,43 @@ export default function JournalList({
     }
   }
 
-  async function deleteSingleItem(item: JournalItem) {
-    const ok = confirm("Delete this reflection?");
-    if (!ok) return;
+  async function addDialogItemsToCollection(collectionId: string) {
+    if (!collectionDialog) return;
 
-    await deleteItem(item.id);
-    setActiveMenu(null);
+    const journalIds = collectionDialog.items.map((item) => item.id);
+
+    try {
+      setCollectionDialogBusy(true);
+      const res = await fetch(
+        `/api/journal/collections/${encodeURIComponent(collectionId)}/items`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ journalIds }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Could not add to this collection.");
+      }
+
+      if (collectionDialog.source === "batch") {
+        setSelectedIds(new Set());
+        onSelectionModeChange?.(false);
+      }
+
+      setCollectionDialog(null);
+    } catch (error) {
+      console.error("Add to collection failed:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Could not add to this collection.",
+      );
+    } finally {
+      setCollectionDialogBusy(false);
+    }
   }
 
   async function favoriteSelectedItems() {
@@ -555,14 +599,6 @@ export default function JournalList({
 
   async function hideSelectedItems() {
     if (selectedItems.length === 0) return;
-
-    const ok = confirm(
-      `Hide ${selectedItems.length} selected reflection${
-        selectedItems.length === 1 ? "" : "s"
-      }?`,
-    );
-
-    if (!ok) return;
 
     for (const item of selectedItems) {
       await updateItem(item.id, { hiddenAt: Date.now() });
@@ -585,16 +621,13 @@ export default function JournalList({
     onSelectionModeChange?.(false);
   }
 
+  async function deleteSingleItem(item: JournalItem) {
+    await deleteItem(item.id);
+    setConfirmDialog(null);
+  }
+
   async function deleteSelectedItems() {
     if (selectedItems.length === 0) return;
-
-    const ok = confirm(
-      `Delete ${selectedItems.length} selected reflection${
-        selectedItems.length === 1 ? "" : "s"
-      }?`,
-    );
-
-    if (!ok) return;
 
     for (const item of selectedItems) {
       await deleteItem(item.id);
@@ -603,6 +636,74 @@ export default function JournalList({
     setSelectedIds(new Set());
     setBatchMenuOpen(false);
     onSelectionModeChange?.(false);
+    setConfirmDialog(null);
+  }
+
+  async function runConfirmDialogAction() {
+    if (!confirmDialog) return;
+
+    try {
+      setConfirmDialogBusy(true);
+
+      if (confirmDialog.type === "delete-single") {
+        await deleteSingleItem(confirmDialog.item);
+        return;
+      }
+
+      if (confirmDialog.type === "hide-selected") {
+        await hideSelectedItems();
+        setConfirmDialog(null);
+        return;
+      }
+
+      if (confirmDialog.type === "delete-selected") {
+        await deleteSelectedItems();
+        return;
+      }
+    } finally {
+      setConfirmDialogBusy(false);
+    }
+  }
+
+  function getConfirmDialogCopy() {
+    if (!confirmDialog) {
+      return {
+        title: "Confirm action",
+        description: "Please confirm this action.",
+        confirmLabel: "Confirm",
+        destructive: false,
+      };
+    }
+
+    if (confirmDialog.type === "delete-single") {
+      return {
+        title: "Delete reflection?",
+        description:
+          "This reflection will be removed from your journal. You can undo it briefly after deletion.",
+        confirmLabel: "Delete",
+        destructive: true,
+      };
+    }
+
+    if (confirmDialog.type === "hide-selected") {
+      const count = confirmDialog.items.length;
+      return {
+        title: `Hide ${count} reflection${count === 1 ? "" : "s"}?`,
+        description:
+          "Hidden reflections stay out of your main journal and can be restored from Hidden later.",
+        confirmLabel: "Hide",
+        destructive: false,
+      };
+    }
+
+    const count = confirmDialog.items.length;
+    return {
+      title: `Delete ${count} reflection${count === 1 ? "" : "s"}?`,
+      description:
+        "These reflections will be removed from your journal. You can undo them briefly after deletion.",
+      confirmLabel: "Delete",
+      destructive: true,
+    };
   }
 
   const activeMenuOverlay = (
@@ -702,6 +803,14 @@ export default function JournalList({
               )}
 
               <button
+                onClick={() => openAddToCollection([activeMenu.item], "single")}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>Add to collection</span>
+                <span className="text-neutral-500">＋</span>
+              </button>
+
+              <button
                 onClick={() => openSetItemLock(activeMenu.item)}
                 className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
@@ -734,7 +843,7 @@ export default function JournalList({
               <div className="my-1 h-px bg-white/[0.08]" />
 
               <button
-                onClick={() => deleteSingleItem(activeMenu.item)}
+                onClick={() => openDeleteSingle(activeMenu.item)}
                 className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
               >
                 <span>Delete</span>
@@ -784,6 +893,14 @@ export default function JournalList({
                   <span className="text-neutral-500">♥</span>
                 </button>
 
+                <button
+                  onClick={() => openAddToCollection(selectedItems, "batch")}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Add selected to collection</span>
+                  <span className="text-neutral-500">＋</span>
+                </button>
+
                 {viewMode === "hidden" ? (
                   <button
                     onClick={unhideSelectedItems}
@@ -794,7 +911,7 @@ export default function JournalList({
                   </button>
                 ) : (
                   <button
-                    onClick={hideSelectedItems}
+                    onClick={openHideSelected}
                     className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                   >
                     <span>Hide selected</span>
@@ -805,7 +922,7 @@ export default function JournalList({
                 <div className="my-1 h-px bg-white/[0.08]" />
 
                 <button
-                  onClick={deleteSelectedItems}
+                  onClick={openDeleteSelected}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
                 >
                   <span>Delete selected</span>
@@ -852,6 +969,38 @@ export default function JournalList({
     />
   );
 
+  const collectionDialogOverlay = (
+    <CollectionPickerDialog
+      open={Boolean(collectionDialog)}
+      title="Add to collection"
+      description="Choose where MindLog should organize this reflection. The original will stay in your Journal."
+      selectedCount={collectionDialog?.items.length ?? 0}
+      loading={collectionDialogBusy}
+      onClose={() => {
+        if (!collectionDialogBusy) setCollectionDialog(null);
+      }}
+      onConfirm={addDialogItemsToCollection}
+    />
+  );
+
+  const confirmCopy = getConfirmDialogCopy();
+
+  const confirmDialogOverlay = (
+    <AccessCodeDialog
+      open={Boolean(confirmDialog)}
+      mode="confirm"
+      title={confirmCopy.title}
+      description={confirmCopy.description}
+      confirmLabel={confirmCopy.confirmLabel}
+      destructive={confirmCopy.destructive}
+      loading={confirmDialogBusy}
+      onClose={() => {
+        if (!confirmDialogBusy) setConfirmDialog(null);
+      }}
+      onConfirm={runConfirmDialogAction}
+    />
+  );
+
   return (
     <>
       <motion.div layout className="mx-auto w-[calc(100%-14px)] space-y-3">
@@ -872,11 +1021,7 @@ export default function JournalList({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 40,
-                }}
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
               >
                 <motion.div
                   data-journal-card="true"
@@ -992,6 +1137,8 @@ export default function JournalList({
       {mounted && createPortal(activeMenuOverlay, document.body)}
       {mounted && createPortal(batchMenuOverlay, document.body)}
       {mounted && createPortal(lockDialogOverlay, document.body)}
+      {mounted && createPortal(collectionDialogOverlay, document.body)}
+      {mounted && createPortal(confirmDialogOverlay, document.body)}
     </>
   );
 }
