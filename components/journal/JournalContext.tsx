@@ -73,7 +73,7 @@ type JournalContextValue = {
   updateItem: (
     id: string,
     patch: JournalUpdatePatch
-  ) => Promise<void>;
+  ) => Promise<JournalItem | null>;
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
 };
@@ -169,7 +169,7 @@ function toApiPatch(patch: JournalUpdatePatch) {
   }
 
   if ("metadata" in patch) {
-    payload.metadata = patch.metadata;
+    payload.metadata = patch.metadata ?? {};
   }
 
   if ("isFavorite" in patch) {
@@ -349,13 +349,33 @@ export function JournalProvider({
           headers: {
             "Content-Type": "application/json",
           },
+          cache: "no-store",
           body: JSON.stringify(toApiPatch(patch)),
         });
 
-        if (!res.ok) throw new Error();
-      } catch {
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || "Update failed");
+        }
+
+        if (!data.item) {
+          throw new Error("Update did not return the saved journal item");
+        }
+
+        const savedItem = normalizeItem(data.item as RawJournalItem);
+
+        setItems((prev) =>
+          prev.map((item) => (item.id === id ? savedItem : item))
+        );
+
+        return savedItem;
+      } catch (error) {
         setItems(snapshot);
-        showError("Update failed");
+        showError(
+          error instanceof Error ? error.message : "Update failed"
+        );
+        throw error;
       }
     },
     [items, showError]
@@ -400,10 +420,15 @@ export function JournalProvider({
         const res = await fetch(`/api/journal/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
+          cache: "no-store",
           body: JSON.stringify({ restore: true }),
         });
 
-        if (!res.ok) throw new Error();
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || "Restore failed");
+        }
 
         await refresh();
       } catch {
