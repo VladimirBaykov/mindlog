@@ -344,7 +344,9 @@ export default function JournalEntryPage() {
   }, [id]);
 
   useEffect(() => {
-    fetch(`/api/journal/${id}`)
+    fetch(`/api/journal/${id}`, {
+  cache: "no-store",
+})
       .then(async (res) => {
         if (!res.ok) return null;
         return res.json();
