@@ -74,48 +74,48 @@ body {
 
 /* Journal pill action menu: compact iOS-like floating menu. */
 .fixed.overflow-hidden.rounded-\[24px\] {
-  width: min(312px, calc(100vw - 32px)) !important;
-  max-height: min(324px, calc(100vh - 96px)) !important;
+  width: min(304px, calc(100vw - 32px)) !important;
+  max-height: min(336px, calc(100vh - 96px)) !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  padding-right: 0.25rem !important;
+  scrollbar-gutter: stable both-edges;
+  padding-right: 0.18rem !important;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 {
-  padding-right: 0.1rem;
+  padding-right: 0;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button {
-  border-radius: 17px !important;
-  padding: 0.7rem 0.9rem !important;
-  font-size: 0.875rem !important;
-  letter-spacing: -0.005em;
+  border-radius: 18px !important;
+  padding: 0.82rem 0.98rem !important;
+  font-size: 0.97rem !important;
+  letter-spacing: -0.012em;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child {
-  font-size: 0.93rem;
+  font-size: 1.05rem;
   line-height: 1;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-track {
-  margin-block: 13px;
+  margin-block: 14px;
   background: transparent;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-thumb {
-  border: 1.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.24);
   background-clip: content-box;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\]::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.32);
   background-clip: content-box;
 }
 
@@ -146,7 +146,7 @@ body {
   }
 
   .fixed.overflow-hidden.rounded-\[24px\] {
-    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
     scrollbar-width: thin;
   }
 }
