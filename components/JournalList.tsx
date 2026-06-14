@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
+import AccessCodeDialog from "@/components/journal/AccessCodeDialog";
 
 type MoodKey = keyof typeof moodConfig;
 type JournalViewMode = "all" | "favorites" | "hidden";
@@ -28,6 +29,10 @@ type ActiveMenu = {
   position: MenuPosition;
 };
 
+type LockDialogState =
+  | { mode: "set"; item: JournalItem }
+  | { mode: "remove"; item: JournalItem };
+
 type JournalListProps = {
   viewMode?: JournalViewMode;
   selectionMode?: boolean;
@@ -40,9 +45,7 @@ const MENU_ESTIMATED_HEIGHT = 300;
 const VIEWPORT_PADDING = 14;
 const HEADER_SAFE_TOP = 66;
 
-function isMoodKey(
-  value: string | null | undefined
-): value is MoodKey {
+function isMoodKey(value: string | null | undefined): value is MoodKey {
   return Boolean(value && value in moodConfig);
 }
 
@@ -106,8 +109,7 @@ function getJournalPreview(item: JournalItem) {
 
   const meaningfulUserMessage = item.messages.find(
     (message) =>
-      message.role === "user" &&
-      !isLowSignalUserMessage(message.content)
+      message.role === "user" && !isLowSignalUserMessage(message.content),
   );
 
   if (meaningfulUserMessage) {
@@ -115,7 +117,7 @@ function getJournalPreview(item: JournalItem) {
   }
 
   const firstUserMessage = item.messages.find(
-    (message) => message.role === "user"
+    (message) => message.role === "user",
   );
 
   if (firstUserMessage) {
@@ -123,7 +125,7 @@ function getJournalPreview(item: JournalItem) {
   }
 
   const firstAssistantMessage = item.messages.find(
-    (message) => message.role === "assistant"
+    (message) => message.role === "assistant",
   );
 
   return firstAssistantMessage?.content ?? "No preview available";
@@ -177,7 +179,7 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
 
   const left = Math.min(
     Math.max(rect.left + (rect.width - width) / 2, VIEWPORT_PADDING),
-    viewportWidth - width - VIEWPORT_PADDING
+    viewportWidth - width - VIEWPORT_PADDING,
   );
 
   const spaceBelow = viewportHeight - rect.bottom;
@@ -185,10 +187,7 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
 
   if (shouldOpenTop) {
     return {
-      top: Math.max(
-        HEADER_SAFE_TOP,
-        rect.top - MENU_ESTIMATED_HEIGHT - 8
-      ),
+      top: Math.max(HEADER_SAFE_TOP, rect.top - MENU_ESTIMATED_HEIGHT - 8),
       left,
       width,
       placement: "top",
@@ -198,7 +197,7 @@ function getMenuPosition(element: HTMLElement): MenuPosition {
   return {
     top: Math.min(
       rect.bottom + 8,
-      viewportHeight - MENU_ESTIMATED_HEIGHT - VIEWPORT_PADDING
+      viewportHeight - MENU_ESTIMATED_HEIGHT - VIEWPORT_PADDING,
     ),
     left,
     width,
@@ -240,9 +239,12 @@ function EmptyView({ viewMode }: { viewMode: JournalViewMode }) {
   if (viewMode === "hidden") {
     return (
       <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-8 text-center">
-        <div className="text-sm font-medium text-white">No hidden reflections</div>
+        <div className="text-sm font-medium text-white">
+          No hidden reflections
+        </div>
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">
-          Hidden reflections stay out of your main journal and can be restored from here.
+          Hidden reflections stay out of your main journal and can be restored
+          from here.
         </p>
       </div>
     );
@@ -275,6 +277,8 @@ export default function JournalList({
   const [activeMenu, setActiveMenu] = useState<ActiveMenu | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchMenuOpen, setBatchMenuOpen] = useState(false);
+  const [lockDialog, setLockDialog] = useState<LockDialogState | null>(null);
+  const [lockDialogBusy, setLockDialogBusy] = useState(false);
   const [mounted, setMounted] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -285,12 +289,12 @@ export default function JournalList({
 
   const visibleItems = useMemo(
     () => getVisibleItems(items, viewMode),
-    [items, viewMode]
+    [items, viewMode],
   );
 
   const selectedItems = useMemo(
     () => visibleItems.filter((item) => selectedIds.has(item.id)),
-    [visibleItems, selectedIds]
+    [visibleItems, selectedIds],
   );
 
   useEffect(() => {
@@ -317,9 +321,7 @@ export default function JournalList({
   useEffect(() => {
     setSelectedIds((prev) => {
       const visibleIds = new Set(visibleItems.map((item) => item.id));
-      const next = new Set(
-        Array.from(prev).filter((id) => visibleIds.has(id))
-      );
+      const next = new Set(Array.from(prev).filter((id) => visibleIds.has(id)));
 
       return next.size === prev.size ? prev : next;
     });
@@ -388,7 +390,7 @@ export default function JournalList({
 
   function handlePointerDown(
     item: JournalItem,
-    event: React.PointerEvent<HTMLDivElement>
+    event: React.PointerEvent<HTMLDivElement>,
   ) {
     if (selectionMode) return;
 
@@ -454,55 +456,80 @@ export default function JournalList({
     setActiveMenu(null);
   }
 
-  async function setItemLock(item: JournalItem) {
-    const nextCode = prompt("New 4–8 digit access code:", "");
-    if (!nextCode) return;
+  function openSetItemLock(item: JournalItem) {
+    setActiveMenu(null);
+    setLockDialog({ mode: "set", item });
+  }
 
-    const code = nextCode.trim();
+  function openRemoveItemLock(item: JournalItem) {
+    setActiveMenu(null);
+    setLockDialog({ mode: "remove", item });
+  }
 
-    if (!/^\d{4,8}$/.test(code)) {
-      alert("Use a 4–8 digit code.");
-      return;
-    }
+  async function applyItemLock(code: string) {
+    if (!lockDialog || lockDialog.mode !== "set") return;
+
+    const item = lockDialog.item;
+    const accessHash = await createAccessHash(item.id, code);
+    const metadata = {
+      ...(item.metadata || {}),
+      accessHash,
+    };
 
     try {
-      const accessHash = await createAccessHash(item.id, code);
-      const metadata = {
-        ...(item.metadata || {}),
-        accessHash,
-      };
-
-      await updateItem(item.id, {
+      setLockDialogBusy(true);
+      const savedItem = await updateItem(item.id, {
         metadata,
         locked: true,
       });
 
-      setActiveMenu(null);
+      if (!savedItem?.metadata?.accessHash || !savedItem.locked) {
+        throw new Error("Access code was not saved. Please try again.");
+      }
+
       await refresh();
+      setLockDialog(null);
     } catch (error) {
       console.error("Reflection soft lock failed:", error);
-      alert("Could not lock this reflection.");
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Could not save this access code. Please try again.",
+      );
+    } finally {
+      setLockDialogBusy(false);
     }
   }
 
-  async function clearItemLock(item: JournalItem) {
-    const ok = confirm("Remove access code from this reflection?");
-    if (!ok) return;
+  async function clearItemLock() {
+    if (!lockDialog || lockDialog.mode !== "remove") return;
+
+    const item = lockDialog.item;
+    const metadata = { ...(item.metadata || {}) };
+    delete metadata.accessHash;
 
     try {
-      const metadata = { ...(item.metadata || {}) };
-      delete metadata.accessHash;
-
-      await updateItem(item.id, {
+      setLockDialogBusy(true);
+      const savedItem = await updateItem(item.id, {
         metadata,
         locked: false,
       });
 
-      setActiveMenu(null);
+      if (savedItem?.metadata?.accessHash || savedItem?.locked) {
+        throw new Error("Access code was not removed. Please try again.");
+      }
+
       await refresh();
+      setLockDialog(null);
     } catch (error) {
       console.error("Remove reflection soft lock failed:", error);
-      alert("Could not remove lock.");
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Could not remove this access code. Please try again.",
+      );
+    } finally {
+      setLockDialogBusy(false);
     }
   }
 
@@ -532,7 +559,7 @@ export default function JournalList({
     const ok = confirm(
       `Hide ${selectedItems.length} selected reflection${
         selectedItems.length === 1 ? "" : "s"
-      }?`
+      }?`,
     );
 
     if (!ok) return;
@@ -564,7 +591,7 @@ export default function JournalList({
     const ok = confirm(
       `Delete ${selectedItems.length} selected reflection${
         selectedItems.length === 1 ? "" : "s"
-      }?`
+      }?`,
     );
 
     if (!ok) return;
@@ -649,9 +676,7 @@ export default function JournalList({
                 className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
                 <span>
-                  {activeMenu.item.isFavorite
-                    ? "Remove favorite"
-                    : "Favorite"}
+                  {activeMenu.item.isFavorite ? "Remove favorite" : "Favorite"}
                 </span>
                 <span className="text-neutral-500">
                   {activeMenu.item.isFavorite ? "♡" : "♥"}
@@ -677,16 +702,18 @@ export default function JournalList({
               )}
 
               <button
-                onClick={() => setItemLock(activeMenu.item)}
+                onClick={() => openSetItemLock(activeMenu.item)}
                 className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
-                <span>{isItemSoftLocked(activeMenu.item) ? "Change code" : "Lock"}</span>
+                <span>
+                  {isItemSoftLocked(activeMenu.item) ? "Change code" : "Lock"}
+                </span>
                 <span className="text-neutral-500">Lock</span>
               </button>
 
               {isItemSoftLocked(activeMenu.item) && (
                 <button
-                  onClick={() => clearItemLock(activeMenu.item)}
+                  onClick={() => openRemoveItemLock(activeMenu.item)}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
                   <span>Remove lock</span>
@@ -790,6 +817,39 @@ export default function JournalList({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+
+  const lockDialogOverlay = (
+    <AccessCodeDialog
+      open={Boolean(lockDialog)}
+      mode={lockDialog?.mode === "remove" ? "confirm" : "code"}
+      title={
+        lockDialog?.mode === "remove"
+          ? "Remove code?"
+          : lockDialog?.item && isItemSoftLocked(lockDialog.item)
+            ? "Change code"
+            : "Lock reflection"
+      }
+      description={
+        lockDialog?.mode === "remove"
+          ? "This reflection will open without asking for an access code. You can lock it again later."
+          : "Set a 4–8 digit code. MindLog will ask for it every time this reflection is opened."
+      }
+      confirmLabel={lockDialog?.mode === "remove" ? "Remove" : "Save code"}
+      destructive={lockDialog?.mode === "remove"}
+      loading={lockDialogBusy}
+      onClose={() => {
+        if (!lockDialogBusy) setLockDialog(null);
+      }}
+      onConfirm={async (code) => {
+        if (lockDialog?.mode === "remove") {
+          await clearItemLock();
+          return;
+        }
+
+        await applyItemLock(code || "");
+      }}
+    />
   );
 
   return (
@@ -931,6 +991,7 @@ export default function JournalList({
 
       {mounted && createPortal(activeMenuOverlay, document.body)}
       {mounted && createPortal(batchMenuOverlay, document.body)}
+      {mounted && createPortal(lockDialogOverlay, document.body)}
     </>
   );
 }
