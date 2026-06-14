@@ -26,6 +26,7 @@ type JournalItem = {
   } | null;
   is_favorite?: boolean | null;
   hidden_at?: string | null;
+  locked?: boolean | null;
 };
 
 type Collection = {
@@ -63,6 +64,10 @@ function getCollectionAccessKey(id: string) {
   return `mindlog:collection-access:${id}`;
 }
 
+function getJournalAccessKey(id: string) {
+  return `mindlog:journal-access:${id}`;
+}
+
 function getDateLabel(value: string | undefined) {
   if (!value) return "Saved";
   const date = new Date(value);
@@ -97,6 +102,12 @@ function getPreview(item: JournalItem) {
   return userMessage?.content ? normalizePreview(userMessage.content) : "Saved reflection";
 }
 
+function isJournalAccessGranted(item: JournalItem) {
+  if (!item.locked) return true;
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(getJournalAccessKey(item.id)) === "1";
+}
+
 export default function JournalCollectionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -112,6 +123,9 @@ export default function JournalCollectionDetailPage() {
   const [accessGranted, setAccessGranted] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [checkingAccess, setCheckingAccess] = useState(false);
+  const [pendingJournal, setPendingJournal] = useState<JournalItem | null>(null);
+  const [journalCode, setJournalCode] = useState("");
+  const [checkingJournal, setCheckingJournal] = useState(false);
 
   const collectionId = params.id;
 
@@ -227,6 +241,41 @@ export default function JournalCollectionDetailPage() {
     }
   }
 
+  async function verifyJournalAccess() {
+    if (!pendingJournal || checkingJournal) return;
+
+    try {
+      setCheckingJournal(true);
+      const res = await fetch(`/api/journal/${pendingJournal.id}/lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: journalCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
+      window.sessionStorage.setItem(getJournalAccessKey(pendingJournal.id), "1");
+      const nextId = pendingJournal.id;
+      setPendingJournal(null);
+      setJournalCode("");
+      router.push(`/journal/${nextId}`);
+    } catch (error) {
+      console.error("Journal access failed:", error);
+      alert("Incorrect code.");
+    } finally {
+      setCheckingJournal(false);
+    }
+  }
+
+  async function openJournal(item: JournalItem) {
+    if (item.locked && !isJournalAccessGranted(item)) {
+      setPendingJournal(item);
+      setJournalCode("");
+      return;
+    }
+
+    router.push(`/journal/${item.id}`);
+  }
+
   async function addSelected() {
     const journalIds = Array.from(selectedIds);
     if (!journalIds.length) return;
@@ -303,7 +352,8 @@ export default function JournalCollectionDetailPage() {
         body: JSON.stringify({ pin: code }),
       });
       if (!res.ok) throw new Error();
-      window.sessionStorage.setItem(getCollectionAccessKey(collection.id), "1");
+      window.sessionStorage.removeItem(getCollectionAccessKey(collection.id));
+      setAccessGranted(false);
       setMenuOpen(false);
       await loadCollection();
     } catch {
@@ -324,6 +374,7 @@ export default function JournalCollectionDetailPage() {
       });
       if (!res.ok) throw new Error();
       window.sessionStorage.removeItem(getCollectionAccessKey(collection.id));
+      setAccessGranted(true);
       setMenuOpen(false);
       await loadCollection();
     } catch {
@@ -427,8 +478,11 @@ export default function JournalCollectionDetailPage() {
                       <div key={item.id} className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]">
                         <div className="flex items-center gap-4">
                           <div className={`h-11 w-[5px] shrink-0 rounded-full ${mood.stripe}`} />
-                          <button onClick={() => router.push(`/journal/${item.id}`)} className="min-w-0 flex-1 text-left">
-                            <h3 className="truncate text-[15px] font-medium text-white">{item.title || "Conversation"}</h3>
+                          <button onClick={() => openJournal(item)} className="min-w-0 flex-1 text-left">
+                            <div className="flex items-center gap-2">
+                              <h3 className="truncate text-[15px] font-medium text-white">{item.title || "Conversation"}</h3>
+                              {item.locked && <span className="text-[13px] text-neutral-300">Lock</span>}
+                            </div>
                             <p className="mt-1.5 line-clamp-1 text-[13px] text-neutral-400">{getPreview(item)}</p>
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                               <span className={`rounded-full px-2.5 py-1 ${mood.softBg} text-neutral-200`}>{mood.label}</span>
@@ -448,6 +502,21 @@ export default function JournalCollectionDetailPage() {
             </>
           )}
         </div>
+
+        {pendingJournal && (
+          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setPendingJournal(null)}>
+            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[380px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked reflection</div>
+              <h2 className="mt-3 text-xl font-semibold text-white">Enter access code</h2>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-400">“{pendingJournal.title || "Conversation"}” is locked on this device session.</p>
+              <input value={journalCode} onChange={(event) => setJournalCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoFocus placeholder="Code" className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
+              <div className="mt-5 flex gap-3">
+                <button onClick={() => setPendingJournal(null)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
+                <button onClick={verifyJournalAccess} disabled={!journalCode || checkingJournal} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{checkingJournal ? "Checking..." : "Unlock"}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {addOpen && (
           <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setAddOpen(false)}>
