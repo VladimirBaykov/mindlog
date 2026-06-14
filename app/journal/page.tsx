@@ -25,12 +25,21 @@ type UsageInfo = {
 
 type JournalViewMode = "all" | "favorites" | "hidden";
 
+type ViewLocks = {
+  favorites: boolean;
+  hidden: boolean;
+};
+
 function getViewMode(value: string | null): JournalViewMode {
   if (value === "favorites" || value === "hidden") {
     return value;
   }
 
   return "all";
+}
+
+function getViewAccessKey(view: Exclude<JournalViewMode, "all">) {
+  return `mindlog:view-access:${view}`;
 }
 
 export default function JournalPage() {
@@ -46,10 +55,16 @@ export default function JournalPage() {
   const [selectedCount, setSelectedCount] = useState(0);
   const [batchActionRequest, setBatchActionRequest] = useState(0);
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
+  const [viewLocks, setViewLocks] = useState<ViewLocks>({ favorites: false, hidden: false });
+  const [viewAccessGranted, setViewAccessGranted] = useState(true);
+  const [viewCode, setViewCode] = useState("");
+  const [checkingViewCode, setCheckingViewCode] = useState(false);
 
   const celebrate = searchParams.get("celebrate");
   const entryId = searchParams.get("entry");
   const viewMode = getViewMode(searchParams.get("view"));
+  const lockedView = viewMode !== "all" && viewLocks[viewMode];
+  const canShowCurrentView = viewMode === "all" || !lockedView || viewAccessGranted;
 
   function navigateToView(nextView: JournalViewMode) {
     setPageMenuOpen(false);
@@ -73,6 +88,21 @@ export default function JournalPage() {
     router.push(next);
   }
 
+  async function loadViewLocks() {
+    try {
+      const res = await fetch("/api/journal/view-locks", { cache: "no-store" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setViewLocks({
+        favorites: Boolean(data.favorites),
+        hidden: Boolean(data.hidden),
+      });
+    } catch (error) {
+      console.error("View locks load failed:", error);
+      setViewLocks({ favorites: false, hidden: false });
+    }
+  }
+
   useEffect(() => {
     setHeader({
       title:
@@ -81,6 +111,15 @@ export default function JournalPage() {
           : viewMode === "hidden"
           ? "Hidden"
           : "Journal",
+      leftSlot:
+        viewMode === "all" ? undefined : (
+          <button
+            onClick={() => router.push("/journal/collections")}
+            className="text-sm text-neutral-400 transition hover:text-white"
+          >
+            ← Collections
+          </button>
+        ),
       rightSlot: (
         <div className="flex items-center gap-2">
           <button
@@ -103,16 +142,18 @@ export default function JournalPage() {
             ⋯
           </button>
 
-          <button
-            onClick={() => {
-              setPageMenuOpen(false);
-              setSelectionMode((value) => !value);
-            }}
-            className="rounded-full px-3 py-1.5 text-sm text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
-            aria-label={selectionMode ? "Exit selection" : "Select reflections"}
-          >
-            {selectionMode ? "×" : "Select"}
-          </button>
+          {canShowCurrentView && (
+            <button
+              onClick={() => {
+                setPageMenuOpen(false);
+                setSelectionMode((value) => !value);
+              }}
+              className="rounded-full px-3 py-1.5 text-sm text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+              aria-label={selectionMode ? "Exit selection" : "Select reflections"}
+            >
+              {selectionMode ? "×" : "Select"}
+            </button>
+          )}
         </div>
       ),
     });
@@ -121,7 +162,9 @@ export default function JournalPage() {
       resetHeader();
     };
   }, [
+    canShowCurrentView,
     resetHeader,
+    router,
     selectedCount,
     selectionMode,
     setHeader,
@@ -132,7 +175,33 @@ export default function JournalPage() {
     setSelectionMode(false);
     setSelectedCount(0);
     setPageMenuOpen(false);
+    setViewCode("");
   }, [viewMode]);
+
+  useEffect(() => {
+    loadViewLocks();
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === "all") {
+      setViewAccessGranted(true);
+      return;
+    }
+
+    if (!viewLocks[viewMode]) {
+      setViewAccessGranted(true);
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      setViewAccessGranted(false);
+      return;
+    }
+
+    setViewAccessGranted(
+      window.sessionStorage.getItem(getViewAccessKey(viewMode)) === "1"
+    );
+  }, [viewLocks, viewMode]);
 
   useEffect(() => {
     if (celebrate === "1") {
@@ -234,7 +303,9 @@ export default function JournalPage() {
         eyebrow: "Favorite reflections",
         title: "Moments worth keeping close.",
         body: "Your favorite saved reflections live here, separate from the full journal.",
-        status: "Favorites are part of your private reflection library.",
+        status: viewLocks.favorites
+          ? "This folder is protected with an access code."
+          : "Favorites are part of your private reflection library.",
       };
     }
 
@@ -243,7 +314,9 @@ export default function JournalPage() {
         eyebrow: "Hidden reflections",
         title: "Private entries, tucked away.",
         body: "Hidden reflections stay out of your main journal until you restore them.",
-        status: "Only you can access this hidden view from the Journal menu.",
+        status: viewLocks.hidden
+          ? "This folder is protected with an access code."
+          : "Only you can access this hidden view from the Journal menu.",
       };
     }
 
@@ -253,7 +326,7 @@ export default function JournalPage() {
       body: "Saved conversations become private entries you can revisit, organize, export, and continue later.",
       status: saveStatusCopy,
     };
-  }, [saveStatusCopy, viewMode]);
+  }, [saveStatusCopy, viewLocks.favorites, viewLocks.hidden, viewMode]);
 
   function dismissCelebrate() {
     setShowCelebrate(false);
@@ -292,6 +365,80 @@ export default function JournalPage() {
     router.push("/sign-in");
   }
 
+  async function setCurrentViewCode() {
+    if (viewMode === "all") return;
+    const nextCode = prompt("New 4–8 digit access code:", "");
+    if (!nextCode) return;
+
+    const code = nextCode.trim();
+
+    if (!/^\d{4,8}$/.test(code)) {
+      alert("Use a 4–8 digit code.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/journal/view-locks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: viewMode, code }),
+      });
+
+      if (!res.ok) throw new Error();
+      window.sessionStorage.removeItem(getViewAccessKey(viewMode));
+      setViewAccessGranted(false);
+      setPageMenuOpen(false);
+      await loadViewLocks();
+    } catch {
+      alert("Could not update access code.");
+    }
+  }
+
+  async function clearCurrentViewCode() {
+    if (viewMode === "all") return;
+    const ok = confirm("Remove access code from this folder?");
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/journal/view-locks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: viewMode, clear: true }),
+      });
+
+      if (!res.ok) throw new Error();
+      window.sessionStorage.removeItem(getViewAccessKey(viewMode));
+      setViewAccessGranted(true);
+      setPageMenuOpen(false);
+      await loadViewLocks();
+    } catch {
+      alert("Could not remove access code.");
+    }
+  }
+
+  async function verifyCurrentView() {
+    if (viewMode === "all" || checkingViewCode) return;
+
+    try {
+      setCheckingViewCode(true);
+      const res = await fetch("/api/journal/view-locks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: viewMode, code: viewCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
+      window.sessionStorage.setItem(getViewAccessKey(viewMode), "1");
+      setViewAccessGranted(true);
+      setViewCode("");
+    } catch (error) {
+      console.error("View unlock failed:", error);
+      alert("Incorrect code.");
+    } finally {
+      setCheckingViewCode(false);
+    }
+  }
+
   return (
     <AuthGate>
       <div className="min-h-[calc(100vh-108px)] bg-black text-white">
@@ -321,7 +468,7 @@ export default function JournalPage() {
                 }`}
               >
                 <span>Favorites</span>
-                <span className="text-rose-300">♥</span>
+                <span className="text-neutral-400">♥</span>
               </button>
 
               <button
@@ -344,6 +491,28 @@ export default function JournalPage() {
                 <span>Collections</span>
                 <span className="text-neutral-500">▦</span>
               </button>
+
+              {viewMode !== "all" && (
+                <>
+                  <div className="my-1 h-px bg-white/[0.08]" />
+                  <button
+                    onClick={setCurrentViewCode}
+                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>{viewLocks[viewMode] ? "Change code" : "Set code"}</span>
+                    <span className="text-neutral-500">Lock</span>
+                  </button>
+                  {viewLocks[viewMode] && (
+                    <button
+                      onClick={clearCurrentViewCode}
+                      className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                    >
+                      <span>Remove code</span>
+                      <span className="text-neutral-500">Open</span>
+                    </button>
+                  )}
+                </>
+              )}
 
               <div className="my-1 h-px bg-white/[0.08]" />
 
@@ -432,13 +601,13 @@ export default function JournalPage() {
               </div>
 
               <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-neutral-200">
-                {viewMode === "all" ? limitPillCopy : viewMode}
+                {viewMode === "all" ? limitPillCopy : viewLocks[viewMode] ? "Locked" : viewMode}
               </div>
             </div>
 
             <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                {viewMode === "all" ? "Journal status" : "Collection status"}
+                {viewMode === "all" ? "Journal status" : "Folder status"}
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-200">
                 {viewCopy.status}
@@ -454,21 +623,51 @@ export default function JournalPage() {
             </div>
           </div>
 
-          {selectionMode && (
-            <div className="mb-4 rounded-[22px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-neutral-300">
-              {selectedCount === 0
-                ? "Select reflections to manage them."
-                : `${selectedCount} selected`}
+          {!canShowCurrentView ? (
+            <div className="rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-7 text-center shadow-2xl shadow-black/20">
+              <div className="mx-auto h-14 w-[5px] rounded-full bg-white" />
+              <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked folder</div>
+              <h2 className="mt-3 text-[24px] font-semibold tracking-[-0.04em] text-white">
+                {viewMode === "favorites" ? "Favorites" : "Hidden"}
+              </h2>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
+                Enter the access code to view this folder on this device session.
+              </p>
+              <input
+                value={viewCode}
+                onChange={(event) => setViewCode(event.target.value.replace(/\D/g, "").slice(0, 8))}
+                inputMode="numeric"
+                autoFocus
+                placeholder="Code"
+                className="mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+              />
+              <button
+                onClick={verifyCurrentView}
+                disabled={!viewCode || checkingViewCode}
+                className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+              >
+                {checkingViewCode ? "Checking..." : "Unlock folder"}
+              </button>
             </div>
-          )}
+          ) : (
+            <>
+              {selectionMode && (
+                <div className="mb-4 rounded-[22px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-neutral-300">
+                  {selectedCount === 0
+                    ? "Select reflections to manage them."
+                    : `${selectedCount} selected`}
+                </div>
+              )}
 
-          <JournalList
-            viewMode={viewMode}
-            selectionMode={selectionMode}
-            batchActionRequest={batchActionRequest}
-            onSelectionModeChange={setSelectionMode}
-            onSelectionChange={setSelectedCount}
-          />
+              <JournalList
+                viewMode={viewMode}
+                selectionMode={selectionMode}
+                batchActionRequest={batchActionRequest}
+                onSelectionModeChange={setSelectionMode}
+                onSelectionChange={setSelectedCount}
+              />
+            </>
+          )}
         </div>
       </div>
     </AuthGate>
