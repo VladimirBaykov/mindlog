@@ -26,6 +26,7 @@
   --journal-icon-edit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E");
   --journal-icon-heart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 1 0-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 0 0 0-7.6Z'/%3E%3C/svg%3E");
   --journal-icon-eye: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+  --journal-icon-eye-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.7 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.7 18.7 0 0 1-2.1 3.1'/%3E%3Cpath d='M14.1 14.1A3 3 0 0 1 9.9 9.9'/%3E%3Cpath d='M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7a10.9 10.9 0 0 0 4.1-.8'/%3E%3C/svg%3E");
   --journal-icon-folder-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7.5A2.5 2.5 0 0 1 5.5 5H9l2 2h7.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5Z'/%3E%3Cpath d='M12 11.5v5'/%3E%3Cpath d='M9.5 14h5'/%3E%3C/svg%3E");
   --journal-icon-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10' width='14' height='10' rx='2.5'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 8 0v3'/%3E%3Cpath d='M12 14v2'/%3E%3C/svg%3E");
   --journal-icon-unlock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='10' width='14' height='10' rx='2.5'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 7.5-1.9'/%3E%3Cpath d='M12 14v2'/%3E%3C/svg%3E");
@@ -75,74 +76,137 @@ body {
   color: #ffffff;
 }
 
-[data-journal-card="true"] .text-rose-300 {
+/* Journal card status icons. */
+[data-journal-card="true"] h3 + span:not([class*="rounded-full"]) {
+  position: relative;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 1.14rem;
+  min-width: 1.14rem;
+  height: 1.14rem;
   color: #ffffff !important;
-  font-size: 1.08rem !important;
-  line-height: 1 !important;
-  text-shadow: 0 0 16px rgba(255, 255, 255, 0.28);
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-shadow: none !important;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
 }
 
-/* Journal pill action menu: compact iOS-like floating menu. */
+[data-journal-card="true"] h3 + span:not([class*="rounded-full"])::before {
+  content: "";
+  width: 1.14rem;
+  height: 1.14rem;
+  background: currentColor;
+  -webkit-mask: var(--journal-icon-heart) center / contain no-repeat;
+  mask: var(--journal-icon-heart) center / contain no-repeat;
+}
+
+span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"] {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 1.46rem;
+  min-width: 1.46rem;
+  height: 1.46rem;
+  padding: 0 !important;
+  color: rgba(255, 255, 255, 0.78) !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  letter-spacing: 0 !important;
+  border-radius: 999px !important;
+}
+
+span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"]::before {
+  content: "";
+  width: 0.92rem;
+  height: 0.92rem;
+  background: currentColor;
+  -webkit-mask: var(--journal-icon-lock) center / contain no-repeat;
+  mask: var(--journal-icon-lock) center / contain no-repeat;
+}
+
+/* Journal action menus: compact iOS-like floating menu. */
 .fixed.overflow-hidden.rounded-\[24px\] {
-  width: min(286px, calc(100vw - 32px)) !important;
+  width: min(270px, calc(100vw - 32px)) !important;
   max-height: min(328px, calc(100vh - 96px)) !important;
   overflow-y: auto !important;
   overscroll-behavior: contain;
   scrollbar-gutter: stable both-edges;
-  padding-right: 0.16rem !important;
+  padding-right: 0.1rem !important;
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 {
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] {
+  max-width: 330px !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] {
+  width: min(270px, calc(100vw - 32px)) !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] {
   padding-right: 0;
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button {
-  border-radius: 16px !important;
-  padding: 0.54rem 0.76rem !important;
-  min-height: 2.34rem;
-  font-size: 0.83rem !important;
-  line-height: 1.08 !important;
-  letter-spacing: -0.012em;
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button {
+  border-radius: 15px !important;
+  padding: 0.42rem 0.68rem !important;
+  min-height: 2.12rem;
+  font-size: 0.9rem !important;
+  line-height: 1.04 !important;
+  letter-spacing: -0.014em;
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button + button {
-  margin-top: 0.05rem !important;
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button + button,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button + button,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button + button {
+  margin-top: 0 !important;
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:first-child {
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:first-child,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:first-child,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:first-child {
   font-size: inherit !important;
   line-height: inherit !important;
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child {
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:last-child,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:last-child {
   --journal-action-icon: var(--journal-icon-open);
   position: relative;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  width: 1.05rem;
-  min-width: 1.05rem !important;
-  height: 1.05rem;
-  margin-left: 0.72rem;
+  width: 1.08rem;
+  min-width: 1.08rem !important;
+  height: 1.08rem;
+  margin-left: 0.58rem;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(255, 255, 255, 0.72) !important;
   font-size: 0 !important;
   line-height: 0 !important;
   letter-spacing: 0;
-  opacity: 0.96;
-  transform: translateY(0.25px);
+  opacity: 0.98;
+  transform: translateY(0.15px);
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before {
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:last-child::before {
   content: "";
   display: block;
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 1.08rem;
+  height: 1.08rem;
   background: currentColor;
   -webkit-mask: var(--journal-action-icon) center / contain no-repeat;
   mask: var(--journal-action-icon) center / contain no-repeat;
 }
 
+/* Single reflection menu. */
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(1) > span:last-child {
   --journal-action-icon: var(--journal-icon-open);
 }
@@ -156,7 +220,7 @@ body {
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(4) > span:last-child {
-  --journal-action-icon: var(--journal-icon-eye);
+  --journal-action-icon: var(--journal-icon-eye-off);
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(5) > span:last-child {
@@ -175,7 +239,35 @@ body {
   --journal-action-icon: var(--journal-icon-export);
 }
 
-.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button.text-red-300 > span:last-child {
+/* Batch menu. */
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-heart);
+}
+
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-folder-plus);
+}
+
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(3) > span:last-child {
+  --journal-action-icon: var(--journal-icon-eye-off);
+}
+
+/* Collection action menu. */
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-edit);
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-lock);
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(3):not(.text-red-300) > span:last-child {
+  --journal-action-icon: var(--journal-icon-unlock);
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button.text-red-300 > span:last-child,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button.text-red-300 > span:last-child,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button.text-red-300 > span:last-child {
   --journal-action-icon: var(--journal-icon-trash);
   color: rgba(252, 165, 165, 0.92) !important;
 }
