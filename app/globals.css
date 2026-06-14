@@ -88,13 +88,16 @@ body {
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button {
   border-radius: 18px !important;
-  padding: 0.82rem 0.98rem !important;
-  font-size: 0.97rem !important;
+  padding: 0.78rem 0.96rem !important;
+  font-size: 0.91rem !important;
   letter-spacing: -0.012em;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child {
-  font-size: 1.05rem;
+  min-width: 2rem;
+  text-align: right;
+  font-size: 0.98rem !important;
+  font-weight: 600;
   line-height: 1;
 }
 
