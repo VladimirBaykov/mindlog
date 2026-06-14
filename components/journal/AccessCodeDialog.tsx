@@ -82,7 +82,7 @@ export default function AccessCodeDialog({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[10020] flex items-end justify-center bg-black/62 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-6 backdrop-blur-md sm:items-center sm:pb-6"
+          className="fixed inset-0 z-[10020] flex items-end justify-center bg-black/[0.62] px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-6 backdrop-blur-md sm:items-center sm:pb-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
