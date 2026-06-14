@@ -20,6 +20,7 @@ export type JournalMetadata = {
   keyTakeaway?: string;
   themes?: string[];
   chatType?: string;
+  accessHash?: string;
 };
 
 export type JournalItem = {
@@ -82,7 +83,17 @@ const PAGE_SIZE = 20;
 const JournalContext =
   createContext<JournalContextValue | null>(null);
 
+function hasMetadataAccessHash(metadata: JournalMetadata | null | undefined) {
+  return Boolean(
+    metadata &&
+      typeof metadata.accessHash === "string" &&
+      metadata.accessHash.length > 0
+  );
+}
+
 function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
+  const metadata = item.metadata ?? null;
+
   return {
     id: item.id,
     title: item.title,
@@ -105,7 +116,7 @@ function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
         : Array.isArray(item.content)
         ? item.content
         : [],
-    metadata: item.metadata ?? null,
+    metadata,
     isFavorite:
       "isFavorite" in item && typeof item.isFavorite === "boolean"
         ? item.isFavorite
@@ -119,7 +130,7 @@ function normalizeItem(item: JournalItem | RawJournalItem): JournalItem {
     locked:
       "locked" in item && typeof item.locked === "boolean"
         ? item.locked
-        : Boolean(item.lock_hash),
+        : Boolean(item.lock_hash || hasMetadataAccessHash(metadata)),
     deleted:
       "deleted" in item
         ? item.deleted
