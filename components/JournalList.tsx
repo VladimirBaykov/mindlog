@@ -13,9 +13,7 @@ import JournalEmpty from "@/components/JournalEmpty";
 import { JournalSkeleton } from "@/components/journal/JournalSkeleton";
 
 type MoodKey = keyof typeof moodConfig;
-
 type JournalViewMode = "all" | "favorites" | "hidden";
-
 type MenuPlacement = "top" | "bottom";
 
 type MenuPosition = {
@@ -139,6 +137,7 @@ function getDateLabel(timestamp: number) {
   const date = new Date(timestamp);
   const today = new Date();
   const yesterday = new Date();
+
   yesterday.setDate(today.getDate() - 1);
 
   if (date.toDateString() === today.toDateString()) {
@@ -155,25 +154,12 @@ function getDateLabel(timestamp: number) {
   });
 }
 
-function getJournalAccessKey(id: string) {
-  return `mindlog:journal-access:${id}`;
-}
-
-function isJournalAccessGranted(item: JournalItem) {
-  if (!item.locked) return true;
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(getJournalAccessKey(item.id)) === "1";
-}
-
 function getMenuPosition(element: HTMLElement): MenuPosition {
   const rect = element.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const maxMenuWidth = Math.min(340, viewportWidth - VIEWPORT_PADDING * 2);
-  const width = Math.min(
-    Math.max(rect.width * 0.82, 250),
-    maxMenuWidth
-  );
+  const width = Math.min(Math.max(rect.width * 0.82, 250), maxMenuWidth);
 
   const left = Math.min(
     Math.max(rect.left + (rect.width - width) / 2, VIEWPORT_PADDING),
@@ -276,9 +262,6 @@ export default function JournalList({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchMenuOpen, setBatchMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [pendingLockedItem, setPendingLockedItem] = useState<JournalItem | null>(null);
-  const [lockCode, setLockCode] = useState("");
-  const [checkingLock, setCheckingLock] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggeredRef = useRef(false);
 
@@ -339,7 +322,6 @@ export default function JournalList({
       if (event.key === "Escape") {
         setActiveMenu(null);
         setBatchMenuOpen(false);
-        setPendingLockedItem(null);
       }
     }
 
@@ -378,14 +360,6 @@ export default function JournalList({
 
   function openEntry(item: JournalItem) {
     if (item.id === activeId) return;
-
-    if (item.locked && !isJournalAccessGranted(item)) {
-      setActiveMenu(null);
-      setPendingLockedItem(item);
-      setLockCode("");
-      return;
-    }
-
     router.push(`/journal/${item.id}`);
   }
 
@@ -484,12 +458,20 @@ export default function JournalList({
         body: JSON.stringify({ code }),
       });
 
-      if (!res.ok) throw new Error();
-      window.sessionStorage.removeItem(getJournalAccessKey(item.id));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not lock reflection");
+      }
+
       setActiveMenu(null);
       await refresh();
-    } catch {
-      alert("Could not lock this reflection.");
+    } catch (error) {
+      console.error("Reflection lock failed:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not lock this reflection."
+      );
     }
   }
 
@@ -504,37 +486,16 @@ export default function JournalList({
         body: JSON.stringify({ clear: true }),
       });
 
-      if (!res.ok) throw new Error();
-      window.sessionStorage.removeItem(getJournalAccessKey(item.id));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not remove lock");
+      }
+
       setActiveMenu(null);
       await refresh();
-    } catch {
-      alert("Could not remove lock.");
-    }
-  }
-
-  async function verifyItemLock() {
-    if (!pendingLockedItem || checkingLock) return;
-
-    try {
-      setCheckingLock(true);
-      const res = await fetch(`/api/journal/${pendingLockedItem.id}/lock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: lockCode.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
-      window.sessionStorage.setItem(getJournalAccessKey(pendingLockedItem.id), "1");
-      const nextId = pendingLockedItem.id;
-      setPendingLockedItem(null);
-      setLockCode("");
-      router.push(`/journal/${nextId}`);
     } catch (error) {
-      console.error("Journal lock verification failed:", error);
-      alert("Incorrect code.");
-    } finally {
-      setCheckingLock(false);
+      console.error("Remove reflection lock failed:", error);
+      alert(error instanceof Error ? error.message : "Could not remove lock.");
     }
   }
 
@@ -648,11 +609,14 @@ export default function JournalList({
                   {activeMenu.item.title || "Conversation"}
                 </div>
                 {activeMenu.item.locked && (
-                  <span className="shrink-0 text-[11px] text-neutral-400">Lock</span>
+                  <span className="shrink-0 text-[11px] text-neutral-400">
+                    Lock
+                  </span>
                 )}
               </div>
               <div className="mt-0.5 text-[11px] text-neutral-500">
-                {getMessageLabel(activeMenu.item.messages.length)} · {getDateLabel(activeMenu.item.createdAt)}
+                {getMessageLabel(activeMenu.item.messages.length)} ·{" "}
+                {getDateLabel(activeMenu.item.createdAt)}
               </div>
             </div>
 
@@ -724,7 +688,9 @@ export default function JournalList({
               )}
 
               <button
-                onClick={() => router.push(`/journal/${activeMenu.item.id}/export`)}
+                onClick={() =>
+                  router.push(`/journal/${activeMenu.item.id}/export`)
+                }
                 className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
               >
                 <span>Export</span>
@@ -814,58 +780,6 @@ export default function JournalList({
               </div>
             </motion.div>
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-
-  const lockedItemOverlay = (
-    <AnimatePresence>
-      {pendingLockedItem && (
-        <motion.div
-          className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setPendingLockedItem(null)}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 560, damping: 42 }}
-            onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-[380px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl"
-          >
-            <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked reflection</div>
-            <h2 className="mt-3 text-xl font-semibold text-white">Enter access code</h2>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              “{pendingLockedItem.title || "Conversation"}” is locked on this device session.
-            </p>
-            <input
-              value={lockCode}
-              onChange={(event) => setLockCode(event.target.value.replace(/\D/g, "").slice(0, 8))}
-              inputMode="numeric"
-              autoFocus
-              placeholder="Code"
-              className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
-            />
-            <div className="mt-5 flex gap-3">
-              <button
-                onClick={() => setPendingLockedItem(null)}
-                className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={verifyItemLock}
-                disabled={!lockCode || checkingLock}
-                className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
-              >
-                {checkingLock ? "Checking..." : "Unlock"}
-              </button>
-            </div>
-          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -1010,7 +924,6 @@ export default function JournalList({
 
       {mounted && createPortal(activeMenuOverlay, document.body)}
       {mounted && createPortal(batchMenuOverlay, document.body)}
-      {mounted && createPortal(lockedItemOverlay, document.body)}
     </>
   );
 }

@@ -36,6 +36,7 @@ type JournalItem = {
   is_favorite?: boolean | null;
   hiddenAt?: number | null;
   hidden_at?: string | null;
+  locked?: boolean;
 };
 
 type SubscriptionInfo = {
@@ -252,7 +253,11 @@ function getFallbackThemes(messages: Message[], moodLabel: string) {
     themes.push("Connection");
   }
 
-  if (text.includes("nervous") || text.includes("scared") || text.includes("anxious")) {
+  if (
+    text.includes("nervous") ||
+    text.includes("scared") ||
+    text.includes("anxious")
+  ) {
     themes.push("Courage");
   }
 
@@ -260,7 +265,11 @@ function getFallbackThemes(messages: Message[], moodLabel: string) {
     themes.push("Work");
   }
 
-  if (text.includes("car") || text.includes("porsche") || text.includes("rolls")) {
+  if (
+    text.includes("car") ||
+    text.includes("porsche") ||
+    text.includes("rolls")
+  ) {
     themes.push("Lifestyle");
   }
 
@@ -305,7 +314,7 @@ export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { setHeader, resetHeader } = useHeader();
-  const { updateItem, deleteItem } = useJournal();
+  const { updateItem, deleteItem, refresh } = useJournal();
 
   const [item, setItem] = useState<JournalItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -318,10 +327,19 @@ export default function JournalEntryPage() {
   const [viewTracked, setViewTracked] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [entryUnlocked, setEntryUnlocked] = useState(false);
+  const [entryCode, setEntryCode] = useState("");
+  const [checkingEntryCode, setCheckingEntryCode] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setEntryUnlocked(false);
+    setEntryCode("");
+    setViewTracked(false);
+  }, [id]);
 
   useEffect(() => {
     fetch(`/api/journal/${id}`)
@@ -381,7 +399,7 @@ export default function JournalEntryPage() {
   );
 
   useEffect(() => {
-    if (!item || viewTracked) return;
+    if (!item || item.locked || viewTracked) return;
 
     setViewTracked(true);
 
@@ -414,7 +432,7 @@ export default function JournalEntryPage() {
 
     setHeader({
       title: item.title || "Reflection",
-      subtitle: mood?.label,
+      subtitle: item.locked && !entryUnlocked ? "Locked" : mood?.label,
       leftSlot: (
         <button
           onClick={() => router.push("/journal")}
@@ -426,7 +444,114 @@ export default function JournalEntryPage() {
     });
 
     return () => resetHeader();
-  }, [item, router, setHeader, resetHeader]);
+  }, [entryUnlocked, item, router, setHeader, resetHeader]);
+
+  async function verifyEntryCode() {
+    if (!item || checkingEntryCode) return;
+
+    try {
+      setCheckingEntryCode(true);
+
+      const res = await fetch(`/api/journal/${item.id}/lock`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: entryCode.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.verified) {
+        throw new Error(data.error || "Incorrect code");
+      }
+
+      setEntryUnlocked(true);
+      setEntryCode("");
+    } catch (error) {
+      console.error("Reflection unlock failed:", error);
+      alert("Incorrect code.");
+    } finally {
+      setCheckingEntryCode(false);
+    }
+  }
+
+  async function setEntryLock() {
+    if (!item) return;
+
+    const nextCode = prompt("New 4–8 digit access code:", "");
+    if (!nextCode) return;
+
+    const code = nextCode.trim();
+
+    if (!/^\d{4,8}$/.test(code)) {
+      alert("Use a 4–8 digit code.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/journal/${item.id}/lock`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not update access code.");
+      }
+
+      setItem((prev) => (prev ? { ...prev, locked: true } : prev));
+      setEntryUnlocked(false);
+      setEntryCode("");
+      setActionsOpen(false);
+      await refresh();
+    } catch (error) {
+      console.error("Set reflection lock failed:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not update access code."
+      );
+    }
+  }
+
+  async function clearEntryLock() {
+    if (!item) return;
+
+    const ok = confirm("Remove access code from this reflection?");
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/journal/${item.id}/lock`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ clear: true }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not remove access code.");
+      }
+
+      setItem((prev) => (prev ? { ...prev, locked: false } : prev));
+      setEntryUnlocked(true);
+      setEntryCode("");
+      setActionsOpen(false);
+      await refresh();
+    } catch (error) {
+      console.error("Remove reflection lock failed:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not remove access code."
+      );
+    }
+  }
 
   async function renameEntry() {
     if (!item) return;
@@ -571,6 +696,51 @@ export default function JournalEntryPage() {
     );
   }
 
+  if (item.locked && !entryUnlocked) {
+    return (
+      <div className="relative min-h-screen bg-black text-white">
+        <div className="mx-auto max-w-xl px-4 pt-8 pb-24">
+          <div className="rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-7 text-center shadow-2xl shadow-black/20">
+            <div className="mx-auto h-14 w-[5px] rounded-full bg-white" />
+
+            <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+              Locked reflection
+            </div>
+
+            <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
+              {item.title || "Reflection"}
+            </h1>
+
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
+              Enter the access code to view this saved reflection.
+            </p>
+
+            <input
+              value={entryCode}
+              onChange={(event) =>
+                setEntryCode(
+                  event.target.value.replace(/\D/g, "").slice(0, 8)
+                )
+              }
+              inputMode="numeric"
+              autoFocus
+              placeholder="Code"
+              className="mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+            />
+
+            <button
+              onClick={verifyEntryCode}
+              disabled={!entryCode || checkingEntryCode}
+              className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+            >
+              {checkingEntryCode ? "Checking..." : "Unlock reflection"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const mood = isMoodKey(item.mood)
     ? moodConfig[item.mood]
     : moodConfig.calm;
@@ -582,7 +752,9 @@ export default function JournalEntryPage() {
   const chatType = formatChatType(metadata?.chatType, normalizedMessages);
   const themes = getThemes(metadata?.themes, normalizedMessages, mood.label);
   const shortFocus = metadata?.summary || getShortFocus(normalizedMessages);
-  const keyTakeaway = metadata?.keyTakeaway || "This reflection is saved so you can return to the moment and its context later.";
+  const keyTakeaway =
+    metadata?.keyTakeaway ||
+    "This reflection is saved so you can return to the moment and its context later.";
   const isFavorite = getFavoriteState(item);
   const hiddenAt = getHiddenAt(item);
 
@@ -648,7 +820,9 @@ export default function JournalEntryPage() {
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
                   <span>{isFavorite ? "Remove favorite" : "Favorite"}</span>
-                  <span className="text-neutral-500">{isFavorite ? "♡" : "♥"}</span>
+                  <span className="text-neutral-500">
+                    {isFavorite ? "♡" : "♥"}
+                  </span>
                 </button>
 
                 {hiddenAt ? (
@@ -666,6 +840,24 @@ export default function JournalEntryPage() {
                   >
                     <span>Hide</span>
                     <span className="text-neutral-500">◌</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={setEntryLock}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>{item.locked ? "Change code" : "Lock"}</span>
+                  <span className="text-neutral-500">Lock</span>
+                </button>
+
+                {item.locked && (
+                  <button
+                    onClick={clearEntryLock}
+                    className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
+                  >
+                    <span>Remove lock</span>
+                    <span className="text-neutral-500">Open</span>
                   </button>
                 )}
 
@@ -704,23 +896,32 @@ export default function JournalEntryPage() {
       >
         <div className="mb-5 overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] shadow-2xl shadow-black/20">
           <div className="flex gap-4 px-5 py-5">
-            <div className={`mt-1 h-16 w-[5px] shrink-0 rounded-full ${mood.stripe}`} />
+            <div
+              className={`mt-1 h-16 w-[5px] shrink-0 rounded-full ${mood.stripe}`}
+            />
 
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className={`inline-flex rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200 ${mood.softBg}`}>
+                    <div
+                      className={`inline-flex rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-neutral-200 ${mood.softBg}`}
+                    >
                       {mood.label}
                     </div>
                     {isFavorite && (
-                      <div className="inline-flex rounded-full border border-rose-300/20 bg-rose-300/10 px-2.5 py-1 text-[11px] text-rose-200">
+                      <div className="inline-flex rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white">
                         ♥ Favorite
                       </div>
                     )}
                     {hiddenAt && (
                       <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
                         Hidden
+                      </div>
+                    )}
+                    {item.locked && (
+                      <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
+                        Locked
                       </div>
                     )}
                   </div>

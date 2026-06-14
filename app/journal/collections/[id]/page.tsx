@@ -60,18 +60,13 @@ const collectionColor: Record<string, string> = {
   pink: "bg-pink-400",
 };
 
-function getCollectionAccessKey(id: string) {
-  return `mindlog:collection-access:${id}`;
-}
-
-function getJournalAccessKey(id: string) {
-  return `mindlog:journal-access:${id}`;
-}
-
 function getDateLabel(value: string | undefined) {
   if (!value) return "Saved";
   const date = new Date(value);
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function getMessageCount(item: JournalItem) {
@@ -96,16 +91,13 @@ function getPreview(item: JournalItem) {
 
   const messages = Array.isArray(item.content) ? item.content : [];
   const userMessage = messages.find(
-    (message) => message.role === "user" && message.content.trim().length > 12
+    (message) =>
+      message.role === "user" && message.content.trim().length > 12
   );
 
-  return userMessage?.content ? normalizePreview(userMessage.content) : "Saved reflection";
-}
-
-function isJournalAccessGranted(item: JournalItem) {
-  if (!item.locked) return true;
-  if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(getJournalAccessKey(item.id)) === "1";
+  return userMessage?.content
+    ? normalizePreview(userMessage.content)
+    : "Saved reflection";
 }
 
 export default function JournalCollectionDetailPage() {
@@ -123,9 +115,6 @@ export default function JournalCollectionDetailPage() {
   const [accessGranted, setAccessGranted] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [checkingAccess, setCheckingAccess] = useState(false);
-  const [pendingJournal, setPendingJournal] = useState<JournalItem | null>(null);
-  const [journalCode, setJournalCode] = useState("");
-  const [checkingJournal, setCheckingJournal] = useState(false);
 
   const collectionId = params.id;
 
@@ -143,18 +132,17 @@ export default function JournalCollectionDetailPage() {
       });
       const data = (await res.json()) as CollectionResponse;
 
-      if (!res.ok) throw new Error(data.error || "Failed to load collection");
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load collection");
+      }
 
       const nextCollection = data.collection ?? null;
+
       setCollection(nextCollection);
       setItems(data.items ?? []);
 
       if (!nextCollection?.locked) {
         setAccessGranted(true);
-      } else if (typeof window !== "undefined") {
-        setAccessGranted(
-          window.sessionStorage.getItem(getCollectionAccessKey(nextCollection.id)) === "1"
-        );
       } else {
         setAccessGranted(false);
       }
@@ -185,26 +173,43 @@ export default function JournalCollectionDetailPage() {
     setHeader({
       title: collection?.name || "Collection",
       leftSlot: (
-        <button onClick={() => router.push("/journal/collections")} className="text-sm text-neutral-400 transition hover:text-white">
+        <button
+          onClick={() => router.push("/journal/collections")}
+          className="text-sm text-neutral-400 transition hover:text-white"
+        >
           ← Collections
         </button>
       ),
-      rightSlot: collection && accessGranted ? (
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setAddOpen(true); loadAllItems(); }} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-300 transition hover:bg-white/[0.06] hover:text-white" aria-label="Add reflections">
-            +
-          </button>
-          <button onClick={() => setMenuOpen((value) => !value)} className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-300 transition hover:bg-white/[0.06] hover:text-white" aria-label="Collection actions">
-            ⋯
-          </button>
-        </div>
-      ) : null,
+      rightSlot:
+        collection && accessGranted ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setAddOpen(true);
+                loadAllItems();
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+              aria-label="Add reflections"
+            >
+              +
+            </button>
+            <button
+              onClick={() => setMenuOpen((value) => !value)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
+              aria-label="Collection actions"
+            >
+              ⋯
+            </button>
+          </div>
+        ) : null,
     });
 
     return () => resetHeader();
   }, [collection, accessGranted, resetHeader, router, setHeader]);
 
   useEffect(() => {
+    setAccessGranted(false);
+    setAccessCode("");
     loadCollection();
   }, [collectionId]);
 
@@ -222,15 +227,19 @@ export default function JournalCollectionDetailPage() {
 
     try {
       setCheckingAccess(true);
+
       const res = await fetch(`/api/journal/collections/${collection.id}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: accessCode.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
 
-      window.sessionStorage.setItem(getCollectionAccessKey(collection.id), "1");
+      const data = await res.json();
+
+      if (!res.ok || !data.verified) {
+        throw new Error(data.error || "Incorrect code");
+      }
+
       setAccessGranted(true);
       setAccessCode("");
     } catch (error) {
@@ -241,38 +250,7 @@ export default function JournalCollectionDetailPage() {
     }
   }
 
-  async function verifyJournalAccess() {
-    if (!pendingJournal || checkingJournal) return;
-
-    try {
-      setCheckingJournal(true);
-      const res = await fetch(`/api/journal/${pendingJournal.id}/lock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: journalCode.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
-      window.sessionStorage.setItem(getJournalAccessKey(pendingJournal.id), "1");
-      const nextId = pendingJournal.id;
-      setPendingJournal(null);
-      setJournalCode("");
-      router.push(`/journal/${nextId}`);
-    } catch (error) {
-      console.error("Journal access failed:", error);
-      alert("Incorrect code.");
-    } finally {
-      setCheckingJournal(false);
-    }
-  }
-
-  async function openJournal(item: JournalItem) {
-    if (item.locked && !isJournalAccessGranted(item)) {
-      setPendingJournal(item);
-      setJournalCode("");
-      return;
-    }
-
+  function openJournal(item: JournalItem) {
     router.push(`/journal/${item.id}`);
   }
 
@@ -287,7 +265,11 @@ export default function JournalCollectionDetailPage() {
         body: JSON.stringify({ journalIds }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add reflections");
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to add reflections");
+      }
+
       setSelectedIds(new Set());
       setAddOpen(false);
       await loadCollection();
@@ -316,6 +298,7 @@ export default function JournalCollectionDetailPage() {
 
   async function renameCollection() {
     if (!collection) return;
+
     const nextName = prompt("Collection name:", collection.name);
     if (!nextName || nextName.trim() === collection.name) return;
 
@@ -335,6 +318,7 @@ export default function JournalCollectionDetailPage() {
 
   async function setCollectionCode() {
     if (!collection) return;
+
     const nextCode = prompt("New 4–8 digit access code:", "");
     if (!nextCode) return;
 
@@ -352,8 +336,9 @@ export default function JournalCollectionDetailPage() {
         body: JSON.stringify({ pin: code }),
       });
       if (!res.ok) throw new Error();
-      window.sessionStorage.removeItem(getCollectionAccessKey(collection.id));
+
       setAccessGranted(false);
+      setAccessCode("");
       setMenuOpen(false);
       await loadCollection();
     } catch {
@@ -363,6 +348,7 @@ export default function JournalCollectionDetailPage() {
 
   async function clearCollectionCode() {
     if (!collection) return;
+
     const ok = confirm("Remove access code from this collection?");
     if (!ok) return;
 
@@ -373,8 +359,9 @@ export default function JournalCollectionDetailPage() {
         body: JSON.stringify({ clearPin: true }),
       });
       if (!res.ok) throw new Error();
-      window.sessionStorage.removeItem(getCollectionAccessKey(collection.id));
+
       setAccessGranted(true);
+      setAccessCode("");
       setMenuOpen(false);
       await loadCollection();
     } catch {
@@ -384,7 +371,10 @@ export default function JournalCollectionDetailPage() {
 
   async function removeCollection() {
     if (!collection) return;
-    const ok = confirm(`Remove “${collection.name}”? Reflections will stay in your journal.`);
+
+    const ok = confirm(
+      `Remove “${collection.name}”? Reflections will stay in your journal.`
+    );
     if (!ok) return;
 
     try {
@@ -398,28 +388,56 @@ export default function JournalCollectionDetailPage() {
     }
   }
 
-  const stripe = collection ? collectionColor[collection.color] ?? collectionColor.blue : collectionColor.blue;
+  const stripe = collection
+    ? collectionColor[collection.color] ?? collectionColor.blue
+    : collectionColor.blue;
 
   return (
     <AuthGate>
       <div className="min-h-[calc(100vh-108px)] bg-black text-white">
         {menuOpen && collection && accessGranted && (
-          <div className="fixed inset-0 z-[9997]" onClick={() => setMenuOpen(false)}>
-            <div onClick={(event) => event.stopPropagation()} className="absolute right-4 top-[54px] w-[230px] overflow-hidden rounded-[22px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl">
-              <button onClick={renameCollection} className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]">
-                <span>Rename</span><span className="text-neutral-500">✎</span>
+          <div
+            className="fixed inset-0 z-[9997]"
+            onClick={() => setMenuOpen(false)}
+          >
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="absolute right-4 top-[54px] w-[230px] overflow-hidden rounded-[22px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            >
+              <button
+                onClick={renameCollection}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>Rename</span>
+                <span className="text-neutral-500">✎</span>
               </button>
-              <button onClick={setCollectionCode} className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]">
-                <span>{collection.locked ? "Change code" : "Set code"}</span><span className="text-neutral-500">Lock</span>
+
+              <button
+                onClick={setCollectionCode}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+              >
+                <span>{collection.locked ? "Change code" : "Set code"}</span>
+                <span className="text-neutral-500">Lock</span>
               </button>
+
               {collection.locked && (
-                <button onClick={clearCollectionCode} className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]">
-                  <span>Remove code</span><span className="text-neutral-500">Open</span>
+                <button
+                  onClick={clearCollectionCode}
+                  className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
+                >
+                  <span>Remove code</span>
+                  <span className="text-neutral-500">Open</span>
                 </button>
               )}
+
               <div className="my-1 h-px bg-white/[0.08]" />
-              <button onClick={removeCollection} className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10">
-                <span>Remove collection</span><span>×</span>
+
+              <button
+                onClick={removeCollection}
+                className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-red-300 transition hover:bg-red-500/10"
+              >
+                <span>Remove collection</span>
+                <span>×</span>
               </button>
             </div>
           </div>
@@ -429,22 +447,55 @@ export default function JournalCollectionDetailPage() {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="h-[86px] animate-pulse rounded-[26px] border border-white/[0.07] bg-white/[0.035]" />
+                <div
+                  key={index}
+                  className="h-[86px] animate-pulse rounded-[26px] border border-white/[0.07] bg-white/[0.035]"
+                />
               ))}
             </div>
           ) : !collection ? (
             <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-8 text-center">
-              <div className="text-sm font-medium text-white">Collection not found</div>
-              <button onClick={() => router.push("/journal/collections")} className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90">Back to collections</button>
+              <div className="text-sm font-medium text-white">
+                Collection not found
+              </div>
+              <button
+                onClick={() => router.push("/journal/collections")}
+                className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+              >
+                Back to collections
+              </button>
             </div>
           ) : collection.locked && !accessGranted ? (
             <div className="rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-7 text-center shadow-2xl shadow-black/20">
               <div className={`mx-auto h-14 w-[5px] rounded-full ${stripe}`} />
-              <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked collection</div>
-              <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">{collection.name}</h1>
-              <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">Enter the access code to view this collection on this device session.</p>
-              <input value={accessCode} onChange={(event) => setAccessCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoFocus placeholder="Code" className="mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
-              <button onClick={verifyAccess} disabled={!accessCode || checkingAccess} className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{checkingAccess ? "Checking..." : "Unlock collection"}</button>
+              <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                Locked collection
+              </div>
+              <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
+                {collection.name}
+              </h1>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
+                Enter the access code to view this collection.
+              </p>
+              <input
+                value={accessCode}
+                onChange={(event) =>
+                  setAccessCode(
+                    event.target.value.replace(/\D/g, "").slice(0, 8)
+                  )
+                }
+                inputMode="numeric"
+                autoFocus
+                placeholder="Code"
+                className="mx-auto mt-6 block w-full max-w-[260px] rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
+              />
+              <button
+                onClick={verifyAccess}
+                disabled={!accessCode || checkingAccess}
+                className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+              >
+                {checkingAccess ? "Checking..." : "Unlock collection"}
+              </button>
             </div>
           ) : (
             <>
@@ -453,13 +504,22 @@ export default function JournalCollectionDetailPage() {
                   <div className={`mt-1 h-14 w-[5px] rounded-full ${stripe}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Collection</div>
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                        Collection
+                      </div>
                       {collection.locked && (
-                        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">Locked</span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
+                          Locked
+                        </span>
                       )}
                     </div>
-                    <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">{collection.name}</h1>
-                    <p className="mt-3 text-sm leading-relaxed text-neutral-400">{collection.count} saved reflection{collection.count === 1 ? "" : "s"} grouped together.</p>
+                    <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
+                      {collection.name}
+                    </h1>
+                    <p className="mt-3 text-sm leading-relaxed text-neutral-400">
+                      {collection.count} saved reflection
+                      {collection.count === 1 ? "" : "s"} grouped together.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -467,32 +527,72 @@ export default function JournalCollectionDetailPage() {
               <div className="mx-auto w-[calc(100%-14px)] space-y-3">
                 {items.length === 0 ? (
                   <div className="rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-8 text-center">
-                    <div className="text-sm font-medium text-white">No reflections here yet</div>
-                    <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">Add saved reflections to start building this collection.</p>
-                    <button onClick={() => { setAddOpen(true); loadAllItems(); }} className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90">Add reflections</button>
+                    <div className="text-sm font-medium text-white">
+                      No reflections here yet
+                    </div>
+                    <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-neutral-400">
+                      Add saved reflections to start building this collection.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setAddOpen(true);
+                        loadAllItems();
+                      }}
+                      className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
+                    >
+                      Add reflections
+                    </button>
                   </div>
                 ) : (
                   items.map((item) => {
                     const mood = getMood(item);
                     return (
-                      <div key={item.id} className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]">
+                      <div
+                        key={item.id}
+                        className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]"
+                      >
                         <div className="flex items-center gap-4">
-                          <div className={`h-11 w-[5px] shrink-0 rounded-full ${mood.stripe}`} />
-                          <button onClick={() => openJournal(item)} className="min-w-0 flex-1 text-left">
+                          <div
+                            className={`h-11 w-[5px] shrink-0 rounded-full ${mood.stripe}`}
+                          />
+                          <button
+                            onClick={() => openJournal(item)}
+                            className="min-w-0 flex-1 text-left"
+                          >
                             <div className="flex items-center gap-2">
-                              <h3 className="truncate text-[15px] font-medium text-white">{item.title || "Conversation"}</h3>
-                              {item.locked && <span className="text-[13px] text-neutral-300">Lock</span>}
+                              <h3 className="truncate text-[15px] font-medium text-white">
+                                {item.title || "Conversation"}
+                              </h3>
+                              {item.locked && (
+                                <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
+                                  Locked
+                                </span>
+                              )}
                             </div>
-                            <p className="mt-1.5 line-clamp-1 text-[13px] text-neutral-400">{getPreview(item)}</p>
+                            <p className="mt-1.5 line-clamp-1 text-[13px] text-neutral-400">
+                              {getPreview(item)}
+                            </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                              <span className={`rounded-full px-2.5 py-1 ${mood.softBg} text-neutral-200`}>{mood.label}</span>
+                              <span
+                                className={`rounded-full px-2.5 py-1 ${mood.softBg} text-neutral-200`}
+                              >
+                                {mood.label}
+                              </span>
                               <span>·</span>
                               <span>{getDateLabel(item.created_at)}</span>
                               <span>·</span>
-                              <span>{getMessageLabel(getMessageCount(item))}</span>
+                              <span>
+                                {getMessageLabel(getMessageCount(item))}
+                              </span>
                             </div>
                           </button>
-                          <button onClick={() => removeFromCollection(item)} className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-white/[0.06] hover:text-white" aria-label="Remove from collection">×</button>
+                          <button
+                            onClick={() => removeFromCollection(item)}
+                            className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-white/[0.06] hover:text-white"
+                            aria-label="Remove from collection"
+                          >
+                            ×
+                          </button>
                         </div>
                       </div>
                     );
@@ -503,49 +603,77 @@ export default function JournalCollectionDetailPage() {
           )}
         </div>
 
-        {pendingJournal && (
-          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setPendingJournal(null)}>
-            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[380px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked reflection</div>
-              <h2 className="mt-3 text-xl font-semibold text-white">Enter access code</h2>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-400">“{pendingJournal.title || "Conversation"}” is locked on this device session.</p>
-              <input value={journalCode} onChange={(event) => setJournalCode(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoFocus placeholder="Code" className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.2em] text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25" />
-              <div className="mt-5 flex gap-3">
-                <button onClick={() => setPendingJournal(null)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
-                <button onClick={verifyJournalAccess} disabled={!journalCode || checkingJournal} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">{checkingJournal ? "Checking..." : "Unlock"}</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {addOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0" onClick={() => setAddOpen(false)}>
-            <div onClick={(event) => event.stopPropagation()} className="w-full max-w-[440px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">Add reflections</div>
-              <h2 className="mt-3 text-xl font-semibold text-white">Choose reflections</h2>
+          <div
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0"
+            onClick={() => setAddOpen(false)}
+          >
+            <div
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-[440px] rounded-[30px] border border-white/10 bg-neutral-950/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl"
+            >
+              <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                Add reflections
+              </div>
+              <h2 className="mt-3 text-xl font-semibold text-white">
+                Choose reflections
+              </h2>
               <div className="mt-5 max-h-[360px] space-y-2 overflow-y-auto pr-1">
                 {availableItems.length === 0 ? (
-                  <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-neutral-400">No available reflections to add.</div>
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-neutral-400">
+                    No available reflections to add.
+                  </div>
                 ) : (
                   availableItems.map((item) => {
                     const selected = selectedIds.has(item.id);
                     const mood = getMood(item);
                     return (
-                      <button key={item.id} onClick={() => toggleSelected(item.id)} className={`flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition ${selected ? "border-white/35 bg-white/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"}`}>
+                      <button
+                        key={item.id}
+                        onClick={() => toggleSelected(item.id)}
+                        className={`flex w-full items-center gap-3 rounded-[20px] border px-3 py-3 text-left transition ${
+                          selected
+                            ? "border-white/35 bg-white/[0.08]"
+                            : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                        }`}
+                      >
                         <div className={`h-9 w-[4px] rounded-full ${mood.stripe}`} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-white">{item.title || "Conversation"}</div>
-                          <div className="mt-1 truncate text-xs text-neutral-500">{getPreview(item)}</div>
+                          <div className="truncate text-sm font-medium text-white">
+                            {item.title || "Conversation"}
+                          </div>
+                          <div className="mt-1 truncate text-xs text-neutral-500">
+                            {getPreview(item)}
+                          </div>
                         </div>
-                        <div className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${selected ? "border-white bg-white text-black" : "border-white/20 text-transparent"}`}>✓</div>
+                        <div
+                          className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
+                            selected
+                              ? "border-white bg-white text-black"
+                              : "border-white/20 text-transparent"
+                          }`}
+                        >
+                          ✓
+                        </div>
                       </button>
                     );
                   })
                 )}
               </div>
               <div className="mt-5 flex gap-3">
-                <button onClick={() => setAddOpen(false)} className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]">Cancel</button>
-                <button onClick={addSelected} disabled={selectedIds.size === 0} className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40">Add selected</button>
+                <button
+                  onClick={() => setAddOpen(false)}
+                  className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addSelected}
+                  disabled={selectedIds.size === 0}
+                  className="flex-1 rounded-[18px] bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:opacity-40"
+                >
+                  Add selected
+                </button>
               </div>
             </div>
           </div>

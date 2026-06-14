@@ -38,10 +38,6 @@ function getViewMode(value: string | null): JournalViewMode {
   return "all";
 }
 
-function getViewAccessKey(view: Exclude<JournalViewMode, "all">) {
-  return `mindlog:view-access:${view}`;
-}
-
 export default function JournalPage() {
   const { setHeader, resetHeader } = useHeader();
   const router = useRouter();
@@ -55,7 +51,10 @@ export default function JournalPage() {
   const [selectedCount, setSelectedCount] = useState(0);
   const [batchActionRequest, setBatchActionRequest] = useState(0);
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
-  const [viewLocks, setViewLocks] = useState<ViewLocks>({ favorites: false, hidden: false });
+  const [viewLocks, setViewLocks] = useState<ViewLocks>({
+    favorites: false,
+    hidden: false,
+  });
   const [viewAccessGranted, setViewAccessGranted] = useState(true);
   const [viewCode, setViewCode] = useState("");
   const [checkingViewCode, setCheckingViewCode] = useState(false);
@@ -64,11 +63,14 @@ export default function JournalPage() {
   const entryId = searchParams.get("entry");
   const viewMode = getViewMode(searchParams.get("view"));
   const lockedView = viewMode !== "all" && viewLocks[viewMode];
-  const canShowCurrentView = viewMode === "all" || !lockedView || viewAccessGranted;
+  const canShowCurrentView =
+    viewMode === "all" || !lockedView || viewAccessGranted;
 
   function navigateToView(nextView: JournalViewMode) {
     setPageMenuOpen(false);
     setSelectionMode(false);
+    setViewAccessGranted(false);
+    setViewCode("");
 
     const params = new URLSearchParams(searchParams.toString());
 
@@ -90,9 +92,14 @@ export default function JournalPage() {
 
   async function loadViewLocks() {
     try {
-      const res = await fetch("/api/journal/view-locks", { cache: "no-store" });
+      const res = await fetch("/api/journal/view-locks", {
+        cache: "no-store",
+      });
+
       if (!res.ok) throw new Error();
+
       const data = await res.json();
+
       setViewLocks({
         favorites: Boolean(data.favorites),
         hidden: Boolean(data.hidden),
@@ -149,7 +156,9 @@ export default function JournalPage() {
                 setSelectionMode((value) => !value);
               }}
               className="rounded-full px-3 py-1.5 text-sm text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
-              aria-label={selectionMode ? "Exit selection" : "Select reflections"}
+              aria-label={
+                selectionMode ? "Exit selection" : "Select reflections"
+              }
             >
               {selectionMode ? "×" : "Select"}
             </button>
@@ -176,6 +185,7 @@ export default function JournalPage() {
     setSelectedCount(0);
     setPageMenuOpen(false);
     setViewCode("");
+    setViewAccessGranted(viewMode === "all");
   }, [viewMode]);
 
   useEffect(() => {
@@ -193,14 +203,7 @@ export default function JournalPage() {
       return;
     }
 
-    if (typeof window === "undefined") {
-      setViewAccessGranted(false);
-      return;
-    }
-
-    setViewAccessGranted(
-      window.sessionStorage.getItem(getViewAccessKey(viewMode)) === "1"
-    );
+    setViewAccessGranted(false);
   }, [viewLocks, viewMode]);
 
   useEffect(() => {
@@ -367,6 +370,7 @@ export default function JournalPage() {
 
   async function setCurrentViewCode() {
     if (viewMode === "all") return;
+
     const nextCode = prompt("New 4–8 digit access code:", "");
     if (!nextCode) return;
 
@@ -385,8 +389,9 @@ export default function JournalPage() {
       });
 
       if (!res.ok) throw new Error();
-      window.sessionStorage.removeItem(getViewAccessKey(viewMode));
+
       setViewAccessGranted(false);
+      setViewCode("");
       setPageMenuOpen(false);
       await loadViewLocks();
     } catch {
@@ -396,6 +401,7 @@ export default function JournalPage() {
 
   async function clearCurrentViewCode() {
     if (viewMode === "all") return;
+
     const ok = confirm("Remove access code from this folder?");
     if (!ok) return;
 
@@ -407,8 +413,9 @@ export default function JournalPage() {
       });
 
       if (!res.ok) throw new Error();
-      window.sessionStorage.removeItem(getViewAccessKey(viewMode));
+
       setViewAccessGranted(true);
+      setViewCode("");
       setPageMenuOpen(false);
       await loadViewLocks();
     } catch {
@@ -421,14 +428,19 @@ export default function JournalPage() {
 
     try {
       setCheckingViewCode(true);
+
       const res = await fetch("/api/journal/view-locks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scope: viewMode, code: viewCode.trim() }),
       });
+
       const data = await res.json();
-      if (!res.ok || !data.verified) throw new Error(data.error || "Incorrect code");
-      window.sessionStorage.setItem(getViewAccessKey(viewMode), "1");
+
+      if (!res.ok || !data.verified) {
+        throw new Error(data.error || "Incorrect code");
+      }
+
       setViewAccessGranted(true);
       setViewCode("");
     } catch (error) {
@@ -499,9 +511,12 @@ export default function JournalPage() {
                     onClick={setCurrentViewCode}
                     className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm text-neutral-100 transition hover:bg-white/[0.06]"
                   >
-                    <span>{viewLocks[viewMode] ? "Change code" : "Set code"}</span>
+                    <span>
+                      {viewLocks[viewMode] ? "Change code" : "Set code"}
+                    </span>
                     <span className="text-neutral-500">Lock</span>
                   </button>
+
                   {viewLocks[viewMode] && (
                     <button
                       onClick={clearCurrentViewCode}
@@ -601,7 +616,11 @@ export default function JournalPage() {
               </div>
 
               <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-neutral-200">
-                {viewMode === "all" ? limitPillCopy : viewLocks[viewMode] ? "Locked" : viewMode}
+                {viewMode === "all"
+                  ? limitPillCopy
+                  : viewLocks[viewMode]
+                  ? "Locked"
+                  : viewMode}
               </div>
             </div>
 
@@ -609,9 +628,10 @@ export default function JournalPage() {
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
                 {viewMode === "all" ? "Journal status" : "Folder status"}
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-200">
+              <p className="mt-2 text-sm leading-relaxed text-neutral-300">
                 {viewCopy.status}
               </p>
+
               {usage?.plan === "free" && viewMode === "all" && (
                 <button
                   onClick={() => router.push("/upgrade")}
@@ -626,16 +646,22 @@ export default function JournalPage() {
           {!canShowCurrentView ? (
             <div className="rounded-[30px] border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.025] px-5 py-7 text-center shadow-2xl shadow-black/20">
               <div className="mx-auto h-14 w-[5px] rounded-full bg-white" />
-              <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">Locked folder</div>
+              <div className="mt-5 text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                Locked folder
+              </div>
               <h2 className="mt-3 text-[24px] font-semibold tracking-[-0.04em] text-white">
                 {viewMode === "favorites" ? "Favorites" : "Hidden"}
               </h2>
               <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-neutral-400">
-                Enter the access code to view this folder on this device session.
+                Enter the access code to view this folder.
               </p>
               <input
                 value={viewCode}
-                onChange={(event) => setViewCode(event.target.value.replace(/\D/g, "").slice(0, 8))}
+                onChange={(event) =>
+                  setViewCode(
+                    event.target.value.replace(/\D/g, "").slice(0, 8)
+                  )
+                }
                 inputMode="numeric"
                 autoFocus
                 placeholder="Code"
