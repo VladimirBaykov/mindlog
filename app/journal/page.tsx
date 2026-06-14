@@ -23,6 +23,16 @@ type UsageInfo = {
   };
 } | null;
 
+type JournalViewMode = "all" | "favorites" | "hidden";
+
+function getViewMode(value: string | null): JournalViewMode {
+  if (value === "favorites" || value === "hidden") {
+    return value;
+  }
+
+  return "all";
+}
+
 export default function JournalPage() {
   const { setHeader, resetHeader } = useHeader();
   const router = useRouter();
@@ -39,10 +49,38 @@ export default function JournalPage() {
 
   const celebrate = searchParams.get("celebrate");
   const entryId = searchParams.get("entry");
+  const viewMode = getViewMode(searchParams.get("view"));
+
+  function navigateToView(nextView: JournalViewMode) {
+    setPageMenuOpen(false);
+    setSelectionMode(false);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (nextView === "all") {
+      params.delete("view");
+    } else {
+      params.set("view", nextView);
+    }
+
+    params.delete("celebrate");
+    params.delete("entry");
+
+    const next = params.toString()
+      ? `/journal?${params.toString()}`
+      : "/journal";
+
+    router.push(next);
+  }
 
   useEffect(() => {
     setHeader({
-      title: "Journal",
+      title:
+        viewMode === "favorites"
+          ? "Favorites"
+          : viewMode === "hidden"
+          ? "Hidden"
+          : "Journal",
       rightSlot: (
         <div className="flex items-center gap-2">
           <button
@@ -87,7 +125,14 @@ export default function JournalPage() {
     selectedCount,
     selectionMode,
     setHeader,
+    viewMode,
   ]);
+
+  useEffect(() => {
+    setSelectionMode(false);
+    setSelectedCount(0);
+    setPageMenuOpen(false);
+  }, [viewMode]);
 
   useEffect(() => {
     if (celebrate === "1") {
@@ -183,6 +228,33 @@ export default function JournalPage() {
       : "Free plan";
   }, [usageLoading, usage]);
 
+  const viewCopy = useMemo(() => {
+    if (viewMode === "favorites") {
+      return {
+        eyebrow: "Favorite reflections",
+        title: "Moments worth keeping close.",
+        body: "Your favorite saved reflections live here, separate from the full journal.",
+        status: "Favorites are part of your private reflection library.",
+      };
+    }
+
+    if (viewMode === "hidden") {
+      return {
+        eyebrow: "Hidden reflections",
+        title: "Private entries, tucked away.",
+        body: "Hidden reflections stay out of your main journal until you restore them.",
+        status: "Only you can access this hidden view from the Journal menu.",
+      };
+    }
+
+    return {
+      eyebrow: "Your reflection journal",
+      title: "Your reflections, remembered.",
+      body: "Saved conversations become private entries you can revisit, organize, export, and continue later.",
+      status: saveStatusCopy,
+    };
+  }, [saveStatusCopy, viewMode]);
+
   function dismissCelebrate() {
     setShowCelebrate(false);
 
@@ -230,8 +302,40 @@ export default function JournalPage() {
           >
             <div
               onClick={(event) => event.stopPropagation()}
-              className="absolute right-4 top-[54px] w-[210px] overflow-hidden rounded-[22px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+              className="absolute right-4 top-[54px] w-[220px] overflow-hidden rounded-[22px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
             >
+              <button
+                onClick={() => navigateToView("all")}
+                className={`flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm transition hover:bg-white/[0.06] ${
+                  viewMode === "all" ? "text-white" : "text-neutral-300"
+                }`}
+              >
+                <span>All reflections</span>
+                <span className="text-neutral-500">Journal</span>
+              </button>
+
+              <button
+                onClick={() => navigateToView("favorites")}
+                className={`flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm transition hover:bg-white/[0.06] ${
+                  viewMode === "favorites" ? "text-white" : "text-neutral-300"
+                }`}
+              >
+                <span>Favorites</span>
+                <span className="text-rose-300">♥</span>
+              </button>
+
+              <button
+                onClick={() => navigateToView("hidden")}
+                className={`flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-sm transition hover:bg-white/[0.06] ${
+                  viewMode === "hidden" ? "text-white" : "text-neutral-300"
+                }`}
+              >
+                <span>Hidden</span>
+                <span className="text-neutral-500">◌</span>
+              </button>
+
+              <div className="my-1 h-px bg-white/[0.08]" />
+
               <button
                 onClick={() => {
                   setPageMenuOpen(false);
@@ -269,8 +373,8 @@ export default function JournalPage() {
           </div>
         )}
 
-        <div className="mx-auto max-w-xl px-4 pt-6 pb-24">
-          {showCelebrate && (
+        <div className="mx-auto max-w-xl px-4 pt-6 pb-28">
+          {showCelebrate && viewMode === "all" && (
             <div className="mb-5 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -306,30 +410,29 @@ export default function JournalPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.18em] text-neutral-500">
-                  Your reflection journal
+                  {viewCopy.eyebrow}
                 </div>
                 <h1 className="mt-3 text-[26px] font-semibold tracking-[-0.04em] text-white">
-                  Your reflections, remembered.
+                  {viewCopy.title}
                 </h1>
                 <p className="mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
-                  Saved conversations become private entries you can revisit,
-                  organize, export, and continue later.
+                  {viewCopy.body}
                 </p>
               </div>
 
               <div className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-neutral-200">
-                {limitPillCopy}
+                {viewMode === "all" ? limitPillCopy : viewMode}
               </div>
             </div>
 
             <div className="mt-5 rounded-[22px] border border-white/10 bg-black/20 px-4 py-4">
               <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                Journal status
+                {viewMode === "all" ? "Journal status" : "Collection status"}
               </div>
               <p className="mt-2 text-sm leading-relaxed text-neutral-200">
-                {saveStatusCopy}
+                {viewCopy.status}
               </p>
-              {usage?.plan === "free" && (
+              {usage?.plan === "free" && viewMode === "all" && (
                 <button
                   onClick={() => router.push("/upgrade")}
                   className="mt-4 rounded-[16px] border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.07]"
@@ -349,6 +452,7 @@ export default function JournalPage() {
           )}
 
           <JournalList
+            viewMode={viewMode}
             selectionMode={selectionMode}
             batchActionRequest={batchActionRequest}
             onSelectionModeChange={setSelectionMode}
