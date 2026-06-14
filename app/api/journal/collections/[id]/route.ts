@@ -46,6 +46,15 @@ function hashPin(pin: string, userId: string) {
     .digest("hex");
 }
 
+function normalizeJournalRow(row: any) {
+  const { lock_hash: _lockHash, ...safeRow } = row;
+
+  return {
+    ...safeRow,
+    locked: Boolean(row.lock_hash),
+  };
+}
+
 async function getAuthed() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -100,7 +109,7 @@ export async function GET(req: Request, context: RouteContext) {
     if (journalIds.length > 0) {
       const { data: journalRows, error: journalsError } = await supabase
         .from("journals")
-        .select("id, title, mood, created_at, updated_at, deleted_at, content, metadata, is_favorite, hidden_at")
+        .select("id, title, mood, created_at, updated_at, deleted_at, content, metadata, is_favorite, hidden_at, lock_hash")
         .eq("user_id", user.id)
         .is("deleted_at", null)
         .in("id", journalIds);
@@ -116,9 +125,9 @@ export async function GET(req: Request, context: RouteContext) {
         journalIds.map((journalId, index) => [journalId, index])
       );
 
-      journals = (journalRows ?? []).sort(
-        (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
-      );
+      journals = (journalRows ?? [])
+        .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+        .map(normalizeJournalRow);
     }
 
     return NextResponse.json({
