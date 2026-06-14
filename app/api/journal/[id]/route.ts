@@ -33,6 +33,15 @@ async function ensureOwnedJournal(
   return data;
 }
 
+function normalizeJournalRow(row: any) {
+  const { lock_hash: _lockHash, ...safeRow } = row;
+
+  return {
+    ...safeRow,
+    locked: Boolean(row.lock_hash),
+  };
+}
+
 // ================= GET =================
 export async function GET(
   req: Request,
@@ -64,7 +73,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(normalizeJournalRow(data));
   } catch (e) {
     console.error("GET JOURNAL ERROR:", e);
 
@@ -115,6 +124,8 @@ export async function PATCH(
     delete payload.id;
     delete payload.user_id;
     delete payload.created_at;
+    delete payload.lock_hash;
+    delete payload.locked;
 
     const { error } = await supabase
       .from("journals")
