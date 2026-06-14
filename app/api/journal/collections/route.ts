@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -23,6 +24,21 @@ function normalizeColor(value: unknown): CollectionColor {
   return COLLECTION_COLORS.includes(value as CollectionColor)
     ? (value as CollectionColor)
     : "blue";
+}
+
+function normalizePin(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function isValidPin(value: string) {
+  return /^\d{4,8}$/.test(value);
+}
+
+function hashPin(pin: string, userId: string) {
+  return createHash("sha256")
+    .update(`mindlog-collection-pin-v1:${userId}:${pin}`)
+    .digest("hex");
 }
 
 async function getAuthed() {
@@ -110,10 +126,18 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const name = normalizeName(body.name);
     const color = normalizeColor(body.color);
+    const pin = normalizePin(body.pin);
 
     if (!name) {
       return NextResponse.json(
         { error: "Collection name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (pin && !isValidPin(pin)) {
+      return NextResponse.json(
+        { error: "PIN must be 4 to 8 digits" },
         { status: 400 }
       );
     }
@@ -124,6 +148,7 @@ export async function POST(req: Request) {
         user_id: user.id,
         name,
         color,
+        pin_hash: pin ? hashPin(pin, user.id) : null,
       })
       .select("id, name, color, pin_hash, created_at, updated_at")
       .single();
