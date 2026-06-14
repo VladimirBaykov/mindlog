@@ -28,6 +28,11 @@ type CollectionItem = {
   updatedAt: string | null;
 };
 
+type ViewLocks = {
+  favorites: boolean;
+  hidden: boolean;
+};
+
 const colorStyles: Record<CollectionColor, { label: string; stripe: string }> = {
   slate: { label: "Slate", stripe: "bg-slate-300" },
   blue: { label: "Blue", stripe: "bg-blue-400" },
@@ -66,6 +71,10 @@ export default function JournalCollectionsPage() {
   const { setHeader, resetHeader } = useHeader();
 
   const [items, setItems] = useState<CollectionItem[]>([]);
+  const [viewLocks, setViewLocks] = useState<ViewLocks>({
+    favorites: false,
+    hidden: false,
+  });
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
@@ -83,10 +92,24 @@ export default function JournalCollectionsPage() {
   async function loadCollections() {
     try {
       setLoading(true);
-      const res = await fetch("/api/journal/collections", { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load collections");
-      setItems(data.items ?? []);
+      const [collectionsRes, locksRes] = await Promise.all([
+        fetch("/api/journal/collections", { cache: "no-store" }),
+        fetch("/api/journal/view-locks", { cache: "no-store" }),
+      ]);
+
+      const collectionsData = await collectionsRes.json();
+      if (!collectionsRes.ok) {
+        throw new Error(collectionsData.error || "Failed to load collections");
+      }
+      setItems(collectionsData.items ?? []);
+
+      if (locksRes.ok) {
+        const locksData = await locksRes.json();
+        setViewLocks({
+          favorites: Boolean(locksData.favorites),
+          hidden: Boolean(locksData.hidden),
+        });
+      }
     } catch (error) {
       console.error("Collections load failed:", error);
       setItems([]);
@@ -153,11 +176,7 @@ export default function JournalCollectionsPage() {
       setColor("blue");
       setAccessCode("");
       setCreateOpen(false);
-
-      if (data.locked && typeof window !== "undefined") {
-        window.sessionStorage.setItem(getCollectionAccessKey(data.id), "1");
-      }
-
+      window.sessionStorage.removeItem(getCollectionAccessKey(data.id));
       router.push(`/journal/collections/${data.id}`);
     } catch (error) {
       console.error("Create collection failed:", error);
@@ -296,7 +315,14 @@ export default function JournalCollectionsPage() {
                   <div className="flex items-center gap-4">
                     <div className="h-11 w-[5px] shrink-0 rounded-full bg-white" />
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-[15px] font-medium text-white">Favorites ♥</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-[15px] font-medium text-white">Favorites ♥</h3>
+                        {viewLocks.favorites && (
+                          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
+                            Locked
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1.5 text-[13px] text-neutral-400">Reflections you marked as important.</p>
                     </div>
                   </div>
@@ -309,7 +335,14 @@ export default function JournalCollectionsPage() {
                   <div className="flex items-center gap-4">
                     <div className="h-11 w-[5px] shrink-0 rounded-full bg-neutral-400" />
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-[15px] font-medium text-white">Hidden</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-[15px] font-medium text-white">Hidden</h3>
+                        {viewLocks.hidden && (
+                          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
+                            Locked
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1.5 text-[13px] text-neutral-400">Reflections tucked away from the main journal.</p>
                     </div>
                   </div>
