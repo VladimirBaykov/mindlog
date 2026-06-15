@@ -1,0 +1,121 @@
+:root {
+  --journal-icon-list: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
+  --journal-icon-folder: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 7.5A2.5 2.5 0 0 1 6 5h3.3l2 2H18a2.5 2.5 0 0 1 2.5 2.5v7A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5Z'/%3E%3C/svg%3E");
+  --journal-icon-chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19V5'/%3E%3Cpath d='M4 19h16'/%3E%3Cpath d='M8 15v-4'/%3E%3Cpath d='M12 15V8'/%3E%3Cpath d='M16 15v-6'/%3E%3C/svg%3E");
+  --journal-icon-sparkles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z'/%3E%3Cpath d='M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z'/%3E%3C/svg%3E");
+  --journal-icon-logout: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 6H6.5A2.5 2.5 0 0 0 4 8.5v7A2.5 2.5 0 0 0 6.5 18H10'/%3E%3Cpath d='M15 8l4 4-4 4'/%3E%3Cpath d='M19 12H9'/%3E%3C/svg%3E");
+}
+
+/* Card status icons: white filled heart and clean standalone lock. */
+[data-journal-card="true"] h3 + span:not([class*="rounded-full"]) {
+  width: 1.34rem !important;
+  min-width: 1.34rem !important;
+  height: 1.34rem !important;
+  color: #ffffff !important;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.34));
+}
+
+[data-journal-card="true"] h3 + span:not([class*="rounded-full"])::before {
+  width: 1.34rem !important;
+  height: 1.34rem !important;
+}
+
+span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"] {
+  width: 1.34rem !important;
+  min-width: 1.34rem !important;
+  height: 1.34rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.86) !important;
+  border-radius: 0 !important;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.18));
+}
+
+span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"]::before {
+  width: 1.22rem !important;
+  height: 1.22rem !important;
+}
+
+/* Journal floating menus: denser iOS-style rows, slightly bigger type. */
+.fixed.overflow-hidden.rounded-\[24px\],
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] {
+  width: min(258px, calc(100vw - 32px)) !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button {
+  min-height: 2.02rem !important;
+  padding: 0.34rem 0.66rem !important;
+  border-radius: 14px !important;
+  font-size: 0.94rem !important;
+  line-height: 1.08 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.018em !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 {
+  gap: 0 !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:last-child,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:last-child {
+  width: 1.18rem !important;
+  min-width: 1.18rem !important;
+  height: 1.18rem !important;
+  margin-left: 0.46rem !important;
+  color: rgba(255, 255, 255, 0.76) !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:last-child::before {
+  width: 1.18rem !important;
+  height: 1.18rem !important;
+}
+
+/* Top Journal menu: explicit, calmer icon mapping by row order. */
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-list) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-heart) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(3) > span:last-child {
+  --journal-action-icon: var(--journal-icon-eye-off) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(4) > span:last-child {
+  --journal-action-icon: var(--journal-icon-folder) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(5) > span:last-child {
+  --journal-action-icon: var(--journal-icon-chart) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(6) > span:last-child {
+  --journal-action-icon: var(--journal-icon-sparkles) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(7) > span:last-child {
+  --journal-action-icon: var(--journal-icon-logout) !important;
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button.text-red-300 > span:last-child {
+  --journal-action-icon: var(--journal-icon-logout) !important;
+  color: rgba(252, 165, 165, 0.94) !important;
+}
+
+/* When Favorites/Hidden adds code actions, keep those rows semantic. */
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(5):not(.text-red-300) > span:last-child {
+  --journal-action-icon: var(--journal-icon-lock);
+}
+
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(6):not(.text-red-300) > span:last-child {
+  --journal-action-icon: var(--journal-icon-unlock);
+}
