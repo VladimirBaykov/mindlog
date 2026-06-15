@@ -16,8 +16,8 @@ const ICON_BY_LABEL: Record<string, string> = {
   "Rename title": "var(--journal-icon-edit)",
   Favorites: "var(--journal-icon-heart)",
   Favorite: "var(--journal-icon-heart)",
-  "Remove favorite": "var(--journal-icon-heart)",
-  "Remove favorites": "var(--journal-icon-heart)",
+  "Remove favorite": "var(--journal-icon-heart-off)",
+  "Remove favorites": "var(--journal-icon-heart-off)",
   "Mark as favorite": "var(--journal-icon-heart)",
   Hidden: "var(--journal-icon-eye-off)",
   Hide: "var(--journal-icon-eye-off)",
@@ -121,6 +121,32 @@ function hideBatchOverlay() {
   overlay.style.setProperty("pointer-events", "none", "important");
 }
 
+function closeBatchOverlaySmooth(onClosed: () => void) {
+  const overlay = findBatchOverlay();
+  if (!overlay) {
+    onClosed();
+    return;
+  }
+
+  const panel = overlay.querySelector(".rounded-\\[24px\\]") as HTMLElement | null;
+
+  overlay.style.setProperty("pointer-events", "none", "important");
+  overlay.style.setProperty("transition", "opacity 140ms ease-out", "important");
+  overlay.style.setProperty("opacity", "0", "important");
+
+  if (panel) {
+    panel.style.setProperty(
+      "transition",
+      "opacity 140ms ease-out, transform 140ms cubic-bezier(0.22, 1, 0.36, 1)",
+      "important",
+    );
+    panel.style.setProperty("opacity", "0", "important");
+    panel.style.setProperty("transform", "translateY(10px) scale(0.985)", "important");
+  }
+
+  window.setTimeout(onClosed, 150);
+}
+
 function isSelectedCard(card: HTMLElement) {
   const className = card.getAttribute("class") || "";
   return (
@@ -203,13 +229,14 @@ function installBatchFavoriteHandler(
 
       const nextValue = rawValue === "true";
 
-      hideBatchOverlay();
-      closeSelectionMode();
+      closeBatchOverlaySmooth(() => {
+        closeSelectionMode();
 
-      void Promise.all(
-        ids.map((id) => updateItem(id, { isFavorite: nextValue })),
-      ).catch((error) => {
-        console.error("Batch favorite update failed:", error);
+        void Promise.all(
+          ids.map((id) => updateItem(id, { isFavorite: nextValue })),
+        ).catch((error) => {
+          console.error("Batch favorite update failed:", error);
+        });
       });
     },
     true,
