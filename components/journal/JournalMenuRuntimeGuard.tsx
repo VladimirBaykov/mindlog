@@ -10,33 +10,33 @@ import {
 type JournalViewMode = "all" | "favorites" | "hidden";
 
 const ICON_BY_LABEL: Record<string, string> = {
-  "Open": "var(--journal-icon-open)",
+  Open: "var(--journal-icon-open)",
   "All reflections": "var(--journal-icon-list)",
-  "Rename": "var(--journal-icon-edit)",
+  Rename: "var(--journal-icon-edit)",
   "Rename title": "var(--journal-icon-edit)",
-  "Favorites": "var(--journal-icon-heart)",
-  "Favorite": "var(--journal-icon-heart)",
+  Favorites: "var(--journal-icon-heart)",
+  Favorite: "var(--journal-icon-heart)",
   "Remove favorite": "var(--journal-icon-heart)",
   "Remove favorites": "var(--journal-icon-heart)",
   "Mark as favorite": "var(--journal-icon-heart)",
-  "Hidden": "var(--journal-icon-eye-off)",
-  "Hide": "var(--journal-icon-eye-off)",
+  Hidden: "var(--journal-icon-eye-off)",
+  Hide: "var(--journal-icon-eye-off)",
   "Hide selected": "var(--journal-icon-eye-off)",
-  "Unhide": "var(--journal-icon-eye)",
+  Unhide: "var(--journal-icon-eye)",
   "Unhide selected": "var(--journal-icon-eye)",
-  "Collections": "var(--journal-icon-folder)",
+  Collections: "var(--journal-icon-folder)",
   "Add to collection": "var(--journal-icon-folder-plus)",
   "Add selected to collection": "var(--journal-icon-folder-plus)",
-  "Lock": "var(--journal-icon-lock)",
+  Lock: "var(--journal-icon-lock)",
   "Set code": "var(--journal-icon-lock)",
   "Change code": "var(--journal-icon-lock)",
   "Remove lock": "var(--journal-icon-unlock)",
   "Remove code": "var(--journal-icon-unlock)",
-  "Export": "var(--journal-icon-export)",
+  Export: "var(--journal-icon-export)",
   "View stats": "var(--journal-icon-chart)",
-  "Upgrade": "var(--journal-icon-sparkles)",
-  "Logout": "var(--journal-icon-logout)",
-  "Delete": "var(--journal-icon-trash)",
+  Upgrade: "var(--journal-icon-sparkles)",
+  Logout: "var(--journal-icon-logout)",
+  Delete: "var(--journal-icon-trash)",
   "Delete selected": "var(--journal-icon-trash)",
   "Remove collection": "var(--journal-icon-trash)",
 };
@@ -114,7 +114,10 @@ function findBatchActionMenu() {
 
 function isSelectedCard(card: HTMLElement) {
   const className = card.getAttribute("class") || "";
-  return className.includes("border-white/35") || className.includes("bg-white/[0.09]");
+  return (
+    className.includes("border-white/35") ||
+    className.includes("bg-white/[0.09]")
+  );
 }
 
 function getSelectedItems(items: JournalItem[], viewMode: JournalViewMode) {
@@ -214,7 +217,9 @@ function syncBatchFavoriteActions(
   const selectedItems = getSelectedItems(items, viewMode);
   if (selectedItems.length === 0) return;
 
-  const buttons = Array.from(batch.menu.querySelectorAll<HTMLButtonElement>("button"));
+  const buttons = Array.from(
+    batch.menu.querySelectorAll<HTMLButtonElement>("button"),
+  );
   const favoriteButton = buttons.find((button) => {
     const label = getButtonLabel(button);
     return (
@@ -275,29 +280,17 @@ export function JournalMenuRuntimeGuard() {
   useEffect(() => {
     let selectedActionsRequestedUntil = 0;
     let suppressAccidentalBatchUntil = 0;
+    const timers: number[] = [];
 
-    function markSelectedActionsRequest(event: Event) {
-      const target = event.target as HTMLElement | null;
-      const button = target?.closest?.("button[aria-label='Open selected actions']");
-      if (!button) return;
-
-      document.body.classList.remove("mindlog-suppress-selected-actions");
-      selectedActionsRequestedUntil = Date.now() + 1200;
+    function addTimer(callback: () => void, delay: number) {
+      const id = window.setTimeout(callback, delay);
+      timers.push(id);
     }
 
-    function markSelectionTap(event: Event) {
-      const target = event.target as HTMLElement | null;
-      if (!target?.closest?.("[data-journal-card='true']")) return;
-      if (!document.querySelector("button[aria-label='Exit selection']")) return;
-
-      suppressAccidentalBatchUntil = Date.now() + 650;
-      document.body.classList.add("mindlog-suppress-selected-actions");
-
-      window.setTimeout(() => {
-        if (Date.now() > suppressAccidentalBatchUntil) {
-          document.body.classList.remove("mindlog-suppress-selected-actions");
-        }
-      }, 700);
+    function hydrateOpenMenus() {
+      const viewMode = getViewMode(searchParams.get("view"));
+      applyMenuIcons();
+      syncBatchFavoriteActions(items, viewMode, updateItem);
     }
 
     function closeAccidentalBatchMenu() {
@@ -312,32 +305,59 @@ export function JournalMenuRuntimeGuard() {
       overlay.click();
     }
 
-    function handleDomChange() {
-      const viewMode = getViewMode(searchParams.get("view"));
-      applyMenuIcons();
-      syncBatchFavoriteActions(items, viewMode, updateItem);
-      closeAccidentalBatchMenu();
+    function scheduleAccidentalBatchClose() {
+      addTimer(closeAccidentalBatchMenu, 0);
+      addTimer(closeAccidentalBatchMenu, 40);
+      addTimer(closeAccidentalBatchMenu, 120);
+    }
+
+    function markSelectedActionsRequest(event: Event) {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest?.("button[aria-label='Open selected actions']");
+      if (!button) return;
+
+      document.body.classList.remove("mindlog-suppress-selected-actions");
+      selectedActionsRequestedUntil = Date.now() + 1200;
+      addTimer(hydrateOpenMenus, 0);
+      addTimer(hydrateOpenMenus, 60);
+      addTimer(hydrateOpenMenus, 180);
+    }
+
+    function markSelectionTap(event: Event) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.("button[aria-label='Open selected actions']")) return;
+      if (!target?.closest?.("[data-journal-card='true']")) return;
+      if (!document.querySelector("button[aria-label='Exit selection']")) return;
+
+      suppressAccidentalBatchUntil = Date.now() + 650;
+      document.body.classList.add("mindlog-suppress-selected-actions");
+      scheduleAccidentalBatchClose();
+
+      addTimer(() => {
+        if (Date.now() > suppressAccidentalBatchUntil) {
+          document.body.classList.remove("mindlog-suppress-selected-actions");
+        }
+      }, 700);
+    }
+
+    function refreshIconsAfterClick() {
+      addTimer(applyMenuIcons, 40);
     }
 
     document.addEventListener("pointerdown", markSelectionTap, true);
     document.addEventListener("pointerdown", markSelectedActionsRequest, true);
     document.addEventListener("click", markSelectedActionsRequest, true);
+    document.addEventListener("click", refreshIconsAfterClick, true);
 
-    handleDomChange();
-
-    const observer = new MutationObserver(handleDomChange);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
+    hydrateOpenMenus();
 
     return () => {
       document.removeEventListener("pointerdown", markSelectionTap, true);
       document.removeEventListener("pointerdown", markSelectedActionsRequest, true);
       document.removeEventListener("click", markSelectedActionsRequest, true);
+      document.removeEventListener("click", refreshIconsAfterClick, true);
       document.body.classList.remove("mindlog-suppress-selected-actions");
-      observer.disconnect();
+      for (const timer of timers) window.clearTimeout(timer);
     };
   }, [items, searchParams, updateItem]);
 
