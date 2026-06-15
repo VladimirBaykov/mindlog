@@ -4,53 +4,60 @@
   --journal-icon-chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19V5'/%3E%3Cpath d='M4 19h16'/%3E%3Cpath d='M8 15v-4'/%3E%3Cpath d='M12 15V8'/%3E%3Cpath d='M16 15v-6'/%3E%3C/svg%3E");
   --journal-icon-sparkles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z'/%3E%3Cpath d='M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z'/%3E%3C/svg%3E");
   --journal-icon-logout: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 6H6.5A2.5 2.5 0 0 0 4 8.5v7A2.5 2.5 0 0 0 6.5 18H10'/%3E%3Cpath d='M15 8l4 4-4 4'/%3E%3Cpath d='M19 12H9'/%3E%3C/svg%3E");
+  --journal-icon-heart-solid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 21.1 4.3 13.8C2.5 12.1 1.5 10.2 1.5 8.2 1.5 5.1 3.9 2.8 7 2.8c1.8 0 3.6.9 5 2.5 1.4-1.6 3.2-2.5 5-2.5 3.1 0 5.5 2.3 5.5 5.4 0 2-1 3.9-2.8 5.6Z'/%3E%3C/svg%3E");
 }
 
-/* Card status icons: white filled heart and clean standalone lock. */
+/* Card status icons: fixed-size white heart and clean standalone lock. */
 [data-journal-card="true"] h3 + span:not([class*="rounded-full"]) {
-  width: 1.42rem !important;
-  min-width: 1.42rem !important;
-  height: 1.42rem !important;
+  width: 1.08rem !important;
+  min-width: 1.08rem !important;
+  height: 1.08rem !important;
   color: #ffffff !important;
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.36));
+  filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.28));
 }
 
 [data-journal-card="true"] h3 + span:not([class*="rounded-full"])::before {
-  width: 1.42rem !important;
-  height: 1.42rem !important;
+  width: 1.08rem !important;
+  height: 1.08rem !important;
+  -webkit-mask: var(--journal-icon-heart-solid) center / contain no-repeat !important;
+  mask: var(--journal-icon-heart-solid) center / contain no-repeat !important;
 }
 
-span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"] {
-  width: 1.42rem !important;
-  min-width: 1.42rem !important;
-  height: 1.42rem !important;
+[data-journal-card="true"] span[class*="uppercase"][class*="tracking-[0.12em]"] {
+  width: 1.06rem !important;
+  min-width: 1.06rem !important;
+  height: 1.06rem !important;
   padding: 0 !important;
   border: 0 !important;
   background: transparent !important;
-  color: rgba(255, 255, 255, 0.88) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
   border-radius: 0 !important;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.18));
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
 }
 
-span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"]::before {
-  width: 1.28rem !important;
-  height: 1.28rem !important;
+[data-journal-card="true"] span[class*="uppercase"][class*="tracking-[0.12em]"]::before {
+  width: 1.06rem !important;
+  height: 1.06rem !important;
 }
 
-/* Journal floating menus: denser iOS-style rows, slightly bigger type. */
+/* Journal floating menus: unified text/icon scale for every three-dot menu. */
 .fixed.overflow-hidden.rounded-\[24px\],
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] {
-  width: min(254px, calc(100vw - 32px)) !important;
+  width: min(258px, calc(100vw - 32px)) !important;
+}
+
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] {
+  max-width: 336px !important;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button,
 .fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button,
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button {
-  min-height: 1.98rem !important;
-  padding: 0.3rem 0.64rem !important;
+  min-height: 2.08rem !important;
+  padding: 0.34rem 0.66rem !important;
   border-radius: 14px !important;
-  font-size: 0.97rem !important;
-  line-height: 1.05 !important;
+  font-size: 1rem !important;
+  line-height: 1.04 !important;
   font-weight: 500 !important;
   letter-spacing: -0.018em !important;
 }
@@ -63,67 +70,126 @@ span[class*="uppercase"][class*="tracking-[0.12em]"][class*="bg-white/[0.05]"]::
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child,
 .fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:last-child,
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:last-child {
-  width: 1.2rem !important;
-  min-width: 1.2rem !important;
-  height: 1.2rem !important;
-  margin-left: 0.42rem !important;
+  --journal-action-icon: var(--journal-icon-open);
+  width: 1.18rem !important;
+  min-width: 1.18rem !important;
+  height: 1.18rem !important;
+  margin-left: 0.44rem !important;
   color: rgba(255, 255, 255, 0.78) !important;
 }
 
 .fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before,
 .fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button > span:last-child::before,
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button > span:last-child::before {
-  width: 1.2rem !important;
-  height: 1.2rem !important;
+  width: 1.18rem !important;
+  height: 1.18rem !important;
 }
 
-/* Top Journal menu: calmer, function-specific default mapping. */
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(1) > span:last-child {
-  --journal-action-icon: var(--journal-icon-list) !important;
+/* Single reflection pill menu. */
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-open) !important;
 }
-
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(2) > span:last-child {
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-edit) !important;
+}
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(3) > span:last-child {
   --journal-action-icon: var(--journal-icon-heart) !important;
 }
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(4) > span:last-child {
+  --journal-action-icon: var(--journal-icon-eye-off) !important;
+}
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(5) > span:last-child {
+  --journal-action-icon: var(--journal-icon-folder-plus) !important;
+}
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(6) > span:last-child {
+  --journal-action-icon: var(--journal-icon-lock) !important;
+}
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-of-type(7):not(:nth-last-of-type(2)) > span:last-child {
+  --journal-action-icon: var(--journal-icon-unlock) !important;
+}
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button:nth-last-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-export) !important;
+}
 
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(3) > span:last-child {
+/* Batch menu. */
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:not(:has(> .space-y-0\.5 > button:nth-of-type(5))) > .space-y-0\.5 > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-heart) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:not(:has(> .space-y-0\.5 > button:nth-of-type(5))) > .space-y-0\.5 > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-folder-plus) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:not(:has(> .space-y-0\.5 > button:nth-of-type(5))) > .space-y-0\.5 > button:nth-of-type(3) > span:last-child {
   --journal-action-icon: var(--journal-icon-eye-off) !important;
 }
 
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(4) > span:last-child {
+/* Open reflection page bottom menu: separate from batch menu by button count. */
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(5)) > .space-y-0\.5 > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-edit) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(5)) > .space-y-0\.5 > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-heart) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(5)) > .space-y-0\.5 > button:nth-of-type(3) > span:last-child {
+  --journal-action-icon: var(--journal-icon-eye-off) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(5)) > .space-y-0\.5 > button:nth-of-type(4) > span:last-child {
+  --journal-action-icon: var(--journal-icon-lock) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(7)) > .space-y-0\.5 > button:nth-of-type(5) > span:last-child {
+  --journal-action-icon: var(--journal-icon-unlock) !important;
+}
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(7)) > .space-y-0\.5 > button:nth-of-type(6) > span:last-child,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\]:has(> .space-y-0\.5 > button:nth-of-type(5)):not(:has(> .space-y-0\.5 > button:nth-of-type(7))) > .space-y-0\.5 > button:nth-of-type(5) > span:last-child {
+  --journal-action-icon: var(--journal-icon-export) !important;
+}
+
+/* Top Journal menu and compact collection menus. */
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-list) !important;
+}
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-heart) !important;
+}
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(3) > span:last-child {
+  --journal-action-icon: var(--journal-icon-eye-off) !important;
+}
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(4) > span:last-child {
   --journal-action-icon: var(--journal-icon-folder) !important;
 }
-
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(5) > span:last-child {
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(5) > span:last-child {
   --journal-action-icon: var(--journal-icon-chart) !important;
 }
-
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(6) > span:last-child {
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(6) > span:last-child {
   --journal-action-icon: var(--journal-icon-sparkles) !important;
 }
-
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button:nth-of-type(7) > span:last-child {
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(5)) > button:nth-of-type(7) > span:last-child {
   --journal-action-icon: var(--journal-icon-logout) !important;
 }
-
-.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button.text-red-300 > span:last-child {
-  --journal-action-icon: var(--journal-icon-logout) !important;
-  color: rgba(252, 165, 165, 0.94) !important;
-}
-
-/* Longer Favorites/Hidden menus include code rows before Stats. */
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(8)) > button:nth-of-type(5) > span:last-child {
   --journal-action-icon: var(--journal-icon-lock) !important;
 }
-
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(8)) > button:nth-of-type(6) > span:last-child {
   --journal-action-icon: var(--journal-icon-unlock) !important;
 }
-
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(8)) > button:nth-of-type(7) > span:last-child {
   --journal-action-icon: var(--journal-icon-chart) !important;
 }
-
 .absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:has(> button:nth-of-type(8)) > button:nth-of-type(8):not(.text-red-300) > span:last-child {
   --journal-action-icon: var(--journal-icon-sparkles) !important;
+}
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:not(:has(> button:nth-of-type(5))) > button:nth-of-type(1) > span:last-child {
+  --journal-action-icon: var(--journal-icon-edit) !important;
+}
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:not(:has(> button:nth-of-type(5))) > button:nth-of-type(2) > span:last-child {
+  --journal-action-icon: var(--journal-icon-lock) !important;
+}
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\]:not(:has(> button:nth-of-type(5))) > button:nth-of-type(3):not(.text-red-300) > span:last-child {
+  --journal-action-icon: var(--journal-icon-unlock) !important;
+}
+
+.fixed.overflow-hidden.rounded-\[24px\] > .space-y-0\.5 > button.text-red-300 > span:last-child,
+.fixed.inset-x-0.bottom-0 .rounded-\[24px\] > .space-y-0\.5 > button.text-red-300 > span:last-child,
+.absolute.right-4.top-\[54px\].overflow-hidden.rounded-\[22px\] > button.text-red-300 > span:last-child {
+  --journal-action-icon: var(--journal-icon-trash) !important;
+  color: rgba(252, 165, 165, 0.94) !important;
 }
