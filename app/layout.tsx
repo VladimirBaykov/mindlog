@@ -1,6 +1,7 @@
 "use client";
 
 import "./globals.css";
+import "./journal-menu-polish.css";
 import { usePathname } from "next/navigation";
 import { HeaderProvider } from "@/components/header/HeaderContext";
 import { Header } from "@/components/header/Header";
@@ -50,9 +51,7 @@ export default function RootLayout({
               <Header />
 
               <main className={mainClassName}>
-                <AnimatedLayout key={pathname}>
-                  {children}
-                </AnimatedLayout>
+                <AnimatedLayout key={pathname}>{children}</AnimatedLayout>
               </main>
 
               <BottomNav />
