@@ -112,6 +112,15 @@ function findBatchActionMenu() {
   return { overlay, menu };
 }
 
+function hideBatchOverlay() {
+  const overlay = findBatchOverlay();
+  if (!overlay) return;
+
+  overlay.style.setProperty("display", "none", "important");
+  overlay.style.setProperty("opacity", "0", "important");
+  overlay.style.setProperty("pointer-events", "none", "important");
+}
+
 function isSelectedCard(card: HTMLElement) {
   const className = card.getAttribute("class") || "";
   return (
@@ -194,13 +203,14 @@ function installBatchFavoriteHandler(
 
       const nextValue = rawValue === "true";
 
-      void (async () => {
-        for (const id of ids) {
-          await updateItem(id, { isFavorite: nextValue });
-        }
+      hideBatchOverlay();
+      closeSelectionMode();
 
-        closeSelectionMode();
-      })();
+      void Promise.all(
+        ids.map((id) => updateItem(id, { isFavorite: nextValue })),
+      ).catch((error) => {
+        console.error("Batch favorite update failed:", error);
+      });
     },
     true,
   );
@@ -253,9 +263,13 @@ function syncBatchFavoriteActions(
     return;
   }
 
-  favoriteButton.dataset.mindlogBatchFavoriteValue = "";
-  favoriteButton.dataset.mindlogBatchFavoriteIds = "";
   setButtonLabel(favoriteButton, "Mark as favorite");
+  setFavoriteButtonMode(
+    favoriteButton,
+    notFavoriteItems.map((item) => item.id),
+    true,
+  );
+  installBatchFavoriteHandler(favoriteButton, updateItem);
   applyMenuIcon(favoriteButton);
 
   if (favoriteItems.length === 0) {
@@ -296,13 +310,9 @@ export function JournalMenuRuntimeGuard() {
     function closeAccidentalBatchMenu() {
       if (Date.now() <= selectedActionsRequestedUntil) return;
 
+      hideBatchOverlay();
       const overlay = findBatchOverlay();
-      if (!overlay) return;
-
-      overlay.style.setProperty("display", "none", "important");
-      overlay.style.setProperty("opacity", "0", "important");
-      overlay.style.setProperty("pointer-events", "none", "important");
-      overlay.click();
+      overlay?.click();
     }
 
     function scheduleAccidentalBatchClose() {
