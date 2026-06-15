@@ -69,7 +69,6 @@ function findAccidentalBatchOverlay() {
 export function JournalMenuRuntimeGuard() {
   useEffect(() => {
     let selectedActionsRequestedUntil = 0;
-    let closeTimer: number | null = null;
 
     function markSelectedActionsRequest(event: Event) {
       const target = event.target as HTMLElement | null;
@@ -85,23 +84,22 @@ export function JournalMenuRuntimeGuard() {
       const overlay = findAccidentalBatchOverlay();
       if (!overlay) return;
 
+      overlay.style.setProperty("display", "none", "important");
+      overlay.style.setProperty("opacity", "0", "important");
+      overlay.style.setProperty("pointer-events", "none", "important");
       overlay.click();
     }
 
     function handleDomChange() {
       applyMenuIcons();
-
-      if (closeTimer) {
-        window.clearTimeout(closeTimer);
-      }
-
-      closeTimer = window.setTimeout(closeAccidentalBatchMenu, 16);
+      closeAccidentalBatchMenu();
     }
 
     document.addEventListener("pointerdown", markSelectedActionsRequest, true);
     document.addEventListener("click", markSelectedActionsRequest, true);
 
     applyMenuIcons();
+    closeAccidentalBatchMenu();
 
     const observer = new MutationObserver(handleDomChange);
     observer.observe(document.body, {
@@ -114,10 +112,6 @@ export function JournalMenuRuntimeGuard() {
       document.removeEventListener("pointerdown", markSelectedActionsRequest, true);
       document.removeEventListener("click", markSelectedActionsRequest, true);
       observer.disconnect();
-
-      if (closeTimer) {
-        window.clearTimeout(closeTimer);
-      }
     };
   }, []);
 
