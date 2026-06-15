@@ -1,0 +1,56 @@
+/* Final Journal polish overrides. Kept separate so the late UX fixes stay easy to audit. */
+
+button[aria-label="Exit selection"] {
+  min-width: 2.25rem !important;
+  height: 2.25rem !important;
+  padding: 0 !important;
+  font-size: 1.55rem !important;
+  line-height: 1 !important;
+  font-weight: 400 !important;
+}
+
+body.mindlog-suppress-selected-actions .fixed.inset-0:has(.space-y-0\.5) {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Collections page cards: show lock as a clean top-right icon, not an inline text badge. */
+.relative.w-full.overflow-hidden.rounded-\[26px\]:not([data-journal-card="true"])
+  span[class*="uppercase"][class*="tracking-[0.12em]"] {
+  position: absolute !important;
+  top: 0.9rem !important;
+  right: 0.95rem !important;
+  z-index: 2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 1.08rem !important;
+  min-width: 1.08rem !important;
+  height: 1.08rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  letter-spacing: 0 !important;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
+}
+
+.relative.w-full.overflow-hidden.rounded-\[26px\]:not([data-journal-card="true"])
+  span[class*="uppercase"][class*="tracking-[0.12em]"]::before {
+  content: "" !important;
+  width: 1.08rem !important;
+  height: 1.08rem !important;
+  background: currentColor !important;
+  -webkit-mask: var(--journal-icon-lock) center / contain no-repeat !important;
+  mask: var(--journal-icon-lock) center / contain no-repeat !important;
+}
+
+.relative.w-full.overflow-hidden.rounded-\[26px\]:not([data-journal-card="true"]):has(
+    span[class*="uppercase"][class*="tracking-[0.12em]"]
+  ) h3 {
+  max-width: calc(100% - 1.75rem) !important;
+}
