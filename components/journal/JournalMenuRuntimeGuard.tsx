@@ -330,8 +330,6 @@ export function JournalMenuRuntimeGuard() {
       childList: true,
       subtree: true,
       characterData: true,
-      attributes: true,
-      attributeFilter: ["class", "style"],
     });
 
     return () => {
