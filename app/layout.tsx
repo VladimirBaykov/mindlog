@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import "./journal-menu-polish.css";
+import "./journal-final-polish.css";
 import { usePathname } from "next/navigation";
 import { HeaderProvider } from "@/components/header/HeaderContext";
 import { Header } from "@/components/header/Header";
