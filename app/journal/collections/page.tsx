@@ -269,7 +269,7 @@ function MenuButton({
       }`}
     >
       <span>{label}</span>
-      <ActionIcon icon={icon as never} name={icon} className="h-[1.12rem] w-[1.12rem]" />
+      <ActionIcon name={icon} className="h-[1.12rem] w-[1.12rem]" />
     </button>
   );
 }
