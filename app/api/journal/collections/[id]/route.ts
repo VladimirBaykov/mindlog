@@ -163,6 +163,52 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     const body = await req.json().catch(() => ({}));
     const payload: Record<string, unknown> = {};
+    const wantsToClearPin = body.clearPin === true;
+    const wantsToSetPin = "pin" in body;
+
+    if ((wantsToClearPin || wantsToSetPin)) {
+      const { data: existingCollection, error: existingCollectionError } = await supabase
+        .from("journal_collections")
+        .select("pin_hash")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (existingCollectionError) {
+        return NextResponse.json(
+          { error: existingCollectionError.message },
+          { status: 500 }
+        );
+      }
+
+      if (!existingCollection) {
+        return NextResponse.json(
+          { error: "Collection not found" },
+          { status: 404 }
+        );
+      }
+
+      if (existingCollection.pin_hash) {
+        const currentPin = normalizePin(body.currentPin);
+
+        if (!isValidPin(currentPin)) {
+          return NextResponse.json(
+            { error: "Current code is required", verified: false },
+            { status: 403 }
+          );
+        }
+
+        const verified = existingCollection.pin_hash === hashPin(currentPin, user.id);
+
+        if (!verified) {
+          return NextResponse.json(
+            { error: "Incorrect current code", verified: false },
+            { status: 403 }
+          );
+        }
+      }
+    }
 
     if ("name" in body) {
       const name = normalizeName(body.name);
@@ -179,9 +225,9 @@ export async function PATCH(req: Request, context: RouteContext) {
       payload.color = normalizeColor(body.color) ?? "blue";
     }
 
-    if (body.clearPin === true) {
+    if (wantsToClearPin) {
       payload.pin_hash = null;
-    } else if ("pin" in body) {
+    } else if (wantsToSetPin) {
       const pin = normalizePin(body.pin);
       if (!isValidPin(pin)) {
         return NextResponse.json(
