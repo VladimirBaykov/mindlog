@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { useToast } from "@/components/ui/ToastContext";
 import { supabase } from "@/lib/supabase-browser";
@@ -83,6 +84,7 @@ type JournalContextValue = {
 };
 
 const PAGE_SIZE = 20;
+const DELETE_UNDO_GROUP_DELAY_MS = 650;
 
 const JournalContext =
   createContext<JournalContextValue | null>(null);
@@ -189,6 +191,15 @@ function toApiPatch(patch: JournalUpdatePatch) {
   return payload;
 }
 
+function shouldMergeBatchResponse(patch: JournalUpdatePatch) {
+  return Boolean(
+    "title" in patch ||
+      "mood" in patch ||
+      "metadata" in patch ||
+      "locked" in patch
+  );
+}
+
 export function JournalProvider({
   children,
 }: {
@@ -203,6 +214,10 @@ export function JournalProvider({
     useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+  const deleteUndoGroupRef = useRef<{
+    items: JournalItem[];
+    timer: NodeJS.Timeout | null;
+  }>({ items: [], timer: null });
 
   const { showUndo, showError } = useToast();
 
@@ -268,6 +283,64 @@ export function JournalProvider({
     }
   }, [fetchPage, hasMore, loadingMore, offset, showError]);
 
+  const restoreDeletedItems = useCallback(
+    async (ids: string[]) => {
+      try {
+        await Promise.all(
+          ids.map(async (id) => {
+            const res = await fetch(`/api/journal/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              cache: "no-store",
+              body: JSON.stringify({ restore: true }),
+            });
+
+            if (!res.ok) throw new Error("Restore failed");
+          })
+        );
+
+        await refresh();
+      } catch {
+        showError("Restore failed");
+      }
+    },
+    [refresh, showError]
+  );
+
+  const queueDeleteUndo = useCallback(
+    (item: JournalItem) => {
+      const group = deleteUndoGroupRef.current;
+
+      if (!group.items.some((queuedItem) => queuedItem.id === item.id)) {
+        group.items.push(item);
+      }
+
+      if (group.timer) {
+        clearTimeout(group.timer);
+      }
+
+      group.timer = setTimeout(() => {
+        const groupedItems = group.items;
+        group.items = [];
+        group.timer = null;
+
+        if (groupedItems.length === 0) return;
+
+        const ids = groupedItems.map((groupedItem) => groupedItem.id);
+        const count = ids.length;
+        const message =
+          count === 1
+            ? "Entry deleted"
+            : `${count} reflections deleted`;
+
+        showUndo(message, () => {
+          void restoreDeletedItems(ids);
+        });
+      }, DELETE_UNDO_GROUP_DELAY_MS);
+    },
+    [restoreDeletedItems, showUndo]
+  );
+
   useEffect(() => {
     let mounted = true;
 
@@ -324,6 +397,13 @@ export function JournalProvider({
       subscription.unsubscribe();
     };
   }, [currentUserId, refresh, resetJournalState]);
+
+  useEffect(() => {
+    return () => {
+      const timer = deleteUndoGroupRef.current.timer;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   const addItem = useCallback((item: JournalItem | RawJournalItem) => {
     const normalized = normalizeItem(item);
@@ -429,13 +509,16 @@ export function JournalProvider({
         const savedItems = (data.items ?? []).map((item: RawJournalItem) =>
           normalizeItem(item)
         );
-        const savedById = new Map(
-          savedItems.map((item: JournalItem) => [item.id, item])
-        );
 
-        setItems((prev) =>
-          prev.map((item) => savedById.get(item.id) ?? item)
-        );
+        if (shouldMergeBatchResponse(patch)) {
+          const savedById = new Map(
+            savedItems.map((item: JournalItem) => [item.id, item])
+          );
+
+          setItems((prev) =>
+            prev.map((item) => savedById.get(item.id) ?? item)
+          );
+        }
 
         return savedItems;
       } catch (error) {
@@ -457,29 +540,29 @@ export function JournalProvider({
       if (!item) return;
 
       setPendingDeletes((prev) => new Set(prev).add(id));
-
       setItems((prev) => prev.filter((i) => i.id !== id));
+      queueDeleteUndo(item);
 
-      showUndo("Entry deleted", () => restoreItem(id));
+      void (async () => {
+        try {
+          const res = await fetch(`/api/journal/${id}`, {
+            method: "DELETE",
+          });
 
-      try {
-        const res = await fetch(`/api/journal/${id}`, {
-          method: "DELETE",
-        });
-
-        if (!res.ok) throw new Error();
-      } catch {
-        showError("Delete failed");
-        setItems((prev) => mergeUnique(prev, [item]));
-      } finally {
-        setPendingDeletes((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }
+          if (!res.ok) throw new Error();
+        } catch {
+          showError("Delete failed");
+          setItems((prev) => mergeUnique(prev, [item]));
+        } finally {
+          setPendingDeletes((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }
+      })();
     },
-    [items, pendingDeletes, showUndo, showError]
+    [items, pendingDeletes, queueDeleteUndo, showError]
   );
 
   const restoreItem = useCallback(
