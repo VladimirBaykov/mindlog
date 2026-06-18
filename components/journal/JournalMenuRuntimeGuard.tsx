@@ -238,74 +238,14 @@ function installBatchFavoriteHandler(
 }
 
 function syncBatchFavoriteActions(
-  items: JournalItem[],
-  viewMode: JournalViewMode,
-  batchUpdateItems: BatchFavoriteUpdater,
+  _items: JournalItem[],
+  _viewMode: JournalViewMode,
+  _batchUpdateItems: BatchFavoriteUpdater,
 ) {
-  const batch = findBatchActionMenu();
-  if (!batch) return;
-
-  const selectedItems = getSelectedItems(items, viewMode);
-  if (selectedItems.length === 0) return;
-
-  const buttons = Array.from(
-    batch.menu.querySelectorAll<HTMLButtonElement>("button"),
-  );
-  const favoriteButton = buttons.find((button) => {
-    const label = getButtonLabel(button);
-    return (
-      label === "Mark as favorite" ||
-      label === "Remove favorite" ||
-      label === "Remove favorites"
-    );
-  });
-
-  if (!favoriteButton) return;
-
-  const favoriteItems = selectedItems.filter((item) => item.isFavorite);
-  const notFavoriteItems = selectedItems.filter((item) => !item.isFavorite);
-  const dynamicRemoveButton = batch.menu.querySelector<HTMLButtonElement>(
-    "button[data-mindlog-dynamic-favorite='remove']",
-  );
-
-  if (notFavoriteItems.length === 0) {
-    dynamicRemoveButton?.remove();
-    setButtonLabel(
-      favoriteButton,
-      selectedItems.length === 1 ? "Remove favorite" : "Remove favorites",
-    );
-    setFavoriteButtonMode(
-      favoriteButton,
-      favoriteItems.map((item) => item.id),
-      false,
-    );
-    installBatchFavoriteHandler(favoriteButton, batchUpdateItems);
-    applyMenuIcon(favoriteButton);
-    return;
-  }
-
-  setButtonLabel(favoriteButton, "Mark as favorite");
-  setFavoriteButtonMode(
-    favoriteButton,
-    notFavoriteItems.map((item) => item.id),
-    true,
-  );
-  installBatchFavoriteHandler(favoriteButton, batchUpdateItems);
-  applyMenuIcon(favoriteButton);
-
-  if (favoriteItems.length === 0) {
-    dynamicRemoveButton?.remove();
-    return;
-  }
-
-  const removeButton = getOrCreateDynamicFavoriteButton(batch.menu, favoriteButton);
-  setFavoriteButtonMode(
-    removeButton,
-    favoriteItems.map((item) => item.id),
-    false,
-  );
-  installBatchFavoriteHandler(removeButton, batchUpdateItems);
-  applyMenuIcon(removeButton);
+  // Select Favorite/Remove Favorite is now handled directly inside JournalList.
+  // Keep this function as a no-op so the runtime only hydrates icons and does
+  // not scan selected cards or mutate the batch action menu.
+  return;
 }
 
 export function JournalMenuRuntimeGuard() {
