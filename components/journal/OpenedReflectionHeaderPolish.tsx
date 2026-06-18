@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const STATUS_LABELS = ["Favorite", "Hidden", "Locked"] as const;
 type StatusLabel = (typeof STATUS_LABELS)[number];
 
 function normalizeText(value: string | null | undefined) {
   return (value || "").replace(/\s+/g, " ").trim();
+}
+
+function isOpenedReflectionPath(pathname: string) {
+  return /^\/journal\/(?!collections(?:\/|$))[^/]+$/.test(pathname);
 }
 
 function getStatusLabel(element: Element): StatusLabel | null {
@@ -25,8 +30,8 @@ function getStatusKey(label: StatusLabel) {
   return "locked";
 }
 
-function applyOpenedReflectionHeaderPolish() {
-  if (!/^\/journal\/(?!collections(?:\/|$))[^/]+$/.test(window.location.pathname)) {
+function applyOpenedReflectionHeaderPolish(pathname: string) {
+  if (!isOpenedReflectionPath(pathname)) {
     return;
   }
 
@@ -92,14 +97,37 @@ function applyOpenedReflectionHeaderPolish() {
   );
 }
 
+function clearOpenedReflectionHeaderPolish() {
+  for (const card of Array.from(
+    document.querySelectorAll<HTMLElement>('[data-opened-reflection-header="true"]'),
+  )) {
+    card.removeAttribute("data-opened-reflection-header");
+    card.querySelector("[data-opened-reflection-status-cluster='true']")?.remove();
+
+    for (const element of Array.from(
+      card.querySelectorAll<HTMLElement>("[data-opened-reflection-source-status]"),
+    )) {
+      element.removeAttribute("data-opened-reflection-source-status");
+      element.removeAttribute("aria-hidden");
+    }
+  }
+}
+
 export default function OpenedReflectionHeaderPolish() {
+  const pathname = usePathname();
+
   useEffect(() => {
+    if (!isOpenedReflectionPath(pathname)) {
+      clearOpenedReflectionHeaderPolish();
+      return;
+    }
+
     const timers = [0, 80, 240, 700].map((delay) =>
-      window.setTimeout(applyOpenedReflectionHeaderPolish, delay),
+      window.setTimeout(() => applyOpenedReflectionHeaderPolish(pathname), delay),
     );
 
     function refreshAfterInteraction() {
-      window.setTimeout(applyOpenedReflectionHeaderPolish, 90);
+      window.setTimeout(() => applyOpenedReflectionHeaderPolish(pathname), 90);
     }
 
     document.addEventListener("click", refreshAfterInteraction, true);
@@ -108,7 +136,7 @@ export default function OpenedReflectionHeaderPolish() {
       timers.forEach((timer) => window.clearTimeout(timer));
       document.removeEventListener("click", refreshAfterInteraction, true);
     };
-  }, []);
+  }, [pathname]);
 
   return (
     <style>{`
