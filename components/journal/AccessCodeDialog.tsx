@@ -53,7 +53,7 @@ export default function AccessCodeDialog({
 
     const timer = window.setTimeout(() => inputRef.current?.focus(), 110);
     return () => window.clearTimeout(timer);
-  }, [open]);
+  }, [open, mode, title]);
 
   function normalizeCode(value: string) {
     return value.replace(/\D/g, "").slice(0, 8);
