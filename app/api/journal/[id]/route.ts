@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -25,7 +26,7 @@ async function ensureOwnedJournal(
 ) {
   const { data, error } = await supabase
     .from("journals")
-    .select("id")
+    .select("id, metadata")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -35,6 +36,21 @@ async function ensureOwnedJournal(
   }
 
   return data;
+}
+
+function normalizeCode(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function isValidCode(value: string) {
+  return /^\d{4,8}$/.test(value);
+}
+
+function hashEntryCode(itemId: string, code: string) {
+  return createHash("sha256")
+    .update(`mindlog-entry-access-v1:${itemId}:${code}`)
+    .digest("hex");
 }
 
 function getMetadataAccessHash(value: any) {
@@ -76,6 +92,7 @@ function sanitizeJournalPatch(patch: Record<string, any>) {
   delete payload.deleted;
   delete payload.lock_hash;
   delete payload.locked;
+  delete payload.currentCode;
 
   if ("metadata" in payload) {
     const metadata = payload.metadata;
@@ -188,6 +205,36 @@ export async function PATCH(
 
     const patch = await req.json().catch(() => ({}));
     const accessChange = getRequestedMetadataAccessChange(patch);
+    const existingAccessHash = getMetadataAccessHash(owned.metadata);
+
+    if (
+      accessChange.touched &&
+      existingAccessHash &&
+      accessChange.nextHash !== existingAccessHash
+    ) {
+      const currentCode = normalizeCode(patch.currentCode);
+
+      if (!isValidCode(currentCode)) {
+        return withNoStore(
+          NextResponse.json(
+            { error: "Current code is required", verified: false },
+            { status: 403 }
+          )
+        );
+      }
+
+      const verified = hashEntryCode(id, currentCode) === existingAccessHash;
+
+      if (!verified) {
+        return withNoStore(
+          NextResponse.json(
+            { error: "Incorrect current code", verified: false },
+            { status: 403 }
+          )
+        );
+      }
+    }
+
     const payload = sanitizeJournalPatch(patch);
     const writer = createSupabaseAdminClient();
 
