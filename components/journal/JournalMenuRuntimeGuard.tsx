@@ -121,27 +121,58 @@ function hideBatchOverlay() {
   overlay.style.setProperty("pointer-events", "none", "important");
 }
 
-function closeBatchOverlaySmooth(onClosed: () => void) {
+function closeBatchOverlaySmooth() {
   const overlay = findBatchOverlay();
   const panel = overlay?.querySelector(".rounded-\\[24px\\]") as HTMLElement | null;
 
   if (overlay) {
     overlay.style.setProperty("pointer-events", "none", "important");
-    overlay.style.setProperty("transition", "opacity 90ms ease-out", "important");
+    overlay.style.setProperty("transition", "opacity 70ms ease-out", "important");
     overlay.style.setProperty("opacity", "0", "important");
   }
 
   if (panel) {
-    panel.style.setProperty(
-      "transition",
-      "opacity 90ms ease-out, transform 120ms cubic-bezier(0.22, 1, 0.36, 1)",
-      "important",
-    );
+    panel.style.setProperty("transition", "opacity 80ms ease-out", "important");
     panel.style.setProperty("opacity", "0", "important");
-    panel.style.setProperty("transform", "translateY(6px) scale(0.99)", "important");
+  }
+}
+
+function runBatchFavoriteUpdates(
+  ids: string[],
+  nextValue: boolean,
+  updateItem: (id: string, patch: { isFavorite: boolean }) => Promise<unknown>,
+) {
+  const uniqueIds = Array.from(new Set(ids));
+  const queue = [...uniqueIds];
+  const workerCount = Math.min(2, queue.length);
+
+  async function worker() {
+    while (queue.length > 0) {
+      const id = queue.shift();
+      if (!id) continue;
+      await updateItem(id, { isFavorite: nextValue });
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
   }
 
-  window.requestAnimationFrame(onClosed);
+  const run = () => {
+    void Promise.all(Array.from({ length: workerCount }, worker)).catch((error) => {
+      console.error("Batch favorite update failed:", error);
+    });
+  };
+
+  const requestIdleCallback = (
+    window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+    }
+  ).requestIdleCallback;
+
+  if (requestIdleCallback) {
+    requestIdleCallback(run, { timeout: 160 });
+    return;
+  }
+
+  window.setTimeout(run, 90);
 }
 
 function isSelectedCard(card: HTMLElement) {
@@ -226,16 +257,10 @@ function installBatchFavoriteHandler(
 
       const nextValue = rawValue === "true";
 
-      closeBatchOverlaySmooth(() => {
+      closeBatchOverlaySmooth();
+      window.requestAnimationFrame(() => {
         closeSelectionMode();
-
-        window.setTimeout(() => {
-          void Promise.all(
-            ids.map((id) => updateItem(id, { isFavorite: nextValue })),
-          ).catch((error) => {
-            console.error("Batch favorite update failed:", error);
-          });
-        }, 30);
+        runBatchFavoriteUpdates(ids, nextValue, updateItem);
       });
     },
     true,
