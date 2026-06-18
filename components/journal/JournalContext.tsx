@@ -74,6 +74,10 @@ type JournalContextValue = {
     id: string,
     patch: JournalUpdatePatch
   ) => Promise<JournalItem | null>;
+  batchUpdateItems: (
+    ids: string[],
+    patch: JournalUpdatePatch
+  ) => Promise<JournalItem[]>;
   deleteItem: (id: string) => Promise<void>;
   restoreItem: (id: string) => Promise<void>;
 };
@@ -381,6 +385,70 @@ export function JournalProvider({
     [items, showError]
   );
 
+  const batchUpdateItems = useCallback(
+    async (ids: string[], patch: JournalUpdatePatch) => {
+      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+
+      if (uniqueIds.length === 0) return [];
+
+      const idSet = new Set(uniqueIds);
+      const snapshot = [...items];
+      const now = Date.now();
+
+      setItems((prev) =>
+        prev.map((item) =>
+          idSet.has(item.id)
+            ? {
+                ...item,
+                ...patch,
+                updatedAt: now,
+              }
+            : item
+        )
+      );
+
+      try {
+        const res = await fetch("/api/journal/batch", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+          body: JSON.stringify({
+            ids: uniqueIds,
+            patch: toApiPatch(patch),
+          }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || "Batch update failed");
+        }
+
+        const savedItems = (data.items ?? []).map((item: RawJournalItem) =>
+          normalizeItem(item)
+        );
+        const savedById = new Map(
+          savedItems.map((item: JournalItem) => [item.id, item])
+        );
+
+        setItems((prev) =>
+          prev.map((item) => savedById.get(item.id) ?? item)
+        );
+
+        return savedItems;
+      } catch (error) {
+        setItems(snapshot);
+        showError(
+          error instanceof Error ? error.message : "Batch update failed"
+        );
+        throw error;
+      }
+    },
+    [items, showError]
+  );
+
   const deleteItem = useCallback(
     async (id: string) => {
       if (pendingDeletes.has(id)) return;
@@ -449,6 +517,7 @@ export function JournalProvider({
         loadMore,
         addItem,
         updateItem,
+        batchUpdateItems,
         deleteItem,
         restoreItem,
       }}
