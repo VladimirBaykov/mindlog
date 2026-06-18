@@ -305,6 +305,7 @@ export default function JournalList({
     loadMore,
     deleteItem,
     updateItem,
+    batchUpdateItems,
   } = useJournal();
 
   const router = useRouter();
@@ -329,6 +330,7 @@ export default function JournalList({
   const [mounted, setMounted] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const lastBatchActionRequestRef = useRef(0);
 
   const activeId = pathname?.startsWith("/journal/")
     ? pathname.split("/journal/")[1]
@@ -342,6 +344,16 @@ export default function JournalList({
   const selectedItems = useMemo(
     () => visibleItems.filter((item) => selectedIds.has(item.id)),
     [visibleItems, selectedIds],
+  );
+
+  const selectedFavoriteItems = useMemo(
+    () => selectedItems.filter((item) => item.isFavorite),
+    [selectedItems],
+  );
+
+  const selectedNotFavoriteItems = useMemo(
+    () => selectedItems.filter((item) => !item.isFavorite),
+    [selectedItems],
   );
 
   useEffect(() => {
@@ -375,7 +387,12 @@ export default function JournalList({
   }, [visibleItems]);
 
   useEffect(() => {
-    if (batchActionRequest > 0 && selectedIds.size > 0) {
+    if (batchActionRequest <= 0) return;
+    if (batchActionRequest === lastBatchActionRequestRef.current) return;
+
+    lastBatchActionRequestRef.current = batchActionRequest;
+
+    if (selectedIds.size > 0) {
       setBatchMenuOpen(true);
     }
   }, [batchActionRequest, selectedIds.size]);
@@ -418,6 +435,12 @@ export default function JournalList({
       else next.add(id);
       return next;
     });
+  }
+
+  function closeSelectionUi() {
+    setSelectedIds(new Set());
+    setBatchMenuOpen(false);
+    onSelectionModeChange?.(false);
   }
 
   function openEntry(item: JournalItem) {
@@ -638,8 +661,7 @@ export default function JournalList({
       }
 
       if (collectionDialog.source === "batch") {
-        setSelectedIds(new Set());
-        onSelectionModeChange?.(false);
+        closeSelectionUi();
       }
 
       setCollectionDialog(null);
@@ -655,40 +677,31 @@ export default function JournalList({
     }
   }
 
-  async function favoriteSelectedItems() {
-    if (selectedItems.length === 0) return;
+  function setSelectedFavoriteValue(itemsToUpdate: JournalItem[], nextValue: boolean) {
+    const ids = itemsToUpdate.map((item) => item.id);
+    if (ids.length === 0) return;
 
-    for (const item of selectedItems) {
-      await updateItem(item.id, { isFavorite: true });
-    }
+    closeSelectionUi();
 
-    setSelectedIds(new Set());
-    setBatchMenuOpen(false);
-    onSelectionModeChange?.(false);
+    window.setTimeout(() => {
+      void batchUpdateItems(ids, { isFavorite: nextValue });
+    }, 0);
   }
 
   async function hideSelectedItems(itemsToHide = selectedItems) {
-    if (itemsToHide.length === 0) return;
+    const ids = itemsToHide.map((item) => item.id);
+    if (ids.length === 0) return;
 
-    for (const item of itemsToHide) {
-      await updateItem(item.id, { hiddenAt: Date.now() });
-    }
-
-    setSelectedIds(new Set());
-    setBatchMenuOpen(false);
-    onSelectionModeChange?.(false);
+    closeSelectionUi();
+    await batchUpdateItems(ids, { hiddenAt: Date.now() });
   }
 
   async function unhideSelectedItems() {
-    if (selectedItems.length === 0) return;
+    const ids = selectedItems.map((item) => item.id);
+    if (ids.length === 0) return;
 
-    for (const item of selectedItems) {
-      await updateItem(item.id, { hiddenAt: null });
-    }
-
-    setSelectedIds(new Set());
-    setBatchMenuOpen(false);
-    onSelectionModeChange?.(false);
+    closeSelectionUi();
+    await batchUpdateItems(ids, { hiddenAt: null });
   }
 
   function deleteSingleItem(item: JournalItem) {
@@ -700,9 +713,7 @@ export default function JournalList({
 
   function deleteSelectedItems(itemsToDelete: JournalItem[]) {
     setConfirmDialog(null);
-    setSelectedIds(new Set());
-    setBatchMenuOpen(false);
-    onSelectionModeChange?.(false);
+    closeSelectionUi();
 
     window.setTimeout(() => {
       void (async () => {
@@ -906,20 +917,21 @@ export default function JournalList({
     <AnimatePresence>
       {batchMenuOpen && selectedIds.size > 0 && (
         <motion.div
-          className="fixed inset-0 z-[9998] bg-black/35 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[9998] bg-black/28"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.08 }}
           onClick={() => setBatchMenuOpen(false)}
         >
           <div className="fixed inset-x-0 bottom-0 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+18px)]">
             <motion.div
-              initial={{ opacity: 0, y: 18 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 18 }}
-              transition={{ type: "spring", stiffness: 560, damping: 42 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.11, ease: [0.22, 1, 0.36, 1] }}
               onClick={(event) => event.stopPropagation()}
-              className="w-full max-w-[360px] rounded-[24px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
+              className="w-full max-w-[360px] rounded-[24px] border border-white/10 bg-neutral-950/95 p-1.5 shadow-2xl shadow-black/50"
             >
               <div className="px-3 py-2.5">
                 <div className="text-[13px] font-medium text-white">
@@ -931,9 +943,29 @@ export default function JournalList({
               </div>
 
               <div className="space-y-0.5">
-                <ActionButton icon="♥" onClick={favoriteSelectedItems}>
-                  Mark as favorite
-                </ActionButton>
+                {selectedNotFavoriteItems.length > 0 && (
+                  <ActionButton
+                    icon="♥"
+                    onClick={() =>
+                      setSelectedFavoriteValue(selectedNotFavoriteItems, true)
+                    }
+                  >
+                    Mark as favorite
+                  </ActionButton>
+                )}
+
+                {selectedFavoriteItems.length > 0 && (
+                  <ActionButton
+                    icon="♡"
+                    onClick={() =>
+                      setSelectedFavoriteValue(selectedFavoriteItems, false)
+                    }
+                  >
+                    {selectedFavoriteItems.length === 1
+                      ? "Remove favorite"
+                      : "Remove favorites"}
+                  </ActionButton>
+                )}
 
                 <ActionButton
                   icon="＋"
@@ -1050,7 +1082,10 @@ export default function JournalList({
 
   return (
     <>
-      <motion.div layout className="mx-auto w-[calc(100%-14px)] space-y-3">
+      <motion.div
+        layout={!selectionMode}
+        className="mx-auto w-[calc(100%-14px)] space-y-3"
+      >
         <AnimatePresence initial={false}>
           {visibleItems.map((item) => {
             const mood = isMoodKey(item.mood)
@@ -1064,11 +1099,15 @@ export default function JournalList({
             return (
               <motion.div
                 key={item.id}
-                layout
-                initial={{ opacity: 0, y: 6 }}
+                layout={!selectionMode}
+                initial={{ opacity: 0, y: selectionMode ? 0 : 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                transition={
+                  selectionMode
+                    ? { duration: 0.08 }
+                    : { type: "spring", stiffness: 500, damping: 40 }
+                }
               >
                 <motion.div
                   data-journal-card="true"
@@ -1081,10 +1120,10 @@ export default function JournalList({
                     openItemMenu(item, event.currentTarget);
                   }}
                   onClick={() => handleCardClick(item)}
-                  whileTap={{ scale: selectionMode ? 0.99 : 0.985 }}
+                  whileTap={{ scale: selectionMode ? 0.998 : 0.985 }}
                   className={`
                     relative w-full overflow-hidden rounded-[26px] border px-4 py-4
-                    transition-all duration-200 ease-out
+                    transition-colors duration-150 ease-out
                     ${
                       isActive
                         ? "border-white/16 bg-white/[0.075]"
@@ -1097,7 +1136,7 @@ export default function JournalList({
                   <div className="flex items-center gap-4">
                     {selectionMode && (
                       <div
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition ${
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ${
                           isSelected
                             ? "border-white bg-white text-black"
                             : "border-white/20 bg-white/[0.03] text-transparent"
