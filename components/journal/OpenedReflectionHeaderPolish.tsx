@@ -160,27 +160,27 @@ export default function OpenedReflectionHeaderPolish() {
 
       [data-opened-reflection-status-cluster="true"] {
         position: absolute;
-        top: 1.35rem;
-        right: 4.35rem;
+        top: 1.28rem;
+        right: 4.25rem;
         z-index: 3;
         display: inline-flex;
         align-items: center;
-        gap: 0.42rem;
+        gap: 0.48rem;
         pointer-events: none;
       }
 
       [data-opened-reflection-status-icon] {
         display: inline-flex;
-        width: 1.05rem;
-        min-width: 1.05rem;
-        height: 1.05rem;
-        color: rgba(255, 255, 255, 0.86);
-        filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.18));
+        width: 1.22rem;
+        min-width: 1.22rem;
+        height: 1.22rem;
+        color: rgba(255, 255, 255, 0.88);
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
       }
 
       [data-opened-reflection-status-icon="favorite"] {
         color: #ffffff;
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.32));
+        filter: drop-shadow(0 0 9px rgba(255, 255, 255, 0.34));
       }
 
       [data-opened-reflection-status-icon]::before {
