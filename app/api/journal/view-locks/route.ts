@@ -83,7 +83,45 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Invalid scope" }, { status: 400 });
     }
 
-    if (body.clear === true) {
+    const wantsToClear = body.clear === true;
+    const wantsToSetCode = "code" in body;
+
+    if (!wantsToClear && !wantsToSetCode) {
+      return NextResponse.json({ success: true });
+    }
+
+    const { data: existingLock, error: existingLockError } = await supabase
+      .from("journal_view_locks")
+      .select("lock_hash")
+      .eq("user_id", user.id)
+      .eq("scope", scope)
+      .maybeSingle();
+
+    if (existingLockError) {
+      return NextResponse.json({ error: existingLockError.message }, { status: 500 });
+    }
+
+    if (existingLock?.lock_hash) {
+      const currentCode = normalizeCode(body.currentCode);
+
+      if (!isValidCode(currentCode)) {
+        return NextResponse.json(
+          { error: "Current code is required", verified: false },
+          { status: 403 }
+        );
+      }
+
+      const verified = existingLock.lock_hash === hashCode(currentCode, user.id, scope);
+
+      if (!verified) {
+        return NextResponse.json(
+          { error: "Incorrect current code", verified: false },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (wantsToClear) {
       const { error } = await supabase
         .from("journal_view_locks")
         .delete()
