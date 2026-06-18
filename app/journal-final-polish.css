@@ -19,6 +19,13 @@ body.mindlog-suppress-selected-actions .fixed.inset-0:has(.space-y-0\.5) {
   pointer-events: none !important;
 }
 
+/* Selected-actions overlay: avoid mobile GPU cost while closing/updating selected cards. */
+.fixed.inset-0:has(.space-y-0\.5) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: rgba(0, 0, 0, 0.24) !important;
+}
+
 /* Collections page cards: show lock as a clean top-right icon, not an inline text badge. */
 .relative.w-full.overflow-hidden.rounded-\[26px\]:not([data-journal-card="true"])
   span[class*="uppercase"][class*="tracking-[0.12em]"] {
