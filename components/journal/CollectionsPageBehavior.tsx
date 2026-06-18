@@ -81,14 +81,19 @@ export function CollectionsPageBehavior() {
       scheduleMenuPlacement(button);
     }
 
-    document.addEventListener("click", handleClick, true);
-    window.addEventListener("resize", () => {
+    function handleResize() {
+      if (pathnameRef.current !== COLLECTIONS_PATH) return;
+
       const activeButton = document.querySelector<HTMLButtonElement>(ACTION_BUTTON_SELECTOR);
       if (activeButton) scheduleMenuPlacement(activeButton);
-    });
+    }
+
+    document.addEventListener("click", handleClick, true);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       document.removeEventListener("click", handleClick, true);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
