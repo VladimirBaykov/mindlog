@@ -123,28 +123,25 @@ function hideBatchOverlay() {
 
 function closeBatchOverlaySmooth(onClosed: () => void) {
   const overlay = findBatchOverlay();
-  if (!overlay) {
-    onClosed();
-    return;
+  const panel = overlay?.querySelector(".rounded-\\[24px\\]") as HTMLElement | null;
+
+  if (overlay) {
+    overlay.style.setProperty("pointer-events", "none", "important");
+    overlay.style.setProperty("transition", "opacity 90ms ease-out", "important");
+    overlay.style.setProperty("opacity", "0", "important");
   }
-
-  const panel = overlay.querySelector(".rounded-\\[24px\\]") as HTMLElement | null;
-
-  overlay.style.setProperty("pointer-events", "none", "important");
-  overlay.style.setProperty("transition", "opacity 140ms ease-out", "important");
-  overlay.style.setProperty("opacity", "0", "important");
 
   if (panel) {
     panel.style.setProperty(
       "transition",
-      "opacity 140ms ease-out, transform 140ms cubic-bezier(0.22, 1, 0.36, 1)",
+      "opacity 90ms ease-out, transform 120ms cubic-bezier(0.22, 1, 0.36, 1)",
       "important",
     );
     panel.style.setProperty("opacity", "0", "important");
-    panel.style.setProperty("transform", "translateY(10px) scale(0.985)", "important");
+    panel.style.setProperty("transform", "translateY(6px) scale(0.99)", "important");
   }
 
-  window.setTimeout(onClosed, 150);
+  window.requestAnimationFrame(onClosed);
 }
 
 function isSelectedCard(card: HTMLElement) {
@@ -232,11 +229,13 @@ function installBatchFavoriteHandler(
       closeBatchOverlaySmooth(() => {
         closeSelectionMode();
 
-        void Promise.all(
-          ids.map((id) => updateItem(id, { isFavorite: nextValue })),
-        ).catch((error) => {
-          console.error("Batch favorite update failed:", error);
-        });
+        window.setTimeout(() => {
+          void Promise.all(
+            ids.map((id) => updateItem(id, { isFavorite: nextValue })),
+          ).catch((error) => {
+            console.error("Batch favorite update failed:", error);
+          });
+        }, 30);
       });
     },
     true,
