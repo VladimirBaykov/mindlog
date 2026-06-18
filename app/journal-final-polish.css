@@ -1,7 +1,7 @@
 /* Final Journal polish overrides. Kept separate so the late UX fixes stay easy to audit. */
 
 :root {
-  --journal-icon-heart-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.35' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 1 0-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 0 0 0-7.6Z'/%3E%3Cpath d='M3 1.15 21 19.15'/%3E%3C/svg%3E");
+  --journal-icon-heart-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.45' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 1 0-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 0 0 0-7.6Z'/%3E%3Cpath d='M0.8 0.95 22.15 20.35'/%3E%3C/svg%3E");
 }
 
 button[aria-label="Exit selection"] {
