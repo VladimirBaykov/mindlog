@@ -61,7 +61,9 @@ type JournalUpdatePatch = Partial<
     JournalItem,
     "title" | "mood" | "metadata" | "isFavorite" | "hiddenAt" | "locked"
   >
->;
+> & {
+  currentCode?: string;
+};
 
 type JournalContextValue = {
   items: JournalItem[];
@@ -186,6 +188,10 @@ function toApiPatch(patch: JournalUpdatePatch) {
     payload.hidden_at = patch.hiddenAt
       ? new Date(patch.hiddenAt).toISOString()
       : null;
+  }
+
+  if ("currentCode" in patch) {
+    payload.currentCode = patch.currentCode;
   }
 
   return payload;
@@ -414,13 +420,15 @@ export function JournalProvider({
   const updateItem = useCallback(
     async (id: string, patch: JournalUpdatePatch) => {
       const snapshot = [...items];
+      const optimisticPatch = { ...patch };
+      delete optimisticPatch.currentCode;
 
       setItems((prev) =>
         prev.map((item) =>
           item.id === id
             ? {
                 ...item,
-                ...patch,
+                ...optimisticPatch,
                 updatedAt: Date.now(),
               }
             : item
@@ -474,13 +482,15 @@ export function JournalProvider({
       const idSet = new Set(uniqueIds);
       const snapshot = [...items];
       const now = Date.now();
+      const optimisticPatch = { ...patch };
+      delete optimisticPatch.currentCode;
 
       setItems((prev) =>
         prev.map((item) =>
           idSet.has(item.id)
             ? {
                 ...item,
-                ...patch,
+                ...optimisticPatch,
                 updatedAt: now,
               }
             : item
