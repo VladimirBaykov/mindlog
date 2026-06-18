@@ -26,6 +26,16 @@ body.mindlog-suppress-selected-actions .fixed.inset-0:has(.space-y-0\.5) {
   background: rgba(0, 0, 0, 0.24) !important;
 }
 
+/* Main Journal cards: slimmer, longer mood stripe like the original polished tablet style. */
+[data-journal-card="true"] > div[class*="items-center"][class*="gap-4"] > div[class*="w-[5px]"] {
+  width: 3px !important;
+  height: 3.65rem !important;
+  border-radius: 999px !important;
+  box-shadow:
+    0 0 14px color-mix(in oklab, currentColor 34%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+
 /* Collections page cards: show lock as a clean top-right icon, not an inline text badge. */
 .relative.w-full.overflow-hidden.rounded-\[26px\]:not([data-journal-card="true"])
   span[class*="uppercase"][class*="tracking-[0.12em]"] {
