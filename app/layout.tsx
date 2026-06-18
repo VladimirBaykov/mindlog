@@ -8,6 +8,7 @@ import { HeaderProvider } from "@/components/header/HeaderContext";
 import { Header } from "@/components/header/Header";
 import { JournalProvider } from "@/components/journal/JournalContext";
 import { JournalMenuRuntimeGuard } from "@/components/journal/JournalMenuRuntimeGuard";
+import { JournalLockSecurityGuard } from "@/components/journal/JournalLockSecurityGuard";
 import { ToastProvider } from "@/components/ui/ToastContext";
 import { AnimatedLayout } from "@/components/layout/AnimatedLayout";
 import { BottomNav } from "@/components/navigation/BottomNav";
@@ -51,6 +52,7 @@ export default function RootLayout({
           <ToastProvider>
             <JournalProvider>
               <JournalMenuRuntimeGuard />
+              <JournalLockSecurityGuard />
               <Header />
 
               <main className={mainClassName}>
