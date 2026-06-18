@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   useJournal,
@@ -132,12 +132,12 @@ function closeBatchOverlaySmooth() {
 
   if (overlay) {
     overlay.style.setProperty("pointer-events", "none", "important");
-    overlay.style.setProperty("transition", "opacity 70ms ease-out", "important");
+    overlay.style.setProperty("transition", "opacity 55ms ease-out", "important");
     overlay.style.setProperty("opacity", "0", "important");
   }
 
   if (panel) {
-    panel.style.setProperty("transition", "opacity 80ms ease-out", "important");
+    panel.style.setProperty("transition", "opacity 55ms ease-out", "important");
     panel.style.setProperty("opacity", "0", "important");
   }
 }
@@ -225,12 +225,13 @@ function installBatchFavoriteHandler(
       const nextValue = rawValue === "true";
 
       closeBatchOverlaySmooth();
-      window.requestAnimationFrame(() => {
-        closeSelectionMode();
+      closeSelectionMode();
+
+      window.setTimeout(() => {
         void batchUpdateItems(ids, { isFavorite: nextValue }).catch((error) => {
           console.error("Batch favorite update failed:", error);
         });
-      });
+      }, 90);
     },
     true,
   );
@@ -310,6 +311,16 @@ function syncBatchFavoriteActions(
 export function JournalMenuRuntimeGuard() {
   const searchParams = useSearchParams();
   const { items, batchUpdateItems } = useJournal();
+  const itemsRef = useRef(items);
+  const batchUpdateItemsRef = useRef(batchUpdateItems);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    batchUpdateItemsRef.current = batchUpdateItems;
+  }, [batchUpdateItems]);
 
   useEffect(() => {
     let selectedActionsRequestedUntil = 0;
@@ -324,7 +335,11 @@ export function JournalMenuRuntimeGuard() {
     function hydrateOpenMenus() {
       const viewMode = getViewMode(searchParams.get("view"));
       applyMenuIcons();
-      syncBatchFavoriteActions(items, viewMode, batchUpdateItems);
+      syncBatchFavoriteActions(
+        itemsRef.current,
+        viewMode,
+        batchUpdateItemsRef.current,
+      );
     }
 
     function closeAccidentalBatchMenu() {
@@ -370,14 +385,22 @@ export function JournalMenuRuntimeGuard() {
       }, 700);
     }
 
-    function refreshIconsAfterClick() {
+    function refreshIconsAfterMenuTrigger(event: Event) {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest?.("button");
+      const ariaLabel = button?.getAttribute("aria-label") || "";
+
+      if (!/Open .*actions|Open .*menu|Open selected actions/i.test(ariaLabel)) {
+        return;
+      }
+
       addTimer(applyMenuIcons, 40);
     }
 
     document.addEventListener("pointerdown", markSelectionTap, true);
     document.addEventListener("pointerdown", markSelectedActionsRequest, true);
     document.addEventListener("click", markSelectedActionsRequest, true);
-    document.addEventListener("click", refreshIconsAfterClick, true);
+    document.addEventListener("click", refreshIconsAfterMenuTrigger, true);
 
     hydrateOpenMenus();
 
@@ -385,11 +408,11 @@ export function JournalMenuRuntimeGuard() {
       document.removeEventListener("pointerdown", markSelectionTap, true);
       document.removeEventListener("pointerdown", markSelectedActionsRequest, true);
       document.removeEventListener("click", markSelectedActionsRequest, true);
-      document.removeEventListener("click", refreshIconsAfterClick, true);
+      document.removeEventListener("click", refreshIconsAfterMenuTrigger, true);
       document.body.classList.remove("mindlog-suppress-selected-actions");
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [items, searchParams, batchUpdateItems]);
+  }, [searchParams]);
 
   return null;
 }
