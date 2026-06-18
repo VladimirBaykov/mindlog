@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
 import { useHeader } from "@/components/header/HeaderContext";
+import AccessCodeDialog from "@/components/journal/AccessCodeDialog";
+import TextInputDialog from "@/components/journal/TextInputDialog";
 
 const COLORS = [
   "slate",
@@ -33,15 +35,49 @@ type ViewLocks = {
   hidden: boolean;
 };
 
-const colorStyles: Record<CollectionColor, { label: string; stripe: string }> = {
-  slate: { label: "Slate", stripe: "bg-slate-300" },
-  blue: { label: "Blue", stripe: "bg-blue-400" },
-  purple: { label: "Purple", stripe: "bg-purple-400" },
-  rose: { label: "Rose", stripe: "bg-rose-400" },
-  amber: { label: "Amber", stripe: "bg-amber-300" },
-  emerald: { label: "Emerald", stripe: "bg-emerald-300" },
-  cyan: { label: "Cyan", stripe: "bg-cyan-300" },
-  pink: { label: "Pink", stripe: "bg-pink-400" },
+type IconName = "dots" | "edit" | "trash" | "heart" | "eyeOff" | "lock";
+
+const colorStyles: Record<CollectionColor, { label: string; stripe: string; glow: string }> = {
+  slate: {
+    label: "Slate",
+    stripe: "bg-slate-300",
+    glow: "shadow-[0_0_18px_rgba(203,213,225,0.26)]",
+  },
+  blue: {
+    label: "Blue",
+    stripe: "bg-blue-400",
+    glow: "shadow-[0_0_18px_rgba(96,165,250,0.28)]",
+  },
+  purple: {
+    label: "Purple",
+    stripe: "bg-purple-400",
+    glow: "shadow-[0_0_18px_rgba(192,132,252,0.28)]",
+  },
+  rose: {
+    label: "Rose",
+    stripe: "bg-rose-400",
+    glow: "shadow-[0_0_18px_rgba(251,113,133,0.28)]",
+  },
+  amber: {
+    label: "Amber",
+    stripe: "bg-amber-300",
+    glow: "shadow-[0_0_18px_rgba(252,211,77,0.24)]",
+  },
+  emerald: {
+    label: "Emerald",
+    stripe: "bg-emerald-300",
+    glow: "shadow-[0_0_18px_rgba(110,231,183,0.24)]",
+  },
+  cyan: {
+    label: "Cyan",
+    stripe: "bg-cyan-300",
+    glow: "shadow-[0_0_18px_rgba(103,232,249,0.24)]",
+  },
+  pink: {
+    label: "Pink",
+    stripe: "bg-pink-400",
+    glow: "shadow-[0_0_18px_rgba(244,114,182,0.26)]",
+  },
 };
 
 function parseAddIds(value: string | null) {
@@ -53,6 +89,97 @@ function parseAddIds(value: string | null) {
 
 function getCountLabel(count: number) {
   return `${count} reflection${count === 1 ? "" : "s"}`;
+}
+
+function ActionIcon({ name, className = "" }: { name: IconName; className?: string }) {
+  const common = {
+    className: `h-[1.08rem] w-[1.08rem] ${className}`,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2.15,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+
+  if (name === "dots") {
+    return (
+      <svg {...common}>
+        <path d="M12 6.5h.01" />
+        <path d="M12 12h.01" />
+        <path d="M12 17.5h.01" />
+      </svg>
+    );
+  }
+
+  if (name === "edit") {
+    return (
+      <svg {...common}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    );
+  }
+
+  if (name === "trash") {
+    return (
+      <svg {...common}>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
+      </svg>
+    );
+  }
+
+  if (name === "heart") {
+    return (
+      <svg {...common} fill="currentColor" stroke="none">
+        <path d="M12 21.1 4.3 13.8C2.5 12.1 1.5 10.2 1.5 8.2 1.5 5.1 3.9 2.8 7 2.8c1.8 0 3.6.9 5 2.5 1.4-1.6 3.2-2.5 5-2.5 3.1 0 5.5 2.3 5.5 5.4 0 2-1 3.9-2.8 5.6Z" />
+      </svg>
+    );
+  }
+
+  if (name === "eyeOff") {
+    return (
+      <svg {...common}>
+        <path d="M3 3l18 18" />
+        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+        <path d="M9.5 5.2A9.5 9.5 0 0 1 12 5c5.5 0 9 5 9 7a10.6 10.6 0 0 1-2.1 3.2" />
+        <path d="M6.4 6.5C3.9 8.1 2.4 10.7 3 12c1 2.1 4.2 7 9 7a9.8 9.8 0 0 0 3.2-.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...common}>
+      <rect x="5" y="10" width="14" height="10" rx="2.5" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function StatusIcon({ name, label }: { name: Exclude<IconName, "dots" | "edit" | "trash">; label: string }) {
+  return (
+    <span
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-white/88 drop-shadow-[0_0_7px_rgba(255,255,255,0.18)]"
+      aria-label={label}
+      title={label}
+    >
+      <ActionIcon name={name} className="h-[1.02rem] w-[1.02rem]" />
+    </span>
+  );
+}
+
+function Stripe({ className, glow }: { className: string; glow?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`block h-[3.65rem] w-[3px] shrink-0 rounded-full ${className} ${glow ?? "shadow-[0_0_18px_rgba(255,255,255,0.2)]"}`}
+    />
+  );
 }
 
 export default function JournalCollectionsPage() {
@@ -71,6 +198,12 @@ export default function JournalCollectionsPage() {
   const [color, setColor] = useState<CollectionColor>("blue");
   const [accessCode, setAccessCode] = useState("");
   const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [renameDialog, setRenameDialog] = useState<CollectionItem | null>(null);
+  const [removeDialog, setRemoveDialog] = useState<CollectionItem | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const addIds = useMemo(() => parseAddIds(searchParams.get("add")), [searchParams]);
   const isAddMode = addIds.length > 0;
@@ -99,6 +232,7 @@ export default function JournalCollectionsPage() {
     } catch (error) {
       console.error("Collections load failed:", error);
       setItems([]);
+      setPageError("Could not load collections.");
     } finally {
       setLoading(false);
     }
@@ -117,7 +251,10 @@ export default function JournalCollectionsPage() {
       ),
       rightSlot: (
         <button
-          onClick={() => setCreateOpen(true)}
+          onClick={() => {
+            setCreateError("");
+            setCreateOpen(true);
+          }}
           className="flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-300 transition hover:bg-white/[0.06] hover:text-white"
           aria-label="Create collection"
         >
@@ -140,12 +277,13 @@ export default function JournalCollectionsPage() {
     if (!trimmed || saving) return;
 
     if (trimmedCode && !/^\d{4,8}$/.test(trimmedCode)) {
-      alert("Use a 4–8 digit code.");
+      setCreateError("Use a 4–8 digit code.");
       return;
     }
 
     try {
       setSaving(true);
+      setCreateError("");
       const res = await fetch("/api/journal/collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,7 +303,7 @@ export default function JournalCollectionsPage() {
       router.push(`/journal/collections/${data.id}`);
     } catch (error) {
       console.error("Create collection failed:", error);
-      alert("Could not create collection.");
+      setCreateError("Could not create collection.");
     } finally {
       setSaving(false);
     }
@@ -173,6 +311,7 @@ export default function JournalCollectionsPage() {
 
   async function addSelectedToCollection(collection: CollectionItem) {
     try {
+      setPageError("");
       const res = await fetch(`/api/journal/collections/${collection.id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -183,7 +322,7 @@ export default function JournalCollectionsPage() {
       router.push(`/journal/collections/${collection.id}`);
     } catch (error) {
       console.error("Add to collection failed:", error);
-      alert("Could not add reflections to this collection.");
+      setPageError("Could not add reflections to this collection.");
     }
   }
 
@@ -196,33 +335,55 @@ export default function JournalCollectionsPage() {
     router.push(`/journal/collections/${collection.id}`);
   }
 
-  async function renameCollection(collection: CollectionItem) {
-    const nextName = prompt("Collection name:", collection.name);
-    if (!nextName || nextName.trim() === collection.name) return;
+  function openRenameDialog(collection: CollectionItem) {
+    setActiveMenuId(null);
+    setRenameDialog(collection);
+  }
+
+  function openRemoveDialog(collection: CollectionItem) {
+    setActiveMenuId(null);
+    setRemoveDialog(collection);
+  }
+
+  async function confirmRenameCollection(nextName: string) {
+    if (!renameDialog) return;
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName || trimmedName === renameDialog.name) {
+      setRenameDialog(null);
+      return;
+    }
 
     try {
-      const res = await fetch(`/api/journal/collections/${collection.id}`, {
+      setActionLoading(true);
+      const res = await fetch(`/api/journal/collections/${renameDialog.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nextName.trim() }),
+        body: JSON.stringify({ name: trimmedName }),
       });
-      if (!res.ok) throw new Error();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not rename collection.");
+      setRenameDialog(null);
       await loadCollections();
-    } catch {
-      alert("Could not rename collection.");
+    } finally {
+      setActionLoading(false);
     }
   }
 
-  async function removeCollection(collection: CollectionItem) {
-    const ok = confirm(`Remove “${collection.name}”? Reflections will stay in your journal.`);
-    if (!ok) return;
+  async function confirmRemoveCollection() {
+    if (!removeDialog) return;
 
     try {
-      const res = await fetch(`/api/journal/collections/${collection.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      setActionLoading(true);
+      const res = await fetch(`/api/journal/collections/${removeDialog.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not remove collection.");
+      setRemoveDialog(null);
       await loadCollections();
-    } catch {
-      alert("Could not remove collection.");
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -238,6 +399,12 @@ export default function JournalCollectionsPage() {
               <p className="mt-3 text-sm leading-relaxed text-cyan-50/90">
                 Choose a collection for {addIds.length} selected reflection{addIds.length === 1 ? "" : "s"}, or create a new one.
               </p>
+            </div>
+          )}
+
+          {pageError && (
+            <div className="mb-5 rounded-[22px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              {pageError}
             </div>
           )}
 
@@ -258,18 +425,15 @@ export default function JournalCollectionsPage() {
               <>
                 <button
                   onClick={() => router.push("/journal?view=favorites")}
-                  className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]"
+                  className="relative w-full rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-11 w-[5px] shrink-0 rounded-full bg-white" />
-                    <div className="min-w-0 flex-1">
+                    <Stripe className="bg-white" />
+                    <div className="min-w-0 flex-1 pr-2">
                       <div className="flex items-center gap-2">
-                        <h3 className="truncate text-[15px] font-medium text-white">Favorites ♥</h3>
-                        {viewLocks.favorites && (
-                          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
-                            Locked
-                          </span>
-                        )}
+                        <h3 className="truncate text-[15px] font-medium text-white">Favorites</h3>
+                        <StatusIcon name="heart" label="Favorites" />
+                        {viewLocks.favorites && <StatusIcon name="lock" label="Locked" />}
                       </div>
                       <p className="mt-1.5 text-[13px] text-neutral-400">Reflections you marked as important.</p>
                     </div>
@@ -278,18 +442,15 @@ export default function JournalCollectionsPage() {
 
                 <button
                   onClick={() => router.push("/journal?view=hidden")}
-                  className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]"
+                  className="relative w-full rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 text-left transition hover:border-white/14 hover:bg-white/[0.055]"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-11 w-[5px] shrink-0 rounded-full bg-neutral-400" />
-                    <div className="min-w-0 flex-1">
+                    <Stripe className="bg-neutral-400" glow="shadow-[0_0_18px_rgba(163,163,163,0.22)]" />
+                    <div className="min-w-0 flex-1 pr-2">
                       <div className="flex items-center gap-2">
                         <h3 className="truncate text-[15px] font-medium text-white">Hidden</h3>
-                        {viewLocks.hidden && (
-                          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
-                            Locked
-                          </span>
-                        )}
+                        <StatusIcon name="eyeOff" label="Hidden" />
+                        {viewLocks.hidden && <StatusIcon name="lock" label="Locked" />}
                       </div>
                       <p className="mt-1.5 text-[13px] text-neutral-400">Reflections tucked away from the main journal.</p>
                     </div>
@@ -314,7 +475,10 @@ export default function JournalCollectionsPage() {
                   Create your first collection to group related reflections.
                 </p>
                 <button
-                  onClick={() => setCreateOpen(true)}
+                  onClick={() => {
+                    setCreateError("");
+                    setCreateOpen(true);
+                  }}
                   className="mt-5 rounded-[18px] bg-white px-5 py-3 text-sm font-medium text-black transition hover:opacity-90"
                 >
                   Create collection
@@ -323,27 +487,25 @@ export default function JournalCollectionsPage() {
             ) : (
               items.map((item) => {
                 const style = colorStyles[item.color] ?? colorStyles.blue;
+                const menuOpen = activeMenuId === item.id;
+
                 return (
                   <div
                     key={item.id}
-                    className="relative w-full overflow-hidden rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]"
+                    className="relative w-full rounded-[26px] border border-white/[0.07] bg-white/[0.035] px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.055]"
                   >
                     <div className="flex items-center gap-4">
                       <button
                         onClick={() => openOrAdd(item)}
                         className="flex min-w-0 flex-1 items-center gap-4 text-left"
                       >
-                        <div className={`h-11 w-[5px] shrink-0 rounded-full ${style.stripe}`} />
-                        <div className="min-w-0 flex-1">
+                        <Stripe className={style.stripe} glow={style.glow} />
+                        <div className="min-w-0 flex-1 pr-1">
                           <div className="flex items-center gap-2">
                             <h3 className="truncate text-[15px] font-medium text-white">
                               {item.name}
                             </h3>
-                            {item.locked && (
-                              <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-neutral-300">
-                                Locked
-                              </span>
-                            )}
+                            {item.locked && <StatusIcon name="lock" label="Locked" />}
                           </div>
                           <p className="mt-1.5 text-[13px] text-neutral-400">
                             {getCountLabel(item.count)} · {style.label}
@@ -353,24 +515,36 @@ export default function JournalCollectionsPage() {
 
                       {!isAddMode && (
                         <button
-                          onClick={() => renameCollection(item)}
-                          className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-white/[0.06] hover:text-white"
-                          aria-label="Rename collection"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setActiveMenuId(menuOpen ? null : item.id);
+                          }}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-white/[0.06] hover:text-white"
+                          aria-label="Collection actions"
                         >
-                          ✎
-                        </button>
-                      )}
-
-                      {!isAddMode && (
-                        <button
-                          onClick={() => removeCollection(item)}
-                          className="rounded-full px-2 py-1 text-lg leading-none text-neutral-500 transition hover:bg-red-500/10 hover:text-red-300"
-                          aria-label="Remove collection"
-                        >
-                          ×
+                          <ActionIcon name="dots" className="h-[1.2rem] w-[1.2rem]" />
                         </button>
                       )}
                     </div>
+
+                    {menuOpen && !isAddMode && (
+                      <div className="absolute right-3 top-[58px] z-30 w-[230px] overflow-hidden rounded-[22px] border border-white/10 bg-neutral-950/96 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl">
+                        <button
+                          onClick={() => openRenameDialog(item)}
+                          className="flex w-full items-center justify-between gap-3 rounded-[16px] px-3 py-2.5 text-left text-[15px] font-medium text-neutral-100 transition hover:bg-white/[0.06]"
+                        >
+                          <span>Rename</span>
+                          <ActionIcon name="edit" />
+                        </button>
+                        <button
+                          onClick={() => openRemoveDialog(item)}
+                          className="flex w-full items-center justify-between gap-3 rounded-[16px] px-3 py-2.5 text-left text-[15px] font-medium text-red-300 transition hover:bg-red-500/10"
+                        >
+                          <span>Remove collection</span>
+                          <ActionIcon name="trash" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -381,7 +555,9 @@ export default function JournalCollectionsPage() {
         {createOpen && (
           <div
             className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] backdrop-blur-[2px] sm:items-center sm:pb-0"
-            onClick={() => setCreateOpen(false)}
+            onClick={() => {
+              if (!saving) setCreateOpen(false);
+            }}
           >
             <div
               onClick={(event) => event.stopPropagation()}
@@ -399,20 +575,30 @@ export default function JournalCollectionsPage() {
 
               <input
                 value={name}
-                onChange={(event) => setName(event.target.value.slice(0, 60))}
+                onChange={(event) => {
+                  setName(event.target.value.slice(0, 60));
+                  if (createError) setCreateError("");
+                }}
                 placeholder="Collection name"
                 className="mt-5 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
               />
 
               <input
                 value={accessCode}
-                onChange={(event) =>
-                  setAccessCode(event.target.value.replace(/\D/g, "").slice(0, 8))
-                }
+                onChange={(event) => {
+                  setAccessCode(event.target.value.replace(/\D/g, "").slice(0, 8));
+                  if (createError) setCreateError("");
+                }}
                 inputMode="numeric"
                 placeholder="Optional 4–8 digit code"
                 className="mt-3 w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/25"
               />
+
+              {createError && (
+                <div className="mt-3 rounded-[16px] border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  {createError}
+                </div>
+              )}
 
               <div className="mt-5 grid grid-cols-4 gap-2">
                 {COLORS.map((nextColor) => {
@@ -428,7 +614,7 @@ export default function JournalCollectionsPage() {
                           : "border-white/10 bg-white/[0.03] text-neutral-400 hover:bg-white/[0.05]"
                       }`}
                     >
-                      <span className={`mx-auto mb-2 block h-7 w-[5px] rounded-full ${style.stripe}`} />
+                      <span className={`mx-auto mb-2 block h-8 w-[3px] rounded-full ${style.stripe} ${style.glow}`} />
                       {style.label}
                     </button>
                   );
@@ -438,7 +624,8 @@ export default function JournalCollectionsPage() {
               <div className="mt-5 flex gap-3">
                 <button
                   onClick={() => setCreateOpen(false)}
-                  className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05]"
+                  disabled={saving}
+                  className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-medium text-white transition hover:bg-white/[0.05] disabled:opacity-40"
                 >
                   Cancel
                 </button>
@@ -453,6 +640,36 @@ export default function JournalCollectionsPage() {
             </div>
           </div>
         )}
+
+        <TextInputDialog
+          open={Boolean(renameDialog)}
+          title="Rename collection"
+          description="Give this collection a clear name that will be easy to find later."
+          initialValue={renameDialog?.name ?? ""}
+          label="Collection name"
+          placeholder="Collection name"
+          confirmLabel="Save"
+          loading={actionLoading}
+          maxLength={60}
+          onClose={() => {
+            if (!actionLoading) setRenameDialog(null);
+          }}
+          onConfirm={confirmRenameCollection}
+        />
+
+        <AccessCodeDialog
+          open={Boolean(removeDialog)}
+          mode="confirm"
+          title="Remove collection?"
+          description={`Remove “${removeDialog?.name ?? "this collection"}”? Reflections will stay in your journal.`}
+          confirmLabel="Remove"
+          destructive
+          loading={actionLoading}
+          onClose={() => {
+            if (!actionLoading) setRemoveDialog(null);
+          }}
+          onConfirm={confirmRemoveCollection}
+        />
       </div>
     </AuthGate>
   );
