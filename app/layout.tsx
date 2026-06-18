@@ -10,6 +10,7 @@ import { JournalProvider } from "@/components/journal/JournalContext";
 import { JournalMenuRuntimeGuard } from "@/components/journal/JournalMenuRuntimeGuard";
 import { JournalLockSecurityGuard } from "@/components/journal/JournalLockSecurityGuard";
 import { JournalEnglishDateGuard } from "@/components/journal/JournalEnglishDateGuard";
+import OpenedReflectionHeaderPolish from "@/components/journal/OpenedReflectionHeaderPolish";
 import { ToastProvider } from "@/components/ui/ToastContext";
 import { AnimatedLayout } from "@/components/layout/AnimatedLayout";
 import { BottomNav } from "@/components/navigation/BottomNav";
@@ -55,6 +56,7 @@ export default function RootLayout({
               <JournalMenuRuntimeGuard />
               <JournalLockSecurityGuard />
               <JournalEnglishDateGuard />
+              <OpenedReflectionHeaderPolish />
               <Header />
 
               <main className={mainClassName}>
