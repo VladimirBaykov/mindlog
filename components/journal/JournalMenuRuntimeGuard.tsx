@@ -9,6 +9,11 @@ import {
 
 type JournalViewMode = "all" | "favorites" | "hidden";
 
+type BatchFavoriteUpdater = (
+  ids: string[],
+  patch: { isFavorite: boolean },
+) => Promise<unknown>;
+
 const ICON_BY_LABEL: Record<string, string> = {
   Open: "var(--journal-icon-open)",
   "All reflections": "var(--journal-icon-list)",
@@ -137,44 +142,6 @@ function closeBatchOverlaySmooth() {
   }
 }
 
-function runBatchFavoriteUpdates(
-  ids: string[],
-  nextValue: boolean,
-  updateItem: (id: string, patch: { isFavorite: boolean }) => Promise<unknown>,
-) {
-  const uniqueIds = Array.from(new Set(ids));
-  const queue = [...uniqueIds];
-  const workerCount = Math.min(2, queue.length);
-
-  async function worker() {
-    while (queue.length > 0) {
-      const id = queue.shift();
-      if (!id) continue;
-      await updateItem(id, { isFavorite: nextValue });
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-    }
-  }
-
-  const run = () => {
-    void Promise.all(Array.from({ length: workerCount }, worker)).catch((error) => {
-      console.error("Batch favorite update failed:", error);
-    });
-  };
-
-  const requestIdleCallback = (
-    window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-    }
-  ).requestIdleCallback;
-
-  if (requestIdleCallback) {
-    requestIdleCallback(run, { timeout: 160 });
-    return;
-  }
-
-  window.setTimeout(run, 90);
-}
-
 function isSelectedCard(card: HTMLElement) {
   const className = card.getAttribute("class") || "";
   return (
@@ -236,7 +203,7 @@ function setFavoriteButtonMode(
 
 function installBatchFavoriteHandler(
   button: HTMLButtonElement,
-  updateItem: (id: string, patch: { isFavorite: boolean }) => Promise<unknown>,
+  batchUpdateItems: BatchFavoriteUpdater,
 ) {
   if (button.dataset.mindlogBatchFavoriteHandler === "1") return;
 
@@ -260,7 +227,9 @@ function installBatchFavoriteHandler(
       closeBatchOverlaySmooth();
       window.requestAnimationFrame(() => {
         closeSelectionMode();
-        runBatchFavoriteUpdates(ids, nextValue, updateItem);
+        void batchUpdateItems(ids, { isFavorite: nextValue }).catch((error) => {
+          console.error("Batch favorite update failed:", error);
+        });
       });
     },
     true,
@@ -270,7 +239,7 @@ function installBatchFavoriteHandler(
 function syncBatchFavoriteActions(
   items: JournalItem[],
   viewMode: JournalViewMode,
-  updateItem: (id: string, patch: { isFavorite: boolean }) => Promise<unknown>,
+  batchUpdateItems: BatchFavoriteUpdater,
 ) {
   const batch = findBatchActionMenu();
   if (!batch) return;
@@ -309,7 +278,7 @@ function syncBatchFavoriteActions(
       favoriteItems.map((item) => item.id),
       false,
     );
-    installBatchFavoriteHandler(favoriteButton, updateItem);
+    installBatchFavoriteHandler(favoriteButton, batchUpdateItems);
     applyMenuIcon(favoriteButton);
     return;
   }
@@ -320,7 +289,7 @@ function syncBatchFavoriteActions(
     notFavoriteItems.map((item) => item.id),
     true,
   );
-  installBatchFavoriteHandler(favoriteButton, updateItem);
+  installBatchFavoriteHandler(favoriteButton, batchUpdateItems);
   applyMenuIcon(favoriteButton);
 
   if (favoriteItems.length === 0) {
@@ -334,13 +303,13 @@ function syncBatchFavoriteActions(
     favoriteItems.map((item) => item.id),
     false,
   );
-  installBatchFavoriteHandler(removeButton, updateItem);
+  installBatchFavoriteHandler(removeButton, batchUpdateItems);
   applyMenuIcon(removeButton);
 }
 
 export function JournalMenuRuntimeGuard() {
   const searchParams = useSearchParams();
-  const { items, updateItem } = useJournal();
+  const { items, batchUpdateItems } = useJournal();
 
   useEffect(() => {
     let selectedActionsRequestedUntil = 0;
@@ -355,7 +324,7 @@ export function JournalMenuRuntimeGuard() {
     function hydrateOpenMenus() {
       const viewMode = getViewMode(searchParams.get("view"));
       applyMenuIcons();
-      syncBatchFavoriteActions(items, viewMode, updateItem);
+      syncBatchFavoriteActions(items, viewMode, batchUpdateItems);
     }
 
     function closeAccidentalBatchMenu() {
@@ -420,7 +389,7 @@ export function JournalMenuRuntimeGuard() {
       document.body.classList.remove("mindlog-suppress-selected-actions");
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [items, searchParams, updateItem]);
+  }, [items, searchParams, batchUpdateItems]);
 
   return null;
 }
