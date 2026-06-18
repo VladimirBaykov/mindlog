@@ -26,47 +26,6 @@ body.mindlog-suppress-selected-actions .fixed.inset-0:has(.space-y-0\.5) {
   background: rgba(0, 0, 0, 0.24) !important;
 }
 
-/* Old detail/collection badges are converted to icon-only status markers by JournalMenuRuntimeGuard. */
-[data-mindlog-status-icon] {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 1.08rem !important;
-  min-width: 1.08rem !important;
-  height: 1.08rem !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  font-size: 0 !important;
-  line-height: 0 !important;
-  letter-spacing: 0 !important;
-}
-
-[data-mindlog-status-icon] > span {
-  display: none !important;
-}
-
-[data-mindlog-status-icon]::before {
-  content: "" !important;
-  width: 1.08rem !important;
-  height: 1.08rem !important;
-  background: currentColor !important;
-  -webkit-mask: var(--mindlog-status-icon) center / contain no-repeat !important;
-  mask: var(--mindlog-status-icon) center / contain no-repeat !important;
-}
-
-[data-mindlog-status-icon="favorite"] {
-  color: #ffffff !important;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.24));
-}
-
-[data-mindlog-status-icon="hidden"],
-[data-mindlog-status-icon="locked"] {
-  color: rgba(255, 255, 255, 0.82) !important;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
-}
-
 /* Collections page cards: show lock as a clean top-right icon, not an inline text badge. */
 .relative.w-full.overflow-hidden.rounded-\[26px\]:not([data-journal-card="true"])
   span[class*="uppercase"][class*="tracking-[0.12em]"] {
