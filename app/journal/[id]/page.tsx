@@ -8,6 +8,8 @@ import { useJournal } from "@/components/journal/JournalContext";
 import { moodConfig } from "@/lib/journal/moodMap";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackClientEvent } from "@/lib/analytics-client";
+import AccessCodeDialog from "@/components/journal/AccessCodeDialog";
+import TextInputDialog from "@/components/journal/TextInputDialog";
 
 type Message = {
   role: "user" | "assistant";
@@ -61,6 +63,13 @@ type UsageInfo = {
     maxTotalInputCharacters: number;
   };
 } | null;
+
+type EntryLockDialogState =
+  | { step: "set" }
+  | { step: "verify-change" }
+  | { step: "change"; currentCode: string }
+  | { step: "verify-remove" }
+  | { step: "confirm-remove"; currentCode: string };
 
 function isMoodKey(value: string | null | undefined): value is MoodKey {
   return Boolean(value && value in moodConfig);
@@ -124,8 +133,7 @@ function isLowSignalUserMessage(content: string) {
 function getMeaningfulUserMessages(messages: Message[]) {
   return messages.filter(
     (message) =>
-      message.role === "user" &&
-      !isLowSignalUserMessage(message.content)
+      message.role === "user" && !isLowSignalUserMessage(message.content),
   );
 }
 
@@ -166,7 +174,7 @@ function getMessageLabel(count: number) {
 
 function getFallbackChatType(messages: Message[]) {
   const text = normalizeForDetection(
-    messages.map((message) => message.content).join(" ")
+    messages.map((message) => message.content).join(" "),
   );
 
   if (
@@ -241,7 +249,7 @@ function formatChatType(value: string | undefined, messages: Message[]) {
 
 function getFallbackThemes(messages: Message[], moodLabel: string) {
   const text = normalizeForDetection(
-    messages.map((message) => message.content).join(" ")
+    messages.map((message) => message.content).join(" "),
   );
 
   const themes: string[] = [];
@@ -266,11 +274,7 @@ function getFallbackThemes(messages: Message[], moodLabel: string) {
     themes.push("Work");
   }
 
-  if (
-    text.includes("car") ||
-    text.includes("porsche") ||
-    text.includes("rolls")
-  ) {
+  if (text.includes("car") || text.includes("porsche") || text.includes("rolls")) {
     themes.push("Lifestyle");
   }
 
@@ -284,7 +288,7 @@ function getFallbackThemes(messages: Message[], moodLabel: string) {
 function getThemes(
   metadataThemes: string[] | undefined,
   messages: Message[],
-  moodLabel: string
+  moodLabel: string,
 ) {
   if (Array.isArray(metadataThemes) && metadataThemes.length > 0) {
     return metadataThemes
@@ -334,14 +338,12 @@ export default function JournalEntryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { setHeader, resetHeader } = useHeader();
-  const { updateItem, deleteItem, refresh } = useJournal();
+  const { updateItem, deleteItem } = useJournal();
 
   const [item, setItem] = useState<JournalItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [subscription, setSubscription] =
-    useState<SubscriptionInfo>(null);
-  const [loadingSubscription, setLoadingSubscription] =
-    useState(true);
+  const [subscription, setSubscription] = useState<SubscriptionInfo>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
   const [usage, setUsage] = useState<UsageInfo>(null);
   const [loadingUsage, setLoadingUsage] = useState(true);
   const [viewTracked, setViewTracked] = useState(false);
@@ -351,6 +353,14 @@ export default function JournalEntryPage() {
   const [entryCode, setEntryCode] = useState("");
   const [entryCodeError, setEntryCodeError] = useState("");
   const [checkingEntryCode, setCheckingEntryCode] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameDialogBusy, setRenameDialogBusy] = useState(false);
+  const [lockDialog, setLockDialog] = useState<EntryLockDialogState | null>(
+    null,
+  );
+  const [lockDialogBusy, setLockDialogBusy] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteDialogBusy, setDeleteDialogBusy] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -361,6 +371,9 @@ export default function JournalEntryPage() {
     setEntryCode("");
     setEntryCodeError("");
     setViewTracked(false);
+    setRenameDialogOpen(false);
+    setLockDialog(null);
+    setDeleteDialogOpen(false);
   }, [id]);
 
   useEffect(() => {
@@ -406,18 +419,17 @@ export default function JournalEntryPage() {
 
   const userMessageCount = useMemo(
     () => normalizedMessages.filter((msg) => msg.role === "user").length,
-    [normalizedMessages]
+    [normalizedMessages],
   );
 
   const assistantMessageCount = useMemo(
-    () =>
-      normalizedMessages.filter((msg) => msg.role === "assistant").length,
-    [normalizedMessages]
+    () => normalizedMessages.filter((msg) => msg.role === "assistant").length,
+    [normalizedMessages],
   );
 
   const reflectionFocus = useMemo(
     () => getReflectionFocus(normalizedMessages),
-    [normalizedMessages]
+    [normalizedMessages],
   );
 
   const entryIsLocked = isEntrySoftLocked(item);
@@ -517,21 +529,55 @@ export default function JournalEntryPage() {
     }
   }
 
-  async function setEntryLock() {
-    if (!item) return;
+  async function verifyCurrentEntryCode(code: string) {
+    if (!item) throw new Error("Reflection not loaded.");
 
-    const nextCode = prompt("New 4–8 digit access code:", "");
-    if (!nextCode) return;
+    const cleanCode = code.trim();
 
-    const code = nextCode.trim();
+    if (!/^\d{4,8}$/.test(cleanCode)) {
+      throw new Error("Use a 4–8 digit code.");
+    }
 
-    if (!/^\d{4,8}$/.test(code)) {
-      alert("Use a 4–8 digit code.");
+    const accessHash = getAccessHash(item);
+
+    if (accessHash) {
+      const nextHash = await createAccessHash(item.id, cleanCode);
+
+      if (nextHash !== accessHash) {
+        throw new Error("Incorrect current code.");
+      }
+
       return;
     }
 
+    const res = await fetch(`/api/journal/${item.id}/lock`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code: cleanCode }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.verified) {
+      throw new Error(data.error || "Incorrect current code.");
+    }
+  }
+
+  async function saveEntryLock(code: string, currentCode?: string) {
+    if (!item) return;
+
+    const cleanCode = code.trim();
+
+    if (!/^\d{4,8}$/.test(cleanCode)) {
+      throw new Error("Use a 4–8 digit code.");
+    }
+
     try {
-      const accessHash = await createAccessHash(item.id, code);
+      setLockDialogBusy(true);
+
+      const accessHash = await createAccessHash(item.id, cleanCode);
       const metadata = {
         ...(item.metadata || {}),
         accessHash,
@@ -540,6 +586,7 @@ export default function JournalEntryPage() {
       await updateItem(id, {
         metadata,
         locked: true,
+        ...(currentCode ? { currentCode } : {}),
       });
 
       setItem((prev) =>
@@ -549,31 +596,36 @@ export default function JournalEntryPage() {
               metadata,
               locked: true,
             }
-          : prev
+          : prev,
       );
 
       setEntryUnlocked(false);
       setEntryCode("");
       setActionsOpen(false);
+      setLockDialog(null);
     } catch (error) {
       console.error("Set reflection soft lock failed:", error);
-      alert("Could not update access code.");
+      throw new Error(
+        error instanceof Error ? error.message : "Could not update access code.",
+      );
+    } finally {
+      setLockDialogBusy(false);
     }
   }
 
-  async function clearEntryLock() {
+  async function removeEntryLock(currentCode: string) {
     if (!item) return;
 
-    const ok = confirm("Remove access code from this reflection?");
-    if (!ok) return;
-
     try {
+      setLockDialogBusy(true);
+
       const metadata = { ...(item.metadata || {}) };
       delete metadata.accessHash;
 
       await updateItem(id, {
         metadata,
         locked: false,
+        currentCode,
       });
 
       setItem((prev) =>
@@ -583,28 +635,95 @@ export default function JournalEntryPage() {
               metadata,
               locked: false,
             }
-          : prev
+          : prev,
       );
 
       setEntryUnlocked(true);
       setEntryCode("");
       setActionsOpen(false);
+      setLockDialog(null);
     } catch (error) {
       console.error("Remove reflection soft lock failed:", error);
-      alert("Could not remove access code.");
+      throw new Error(
+        error instanceof Error ? error.message : "Could not remove access code.",
+      );
+    } finally {
+      setLockDialogBusy(false);
     }
   }
 
-  async function renameEntry() {
+  function openEntryLockDialog() {
+    setActionsOpen(false);
+    setLockDialog(entryIsLocked ? { step: "verify-change" } : { step: "set" });
+  }
+
+  function openRemoveEntryLockDialog() {
+    if (!entryIsLocked) return;
+    setActionsOpen(false);
+    setLockDialog({ step: "verify-remove" });
+  }
+
+  async function handleLockDialogConfirm(code?: string) {
+    if (!lockDialog) return;
+
+    if (lockDialog.step === "set") {
+      await saveEntryLock(code || "");
+      return;
+    }
+
+    if (lockDialog.step === "verify-change") {
+      await verifyCurrentEntryCode(code || "");
+      setLockDialog({ step: "change", currentCode: (code || "").trim() });
+      return;
+    }
+
+    if (lockDialog.step === "change") {
+      await saveEntryLock(code || "", lockDialog.currentCode);
+      return;
+    }
+
+    if (lockDialog.step === "verify-remove") {
+      await verifyCurrentEntryCode(code || "");
+      setLockDialog({ step: "confirm-remove", currentCode: (code || "").trim() });
+      return;
+    }
+
+    if (lockDialog.step === "confirm-remove") {
+      await removeEntryLock(lockDialog.currentCode);
+    }
+  }
+
+  function openRenameEntryDialog() {
+    setActionsOpen(false);
+    setRenameDialogOpen(true);
+  }
+
+  async function renameEntry(nextTitle: string) {
     if (!item) return;
 
-    const nextTitle = prompt("New reflection title:", item.title || "");
+    const cleanTitle = nextTitle.trim();
 
-    if (!nextTitle || nextTitle === item.title) return;
+    if (!cleanTitle || cleanTitle === item.title) {
+      setRenameDialogOpen(false);
+      return;
+    }
 
-    setItem((prev) => (prev ? { ...prev, title: nextTitle } : prev));
-    await updateItem(id, { title: nextTitle });
-    setActionsOpen(false);
+    try {
+      setRenameDialogBusy(true);
+      setItem((prev) => (prev ? { ...prev, title: cleanTitle } : prev));
+      await updateItem(id, { title: cleanTitle });
+      setRenameDialogOpen(false);
+      setActionsOpen(false);
+    } catch (error) {
+      console.error("Rename reflection failed:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Could not rename this reflection.",
+      );
+    } finally {
+      setRenameDialogBusy(false);
+    }
   }
 
   async function toggleFavoriteEntry() {
@@ -619,7 +738,7 @@ export default function JournalEntryPage() {
             isFavorite: nextValue,
             is_favorite: nextValue,
           }
-        : prev
+        : prev,
     );
 
     await updateItem(id, { isFavorite: nextValue });
@@ -638,7 +757,7 @@ export default function JournalEntryPage() {
             hiddenAt: now,
             hidden_at: new Date(now).toISOString(),
           }
-        : prev
+        : prev,
     );
 
     await updateItem(id, { hiddenAt: now });
@@ -656,21 +775,36 @@ export default function JournalEntryPage() {
             hiddenAt: null,
             hidden_at: null,
           }
-        : prev
+        : prev,
     );
 
     await updateItem(id, { hiddenAt: null });
     setActionsOpen(false);
   }
 
+  function openDeleteEntryDialog() {
+    setActionsOpen(false);
+    setDeleteDialogOpen(true);
+  }
+
   async function deleteEntry() {
     if (!item) return;
 
-    const ok = confirm("Delete this reflection?");
-    if (!ok) return;
-
-    await deleteItem(id);
-    router.push("/journal");
+    try {
+      setDeleteDialogBusy(true);
+      await deleteItem(id);
+      setDeleteDialogOpen(false);
+      router.push("/journal");
+    } catch (error) {
+      console.error("Delete reflection failed:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this reflection.",
+      );
+    } finally {
+      setDeleteDialogBusy(false);
+    }
   }
 
   async function openExport() {
@@ -760,9 +894,7 @@ export default function JournalEntryPage() {
             <input
               value={entryCode}
               onChange={(event) => {
-                setEntryCode(
-                  event.target.value.replace(/\D/g, "").slice(0, 8)
-                );
+                setEntryCode(event.target.value.replace(/\D/g, "").slice(0, 8));
                 setEntryCodeError("");
               }}
               inputMode="numeric"
@@ -794,14 +926,10 @@ export default function JournalEntryPage() {
     );
   }
 
-  const mood = isMoodKey(item.mood)
-    ? moodConfig[item.mood]
-    : moodConfig.calm;
+  const mood = isMoodKey(item.mood) ? moodConfig[item.mood] : moodConfig.calm;
 
   const metadata = item.metadata || null;
-  const createdDate = new Date(
-    item.created_at || item.createdAt || Date.now()
-  );
+  const createdDate = new Date(item.created_at || item.createdAt || Date.now());
   const chatType = formatChatType(metadata?.chatType, normalizedMessages);
   const themes = getThemes(metadata?.themes, normalizedMessages, mood.label);
   const shortFocus = metadata?.summary || getShortFocus(normalizedMessages);
@@ -861,7 +989,7 @@ export default function JournalEntryPage() {
 
               <div className="space-y-0.5">
                 <button
-                  onClick={renameEntry}
+                  onClick={openRenameEntryDialog}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
                   <span>Rename title</span>
@@ -897,7 +1025,7 @@ export default function JournalEntryPage() {
                 )}
 
                 <button
-                  onClick={setEntryLock}
+                  onClick={openEntryLockDialog}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                 >
                   <span>{entryIsLocked ? "Change code" : "Lock"}</span>
@@ -906,7 +1034,7 @@ export default function JournalEntryPage() {
 
                 {entryIsLocked && (
                   <button
-                    onClick={clearEntryLock}
+                    onClick={openRemoveEntryLockDialog}
                     className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-neutral-100 transition hover:bg-white/[0.06]"
                   >
                     <span>Remove lock</span>
@@ -925,7 +1053,7 @@ export default function JournalEntryPage() {
                 <div className="my-1 h-px bg-white/[0.08]" />
 
                 <button
-                  onClick={deleteEntry}
+                  onClick={openDeleteEntryDialog}
                   className="flex w-full items-center justify-between rounded-[16px] px-3.5 py-2.5 text-[13px] text-red-300 transition hover:bg-red-500/10"
                 >
                   <span>Delete</span>
@@ -937,6 +1065,131 @@ export default function JournalEntryPage() {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+
+  const lockDialogCopy = (() => {
+    if (!lockDialog) {
+      return {
+        mode: "code" as const,
+        title: "Access code",
+        description: "Enter the access code for this reflection.",
+        confirmLabel: "Continue",
+        destructive: false,
+        codeLabel: "Access code",
+        codePlaceholder: "Code",
+      };
+    }
+
+    if (lockDialog.step === "set") {
+      return {
+        mode: "code" as const,
+        title: "Lock reflection",
+        description:
+          "Set a 4–8 digit code. MindLog will ask for it before opening this reflection.",
+        confirmLabel: "Save code",
+        destructive: false,
+        codeLabel: "New code",
+        codePlaceholder: "4–8 digits",
+      };
+    }
+
+    if (lockDialog.step === "verify-change") {
+      return {
+        mode: "code" as const,
+        title: "Enter current code",
+        description: "First confirm the current access code before changing it.",
+        confirmLabel: "Continue",
+        destructive: false,
+        codeLabel: "Current code",
+        codePlaceholder: "Current code",
+      };
+    }
+
+    if (lockDialog.step === "change") {
+      return {
+        mode: "code" as const,
+        title: "New access code",
+        description: "Choose the new 4–8 digit code for this reflection.",
+        confirmLabel: "Save new code",
+        destructive: false,
+        codeLabel: "New code",
+        codePlaceholder: "4–8 digits",
+      };
+    }
+
+    if (lockDialog.step === "verify-remove") {
+      return {
+        mode: "code" as const,
+        title: "Enter current code",
+        description: "First confirm the current access code before removing the lock.",
+        confirmLabel: "Continue",
+        destructive: false,
+        codeLabel: "Current code",
+        codePlaceholder: "Current code",
+      };
+    }
+
+    return {
+      mode: "confirm" as const,
+      title: "Remove code?",
+      description:
+        "This reflection will open without asking for an access code. You can lock it again later.",
+      confirmLabel: "Remove code",
+      destructive: true,
+      codeLabel: "Access code",
+      codePlaceholder: "Code",
+    };
+  })();
+
+  const dialogOverlays = (
+    <>
+      <TextInputDialog
+        open={renameDialogOpen}
+        title="Rename reflection"
+        description="Give this saved reflection a short, clear title."
+        initialValue={item.title || ""}
+        label="Reflection title"
+        placeholder="New title"
+        confirmLabel="Save title"
+        loading={renameDialogBusy}
+        maxLength={80}
+        onClose={() => {
+          if (!renameDialogBusy) setRenameDialogOpen(false);
+        }}
+        onConfirm={renameEntry}
+      />
+
+      <AccessCodeDialog
+        key={lockDialog ? lockDialog.step : "closed"}
+        open={Boolean(lockDialog)}
+        mode={lockDialogCopy.mode}
+        title={lockDialogCopy.title}
+        description={lockDialogCopy.description}
+        confirmLabel={lockDialogCopy.confirmLabel}
+        destructive={lockDialogCopy.destructive}
+        loading={lockDialogBusy}
+        codeLabel={lockDialogCopy.codeLabel}
+        codePlaceholder={lockDialogCopy.codePlaceholder}
+        onClose={() => {
+          if (!lockDialogBusy) setLockDialog(null);
+        }}
+        onConfirm={handleLockDialogConfirm}
+      />
+
+      <AccessCodeDialog
+        open={deleteDialogOpen}
+        mode="confirm"
+        title="Delete reflection?"
+        description="This reflection will be removed from your journal. You can undo it briefly after deletion."
+        confirmLabel="Delete"
+        destructive
+        loading={deleteDialogBusy}
+        onClose={() => {
+          if (!deleteDialogBusy) setDeleteDialogOpen(false);
+        }}
+        onConfirm={deleteEntry}
+      />
+    </>
   );
 
   return (
@@ -963,18 +1216,21 @@ export default function JournalEntryPage() {
                       {mood.label}
                     </div>
                     {isFavorite && (
-                      <div className="inline-flex rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white">
-                        ♥ Favorite
+                      <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white shadow-[0_0_16px_rgba(255,255,255,0.04)]">
+                        <span className="text-[12px] leading-none">♥</span>
+                        <span>Favorite</span>
                       </div>
                     )}
                     {hiddenAt && (
-                      <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
-                        Hidden
+                      <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
+                        <span className="text-[12px] leading-none">◌</span>
+                        <span>Hidden</span>
                       </div>
                     )}
                     {entryIsLocked && (
-                      <div className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
-                        Locked
+                      <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-neutral-300">
+                        <span className="text-[12px] leading-none">⌁</span>
+                        <span>Locked</span>
                       </div>
                     )}
                   </div>
@@ -1043,12 +1299,10 @@ export default function JournalEntryPage() {
         </div>
 
         <div className="mb-5 rounded-[28px] border border-white/10 bg-white/[0.035] px-5 py-5">
-          <div className="text-sm font-medium text-white">
-            Reflection insight
-          </div>
+          <div className="text-sm font-medium text-white">Reflection insight</div>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-            A focused view of this saved conversation only. Broader patterns
-            will live in Stats later.
+            A focused view of this saved conversation only. Broader patterns will
+            live in Stats later.
           </p>
 
           <div className="mt-5 grid gap-3">
@@ -1114,9 +1368,7 @@ export default function JournalEntryPage() {
         </div>
 
         <div className="mb-5 rounded-[28px] border border-white/10 bg-white/[0.03] px-5 py-5">
-          <div className="text-sm font-medium text-white">
-            Journal status
-          </div>
+          <div className="text-sm font-medium text-white">Journal status</div>
           <p className="mt-2 text-sm leading-relaxed text-neutral-400">
             {progressCopy}
           </p>
@@ -1136,8 +1388,8 @@ export default function JournalEntryPage() {
               {loadingSubscription
                 ? "Open export"
                 : subscription?.isPro
-                ? "Export"
-                : "Unlock export"}
+                  ? "Export"
+                  : "Unlock export"}
             </button>
           </div>
         </div>
@@ -1161,8 +1413,7 @@ export default function JournalEntryPage() {
               normalizedMessages.map((msg, idx) => {
                 const isUser = msg.role === "user";
                 const previous = normalizedMessages[idx - 1];
-                const groupedWithPrevious =
-                  previous && previous.role === msg.role;
+                const groupedWithPrevious = previous && previous.role === msg.role;
 
                 return (
                   <motion.div
@@ -1196,6 +1447,7 @@ export default function JournalEntryPage() {
       </motion.div>
 
       {mounted && createPortal(actionsOverlay, document.body)}
+      {mounted && createPortal(dialogOverlays, document.body)}
     </div>
   );
 }
